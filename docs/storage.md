@@ -43,9 +43,11 @@ S3_SECRET_KEY=
 S3_USE_SSL=false
 MEDIA_PUBLIC_BASE_URL=https://api.foodai.example/media
 S3_PRESIGNED_URL_TTL_SECONDS=300
+MINIO_ROOT_USER=
+MINIO_ROOT_PASSWORD=
 ```
 
-`S3_ACCESS_KEY`/`S3_SECRET_KEY` существуют только в `.env`/secret manager backend and worker. Bucket создаётся provisioning step с private policy; public bucket и anonymous list/read запрещены. Local MinIO console не публикуется production edge. Named `minio_data` volume сохраняет объекты между контейнерными перезапусками.
+`MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` нужны только MinIO bootstrap/provisioning и не передаются приложению. Provisioning создаёт private bucket и отдельную least-privilege пару `S3_ACCESS_KEY`/`S3_SECRET_KEY` для backend/worker. Все эти значения существуют только в `.env`/secret manager; public bucket и anonymous list/read запрещены. Local MinIO console не публикуется production edge. Named `minio_data` volume сохраняет объекты между контейнерными перезапусками.
 
 Documented Compose topology включает `postgres`, `redis`, `backend`, `worker`, `nginx`, `minio`; у каждого service есть healthcheck. `backend`/`worker` не считаются ready до доступности нужной зависимости; Nginx проверяет backend `/health`, а image generation не является healthcheck dependency.
 

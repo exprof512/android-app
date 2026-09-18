@@ -85,6 +85,8 @@ S3_SECRET_KEY=
 S3_USE_SSL=false
 MEDIA_PUBLIC_BASE_URL=http://localhost:8080/media
 S3_PRESIGNED_URL_TTL_SECONDS=300
+MINIO_ROOT_USER=
+MINIO_ROOT_PASSWORD=
 
 NUTRITION_MIN_DAILY_CALORIES_FEMALE=1200
 NUTRITION_MIN_DAILY_CALORIES_MALE=1500
@@ -95,7 +97,7 @@ AI_RATE_LIMIT_FREE_PER_DAY=
 AI_RATE_LIMIT_PREMIUM_PER_DAY=
 ```
 
-Production injects secrets from a secret manager/orchestrator, with distinct credentials per environment. Rotate `OPENAI_API_KEY`, `JWT_SECRET`, database password and S3 keys independently. `JWT_SECRET=CHANGE_ME` or default database/S3 passwords are startup failures outside a disposable local test environment.
+Production injects secrets from a secret manager/orchestrator, with distinct credentials per environment. `MINIO_ROOT_*` используются только bootstrap MinIO; backend/worker используют отдельные least-privilege `S3_*` keys. Rotate `OPENAI_API_KEY`, `JWT_SECRET`, database password and S3 keys independently. `JWT_SECRET=CHANGE_ME` or default database/S3 passwords are startup failures outside a disposable local test environment.
 
 ## Local services
 
