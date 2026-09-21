@@ -20,8 +20,9 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 4 — Recipe domain | готово: каталог ингредиентов, `RecipeEngine` (валидация, канонизация, единицы → граммы, fingerprint/dedup), пересчёт БЖУ и стоимости, `GET /recipes/{id}` и favorites |
 | 5 — Text AI | готово: `integrations/openai`, `TextAIService`, Structured Outputs, cache, `ai_text_usage`, `MockTextProvider` tests |
 | 6 — Meal planning | готово: generate/today/week/replace/complete, MealPlanEngine constraints, idempotent reuse |
-| 7 — Image pipeline | не начато ← **следующий шаг** |
-| 8–16 | не начаты |
+| 7 — Image pipeline | готово: StorageProvider/MinIO, RecipeImage, Arq worker, Mock/OpenAI providers, media URLs |
+| 8 — Android foundation | не начато ← **следующий шаг** |
+| 9–16 | не начаты |
 
 Android-модуля (`android/`) пока нет. Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 

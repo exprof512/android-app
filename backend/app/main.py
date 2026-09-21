@@ -25,6 +25,7 @@ from app.core.errors import (
 )
 from app.core.logging import configure_logging
 from app.core.services import Services
+from app.images.api import media_router
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(Exception, unhandled_error_handler)
     app.include_router(health_router)
     app.include_router(create_api_router(active_settings.api_prefix))
+    app.include_router(media_router)
     return app
 
 

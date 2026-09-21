@@ -13,11 +13,11 @@ from app.core.db import Database
 from app.core.errors import DependencyUnavailable
 from app.core.redis import RedisClient
 from app.nutrition.engine import NutritionEngine
+from app.storage.provider import StorageProvider
+from app.storage.s3 import S3StorageProvider
 
 logger = logging.getLogger(__name__)
 
-# Answer before the Docker/Nginx healthcheck gives up, so a stalled dependency
-# surfaces as 503 instead of a hanging request.
 HEALTHCHECK_TIMEOUT_SECONDS = 2.0
 
 
@@ -32,6 +32,7 @@ class Services:
         tokens: TokenService,
         nutrition: NutritionEngine,
         text_provider: TextGenerationProvider | None = None,
+        storage: StorageProvider | None = None,
     ) -> None:
         self.database = database
         self.redis = redis
@@ -39,6 +40,7 @@ class Services:
         self.tokens = tokens
         self.nutrition = nutrition
         self.text_provider = text_provider
+        self.storage = storage
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Services":
@@ -52,6 +54,21 @@ class Services:
             raise RuntimeError(
                 f"Sample or too short secrets are rejected in {settings.app_env}: {weak_names}"
             )
+        storage = None
+        if settings.app_env != "test":
+            access = settings.s3_access_key or settings.minio_root_user
+            secret = settings.s3_secret_key or settings.minio_root_password
+            if access and secret:
+                storage = S3StorageProvider(
+                    endpoint_url=settings.s3_endpoint,
+                    access_key=access,
+                    secret_key=secret,
+                    bucket=settings.s3_bucket,
+                    region=settings.s3_region,
+                    public_base_url=settings.media_public_base_url,
+                    use_ssl=settings.s3_use_ssl,
+                    presigned_ttl_seconds=settings.s3_presigned_url_ttl_seconds,
+                )
         return cls(
             database=Database(settings.database_url),
             redis=RedisClient(settings.redis_url),
@@ -62,9 +79,18 @@ class Services:
                 refresh_ttl_days=settings.jwt_refresh_ttl_days,
             ),
             nutrition=NutritionEngine.from_settings(settings),
+            storage=storage,
         )
 
     async def start(self) -> None:
+        if isinstance(self.storage, S3StorageProvider):
+            try:
+                await self.storage.ensure_bucket()
+            except Exception:
+                logger.warning(
+                    "storage_bucket_ensure_failed",
+                    extra={"error_code": "storage_init"},
+                )
         logger.info("infrastructure_initialized")
 
     async def check_health(

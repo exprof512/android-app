@@ -15,6 +15,7 @@ from app.ai.drafts import recipe_candidate_to_draft
 from app.ai.service import TextAIService
 from app.core.errors import OwnershipDenied
 from app.core.models import utcnow
+from app.images.service import ImageGenerationService
 from app.meal_plans import constants
 from app.meal_plans.engine import DayTargets, MealPlanEngine, PlannedSlot
 from app.meal_plans.errors import (
@@ -63,6 +64,7 @@ class MealPlanService:
         meal_plan_engine: MealPlanEngine,
         text_ai: TextAIService,
         ai_model: str,
+        image_service: ImageGenerationService | None = None,
     ) -> None:
         self._session = session
         self._repository = repository
@@ -72,6 +74,7 @@ class MealPlanService:
         self._engine = meal_plan_engine
         self._text_ai = text_ai
         self._ai_model = ai_model
+        self._images = image_service
 
     async def generate(
         self, user_id: UUID, payload: MealPlanGenerateRequest
@@ -163,6 +166,21 @@ class MealPlanService:
         await self._repository.add_plan(plan)
         await self._session.commit()
         await self._session.refresh(plan)
+        if self._images is not None:
+            seen: set = set()
+            for recipe in stored_recipes:
+                if recipe.id in seen:
+                    continue
+                seen.add(recipe.id)
+                try:
+                    await self._images.enqueue_for_recipe(
+                        recipe.id, user_id=user_id
+                    )
+                except Exception:
+                    logger.warning(
+                        "image_enqueue_failed",
+                        extra={"recipe_id": str(recipe.id), "error_code": "image_enqueue"},
+                    )
         return await self._to_out(plan, warnings=warnings, reused=False)
 
     async def today(self, user_id: UUID, on_date: date) -> MealPlanOut:
@@ -305,6 +323,14 @@ class MealPlanService:
         item.estimated_cost_amount = _scale(recipe.estimated_cost_amount, item.servings)
         await self._session.commit()
         await self._session.refresh(item)
+        if self._images is not None:
+            try:
+                await self._images.enqueue_for_recipe(recipe.id, user_id=user_id)
+            except Exception:
+                logger.warning(
+                    "image_enqueue_failed",
+                    extra={"recipe_id": str(recipe.id), "error_code": "image_enqueue"},
+                )
         refreshed = await self._repository.get_plan(plan.id)
         assert refreshed is not None
         return await self._to_out(refreshed, warnings=warnings)

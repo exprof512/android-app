@@ -10,6 +10,8 @@ from app.ai.service import TextAIService
 from app.core.config import Settings
 from app.core.dependencies import get_db_session, get_services
 from app.core.services import Services
+from app.images.dependencies import get_image_service
+from app.images.service import ImageGenerationService
 from app.meal_plans.engine import MealPlanEngine
 from app.meal_plans.repository import MealPlanRepository
 from app.meal_plans.service import MealPlanService
@@ -27,6 +29,7 @@ def get_meal_plan_service(
     profile_service: ProfileService = Depends(get_profile_service),
     recipe_service: RecipeService = Depends(get_recipe_service),
     text_ai: TextAIService = Depends(get_text_ai_service),
+    image_service: ImageGenerationService = Depends(get_image_service),
 ) -> MealPlanService:
     settings: Settings = request.app.state.settings
     return MealPlanService(
@@ -38,4 +41,5 @@ def get_meal_plan_service(
         meal_plan_engine=MealPlanEngine(),
         text_ai=text_ai,
         ai_model=settings.openai_text_model or "gpt-4.1-mini",
+        image_service=image_service,
     )
