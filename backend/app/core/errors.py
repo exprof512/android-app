@@ -20,11 +20,13 @@ class ApiError(Exception):
         code: str,
         message: str,
         details: list[dict[str, str]] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.status_code = status_code
         self.code = code
         self.message = message
         self.details = details
+        self.headers = headers
 
 
 class DependencyUnavailable(ApiError):
@@ -33,6 +35,17 @@ class DependencyUnavailable(ApiError):
             status_code=503,
             code="dependency_unavailable",
             message="A required service is temporarily unavailable.",
+        )
+
+
+class OwnershipDenied(ApiError):
+    """Raised when an authenticated user targets another user's resource."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=403,
+            code="ownership_denied",
+            message="Доступ к этому ресурсу запрещён.",
         )
 
 
@@ -47,6 +60,7 @@ def _response(
     code: str,
     message: str,
     details: list[dict[str, str]] | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     error: dict[str, Any] = {
         "code": code,
@@ -55,7 +69,9 @@ def _response(
     }
     if details:
         error["details"] = details
-    return JSONResponse(status_code=status_code, content={"error": error})
+    return JSONResponse(
+        status_code=status_code, content={"error": error}, headers=headers
+    )
 
 
 async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
@@ -65,6 +81,7 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
         code=exc.code,
         message=exc.message,
         details=exc.details,
+        headers=exc.headers,
     )
 
 

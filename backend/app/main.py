@@ -14,6 +14,7 @@ from fastapi.responses import Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.health import router as health_router
+from app.api.v1 import create_api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import (
     ApiError,
@@ -71,6 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "request_completed",
             extra={
                 "request_id": request.state.request_id,
+                "user_id": getattr(request.state, "user_id", None),
                 "endpoint": request.url.path,
                 "method": request.method,
                 "status_code": response.status_code,
@@ -84,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, http_error_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)
     app.include_router(health_router)
+    app.include_router(create_api_router(active_settings.api_prefix))
     return app
 
 

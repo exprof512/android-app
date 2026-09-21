@@ -8,6 +8,11 @@ from typing import Literal
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Values that must never authenticate a real deployment.
+_PLACEHOLDER_SECRETS = frozenset({"change_me", "changeme", "placeholder", "secret"})
+# RFC 7518 3.2 minimum for HMAC-SHA256 signing keys.
+JWT_SECRET_MIN_LENGTH = 32
+
 
 class Settings(BaseSettings):
     """Configuration only; values are never logged."""
@@ -63,6 +68,11 @@ class Settings(BaseSettings):
     ai_rate_limit_free_per_day: int | None = None
     ai_rate_limit_premium_per_day: int | None = None
 
+    @field_validator("api_prefix")
+    @classmethod
+    def api_prefix_has_no_trailing_slash(cls, value: str) -> str:
+        return value.rstrip("/")
+
     @field_validator(
         "image_max_concurrent_jobs",
         "nutrition_max_weekly_weight_change_kg",
@@ -79,8 +89,19 @@ class Settings(BaseSettings):
         required = {
             "DATABASE_URL": self.database_url,
             "REDIS_URL": self.redis_url,
+            "JWT_SECRET": self.jwt_secret,
         }
         return tuple(name for name, value in required.items() if not value)
+
+    def weak_runtime_settings(self) -> tuple[str, ...]:
+        """Return secrets that are a sample value or too short, without exposing them."""
+        weak: list[str] = []
+        secret = self.jwt_secret.strip()
+        if secret.lower() in _PLACEHOLDER_SECRETS or (
+            secret and len(secret) < JWT_SECRET_MIN_LENGTH
+        ):
+            weak.append("JWT_SECRET")
+        return tuple(weak)
 
 
 @lru_cache

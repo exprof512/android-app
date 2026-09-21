@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.auth.passwords import PasswordHasher
+from app.auth.tokens import TokenService
 from app.core.config import Settings
 from app.core.db import Database
 from app.core.errors import DependencyUnavailable
@@ -16,9 +18,17 @@ logger = logging.getLogger(__name__)
 class Services:
     """Explicit dependency container shared by HTTP handlers."""
 
-    def __init__(self, database: Database, redis: RedisClient) -> None:
+    def __init__(
+        self,
+        database: Database,
+        redis: RedisClient,
+        passwords: PasswordHasher,
+        tokens: TokenService,
+    ) -> None:
         self.database = database
         self.redis = redis
+        self.passwords = passwords
+        self.tokens = tokens
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Services":
@@ -26,9 +36,21 @@ class Services:
         if missing:
             missing_names = ", ".join(missing)
             raise RuntimeError(f"Missing required runtime settings: {missing_names}")
+        weak = settings.weak_runtime_settings()
+        if weak and settings.app_env not in {"development", "test"}:
+            weak_names = ", ".join(weak)
+            raise RuntimeError(
+                f"Sample or too short secrets are rejected in {settings.app_env}: {weak_names}"
+            )
         return cls(
             database=Database(settings.database_url),
             redis=RedisClient(settings.redis_url),
+            passwords=PasswordHasher(settings.password_hasher),
+            tokens=TokenService(
+                secret=settings.jwt_secret,
+                access_ttl_seconds=settings.jwt_access_ttl_seconds,
+                refresh_ttl_days=settings.jwt_refresh_ttl_days,
+            ),
         )
 
     async def start(self) -> None:
