@@ -11,6 +11,7 @@ from app.core.config import Settings
 from app.core.db import Database
 from app.core.errors import DependencyUnavailable
 from app.core.redis import RedisClient
+from app.nutrition.engine import NutritionEngine
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +25,13 @@ class Services:
         redis: RedisClient,
         passwords: PasswordHasher,
         tokens: TokenService,
+        nutrition: NutritionEngine,
     ) -> None:
         self.database = database
         self.redis = redis
         self.passwords = passwords
         self.tokens = tokens
+        self.nutrition = nutrition
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Services":
@@ -51,6 +54,7 @@ class Services:
                 access_ttl_seconds=settings.jwt_access_ttl_seconds,
                 refresh_ttl_days=settings.jwt_refresh_ttl_days,
             ),
+            nutrition=NutritionEngine.from_settings(settings),
         )
 
     async def start(self) -> None:
