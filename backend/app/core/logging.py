@@ -29,6 +29,7 @@ _SAFE_FIELDS = (
     "image_duration_ms",
     "error_code",
     "job_id",
+    "recipe_id",
 )
 
 

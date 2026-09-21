@@ -7,16 +7,11 @@ from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field, PlainSerializer
+from pydantic import BaseModel, Field
 
+from app.core.schemas import DecimalOut
 from app.nutrition.engine import ActivityLevel, CalorieMode, GoalType, Sex
 from app.profiles import limits
-
-# Weights and money stay Decimal in Python and numeric in PostgreSQL; the JSON
-# contract uses plain numbers.
-DecimalOut = Annotated[
-    Decimal, PlainSerializer(float, return_type=float, when_used="json")
-]
 
 AgeYears = Annotated[int, Field(ge=limits.AGE_YEARS_MIN, le=limits.AGE_YEARS_MAX)]
 HeightCm = Annotated[

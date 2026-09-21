@@ -7,6 +7,7 @@ comes from this module.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, get_args
@@ -74,6 +75,25 @@ class GoalRequest:
 
 
 @dataclass(frozen=True)
+class NutrientPortion:
+    """One canonical ingredient amount inside a dish."""
+
+    grams: Decimal
+    calories_per_100g: Decimal
+    protein_per_100g: Decimal
+    fat_per_100g: Decimal
+    carbohydrate_per_100g: Decimal
+
+
+@dataclass(frozen=True)
+class RecipeNutrition:
+    calories_kcal: int
+    protein_g: Decimal
+    fat_g: Decimal
+    carbohydrate_g: Decimal
+
+
+@dataclass(frozen=True)
 class MacroTargets:
     protein_g: int
     fat_g: int
@@ -92,6 +112,10 @@ class NutritionTargets:
 
 def _round_int(value: Decimal) -> int:
     return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _round_grams(value: Decimal) -> Decimal:
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 class NutritionEngine:
@@ -175,6 +199,29 @@ class NutritionEngine:
                 calories_kcal=target_kcal, weight_kg=request.current_weight_kg
             ),
             warnings=warnings,
+        )
+
+    def recipe_nutrition(
+        self, portions: Sequence[NutrientPortion], *, servings: int = 1
+    ) -> RecipeNutrition:
+        """Sum canonical ingredient values; AI numbers never reach this path."""
+        if servings < 1:
+            raise ValueError("servings must be at least 1.")
+
+        totals = {"calories": Decimal("0"), "protein": Decimal("0"), "fat": Decimal("0"), "carbohydrate": Decimal("0")}
+        for portion in portions:
+            share = portion.grams / Decimal("100")
+            totals["calories"] += portion.calories_per_100g * share
+            totals["protein"] += portion.protein_per_100g * share
+            totals["fat"] += portion.fat_per_100g * share
+            totals["carbohydrate"] += portion.carbohydrate_per_100g * share
+
+        divisor = Decimal(servings)
+        return RecipeNutrition(
+            calories_kcal=_round_int(totals["calories"] / divisor),
+            protein_g=_round_grams(totals["protein"] / divisor),
+            fat_g=_round_grams(totals["fat"] / divisor),
+            carbohydrate_g=_round_grams(totals["carbohydrate"] / divisor),
         )
 
     def macro_targets(self, *, calories_kcal: int, weight_kg: Decimal) -> MacroTargets:

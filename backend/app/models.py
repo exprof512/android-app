@@ -8,13 +8,23 @@ from app.profiles.models import (
     Goal,
     UserProfile,
 )
+from app.recipes.models import (
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    UserRecipeFavorite,
+)
 
 __all__ = [
     "AvailableProduct",
     "FoodPreference",
     "FoodRestriction",
     "Goal",
+    "Ingredient",
+    "Recipe",
+    "RecipeIngredient",
     "RefreshToken",
     "User",
     "UserProfile",
+    "UserRecipeFavorite",
 ]
