@@ -18,8 +18,9 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 2 — Auth and session | готово: `users`/`refresh_tokens`, Argon2id, JWT access/refresh rotation, `/auth/*`, `/users/me`, ownership guard |
 | 3 — Profile and Nutrition Engine | готово: анкета, цели, предпочтения/ограничения/pantry, `GET`/`PUT /profile`, `POST /profile/calculate-target`, BMR/TDEE/macros с safety floors |
 | 4 — Recipe domain | готово: каталог ингредиентов, `RecipeEngine` (валидация, канонизация, единицы → граммы, fingerprint/dedup), пересчёт БЖУ и стоимости, `GET /recipes/{id}` и favorites |
-| 5 — Text AI | не начато ← **следующий шаг после confirmation** |
-| 6–16 | не начаты |
+| 5 — Text AI | готово: `integrations/openai`, `TextAIService`, Structured Outputs, cache, `ai_text_usage`, `MockTextProvider` tests |
+| 6 — Meal planning | не начато ← **следующий шаг** |
+| 7–16 | не начаты |
 
 Android-модуля (`android/`) пока нет. Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 

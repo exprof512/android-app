@@ -1,5 +1,6 @@
 """Model registry so Alembic autogenerate sees every table in ``Base.metadata``."""
 
+from app.ai.models import AiTextUsage
 from app.auth.models import RefreshToken, User
 from app.profiles.models import (
     AvailableProduct,
@@ -16,6 +17,7 @@ from app.recipes.models import (
 )
 
 __all__ = [
+    "AiTextUsage",
     "AvailableProduct",
     "FoodPreference",
     "FoodRestriction",

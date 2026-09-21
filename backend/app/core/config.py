@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     openai_text_model: str = ""
     openai_text_timeout_seconds: int = 30
     openai_text_max_attempts: int = 2
+    openai_response_schema_version: int = 1
     openai_image_model: str = "gpt-image-2"
     openai_image_size: str = ""
     openai_image_quality: str = ""

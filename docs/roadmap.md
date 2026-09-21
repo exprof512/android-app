@@ -19,7 +19,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | 3 Auth + Android login | **2** Auth (+ Android позже в **8**) | backend готово; Android отсутствует |
 | 4 Profile + onboarding UI | **3** Profile/Nutrition (+ Android **9**) | backend готово |
 | 5 Nutrition engine | **3** Profile and Nutrition Engine | готово |
-| 6 OpenAI text | **5** Text AI integration | не начато |
+| 6 OpenAI text | **5** Text AI integration | готово |
 | 7 Recipes + Android recipe | **4** Recipe domain (+ Android **10**) | backend готово |
 | 8 Image generation | **7** Image pipeline and storage | не начато |
 | 9 Daily meal plan | **6** Meal planning (+ Android **10**) | не начато |

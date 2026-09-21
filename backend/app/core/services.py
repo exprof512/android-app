@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from app.ai.provider import TextGenerationProvider
 from app.auth.passwords import PasswordHasher
 from app.auth.tokens import TokenService
 from app.core.config import Settings
@@ -30,12 +31,14 @@ class Services:
         passwords: PasswordHasher,
         tokens: TokenService,
         nutrition: NutritionEngine,
+        text_provider: TextGenerationProvider | None = None,
     ) -> None:
         self.database = database
         self.redis = redis
         self.passwords = passwords
         self.tokens = tokens
         self.nutrition = nutrition
+        self.text_provider = text_provider
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Services":
@@ -79,7 +82,10 @@ class Services:
         except TimeoutError:
             checks = [TimeoutError()]
         if any(isinstance(result, Exception) for result in checks):
-            logger.warning("dependency_healthcheck_failed", extra={"error_code": "dependency_unavailable"})
+            logger.warning(
+                "dependency_healthcheck_failed",
+                extra={"error_code": "dependency_unavailable"},
+            )
             raise DependencyUnavailable()
 
     async def close(self) -> None:
