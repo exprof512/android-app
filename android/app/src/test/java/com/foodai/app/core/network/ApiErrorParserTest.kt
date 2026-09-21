@@ -7,9 +7,10 @@ import org.junit.Test
 
 class ApiErrorParserTest {
     @Test
-    fun parsesUnauthorizedCode() {
-        val body = """{"code":"invalid_credentials","message":"Неверный email или пароль"}"""
-            .toResponseBody("application/json".toMediaType())
+    fun unwrapsErrorEnvelope() {
+        val body = """
+            {"error":{"code":"invalid_credentials","message":"Неверный email или пароль.","request_id":"abc"}}
+        """.trimIndent().toResponseBody("application/json".toMediaType())
         val error = ApiErrorParser.fromHttp(401, body)
         assertThat(error).isInstanceOf(ApiException.Unauthorized::class.java)
         assertThat(error.code).isEqualTo("invalid_credentials")
@@ -17,8 +18,19 @@ class ApiErrorParserTest {
     }
 
     @Test
+    fun parsesNutritionDetails() {
+        val body = """
+            {"error":{"code":"nutrition_validation_error","message":"Цель небезопасна","details":[{"field":"target_weight_kg","reason":"must_be_below_current_weight"}]}}
+        """.trimIndent().toResponseBody("application/json".toMediaType())
+        val error = ApiErrorParser.fromHttp(422, body)
+        assertThat(error).isInstanceOf(ApiException.Validation::class.java)
+        assertThat(error.code).isEqualTo("nutrition_validation_error")
+        assertThat(error.message).contains("target_weight_kg")
+    }
+
+    @Test
     fun parsesConflict() {
-        val body = """{"code":"email_already_registered","message":"Email занят"}"""
+        val body = """{"error":{"code":"email_already_registered","message":"Email занят"}}"""
             .toResponseBody("application/json".toMediaType())
         val error = ApiErrorParser.fromHttp(409, body)
         assertThat(error).isInstanceOf(ApiException.Conflict::class.java)

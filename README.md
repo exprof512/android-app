@@ -22,8 +22,9 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 6 — Meal planning | готово: generate/today/week/replace/complete, MealPlanEngine constraints, idempotent reuse |
 | 7 — Image pipeline | готово: StorageProvider/MinIO, RecipeImage, Arq worker, Mock/OpenAI providers, media URLs |
 | 8 — Android foundation | готово: Kotlin/Compose shell, Hilt, Retrofit, EncryptedSharedPreferences, login/register, bottom nav |
-| 9 — Android onboarding/profile | не начато ← **следующий шаг** |
-| 10–16 | не начаты |
+| 9 — Android onboarding/profile | готово: 7 экранов, draft, calculate-target preview, first-plan loading, Profile tab |
+| 10 — Android plan and recipe | не начато ← **следующий шаг** |
+| 11–16 | не начаты |
 
 Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 

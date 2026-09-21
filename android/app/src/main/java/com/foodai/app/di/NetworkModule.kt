@@ -6,6 +6,8 @@ import com.foodai.app.core.auth.TokenStore
 import com.foodai.app.core.network.AuthApi
 import com.foodai.app.core.network.AuthApiProvider
 import com.foodai.app.core.network.AuthInterceptor
+import com.foodai.app.core.network.MealPlanApi
+import com.foodai.app.core.network.ProfileApi
 import com.foodai.app.core.network.TokenAuthenticator
 import dagger.Binds
 import dagger.Module
@@ -66,6 +68,8 @@ object NetworkModule {
         tokenAuthenticator: TokenAuthenticator,
         @Named("bare") bare: OkHttpClient,
     ): OkHttpClient = bare.newBuilder()
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
         .addInterceptor(authInterceptor)
         .authenticator(tokenAuthenticator)
         .build()
@@ -93,7 +97,6 @@ object NetworkModule {
         authApiProvider: AuthApiProvider,
     ): AuthApi {
         val api = bareRetrofit.create(AuthApi::class.java)
-        // Refresh must never go through TokenAuthenticator (single-flight + no recursion).
         authApiProvider.authApi = api
         return api
     }
@@ -102,6 +105,14 @@ object NetworkModule {
     @Singleton
     @Named("authed")
     fun provideAuthedAuthApi(retrofit: Retrofit): AuthApi = retrofit.create(AuthApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideProfileApi(retrofit: Retrofit): ProfileApi = retrofit.create(ProfileApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideMealPlanApi(retrofit: Retrofit): MealPlanApi = retrofit.create(MealPlanApi::class.java)
 
     private fun buildRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()

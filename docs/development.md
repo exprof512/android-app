@@ -189,7 +189,7 @@ Alembic migration accompanies every schema change; do not use `create_all` as pr
 
 ## Android build policy
 
-Android (`android/`) — Kotlin/Compose, Hilt, Retrofit/OkHttp, Kotlinx Serialization. В BuildConfig попадает только `API_BASE_URL` (debug default `http://10.0.2.2:8080/api/v1/`). OpenAI, database, Redis, MinIO keys и JWT secret на устройство не попадают. Access/refresh хранятся в EncryptedSharedPreferences (Android Keystore master key); refresh выполняется single-flight через `TokenAuthenticator`.
+Android (`android/`) — Kotlin/Compose, Hilt, Retrofit/OkHttp, Kotlinx Serialization. В BuildConfig попадает только `API_BASE_URL` (debug default `http://193.32.179.108:8080/api/v1/` для физического телефона). Override: `FOODAI_API_BASE_URL=... ./scripts/build_android.sh`. OpenAI, database, Redis, MinIO keys и JWT secret на устройство не попадают. Access/refresh хранятся в EncryptedSharedPreferences (Android Keystore master key); refresh выполняется single-flight через `TokenAuthenticator`. Онбординг Phase 9: 7 resumable screens + local draft + `calculate-target` preview + first plan generate.
 
 ```text
 scripts/build_android.sh

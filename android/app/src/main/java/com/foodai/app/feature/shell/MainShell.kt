@@ -15,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +31,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.theme.FoodAiTokens
@@ -52,6 +54,7 @@ private val tabs = listOf(
 @Composable
 fun MainShellRoute(
     onSignedOut: () -> Unit,
+    onEditProfile: () -> Unit,
     viewModel: SessionViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -63,7 +66,9 @@ fun MainShellRoute(
         )
         else -> MainShell(
             email = state.user?.email ?: "—",
+            profile = state.profile,
             onLogout = { viewModel.logout(onSignedOut) },
+            onEditProfile = onEditProfile,
         )
     }
 }
@@ -71,7 +76,9 @@ fun MainShellRoute(
 @Composable
 fun MainShell(
     email: String,
+    profile: ProfileResponse?,
     onLogout: () -> Unit,
+    onEditProfile: () -> Unit,
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -129,28 +136,54 @@ fun MainShell(
                 )
             }
             composable(Routes.Profile) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(FoodAiTokens.SpaceLg.dp),
-                    verticalArrangement = Arrangement.spacedBy(FoodAiTokens.SpaceMd.dp),
-                    horizontalAlignment = Alignment.Start,
-                ) {
-                    Text("Profile", style = MaterialTheme.typography.headlineMedium)
-                    Text(
-                        text = email,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "Онбординг и редактирование профиля — Phase 9.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Button(onClick = onLogout) {
-                        Text("Выйти")
-                    }
-                }
+                ProfilePane(
+                    email = email,
+                    profile = profile,
+                    onEditProfile = onEditProfile,
+                    onLogout = onLogout,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun ProfilePane(
+    email: String,
+    profile: ProfileResponse?,
+    onEditProfile: () -> Unit,
+    onLogout: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(FoodAiTokens.SpaceLg.dp),
+        verticalArrangement = Arrangement.spacedBy(FoodAiTokens.SpaceMd.dp),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        Text("Profile", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = email,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val goal = profile?.goal
+        if (goal != null) {
+            Text(
+                text = "Цель: ${goal.calorieTargetKcal} ккал · " +
+                    "Б ${goal.macroTargetsG.protein} / Ж ${goal.macroTargetsG.fat} / " +
+                    "У ${goal.macroTargetsG.carbohydrate}",
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        profile?.warnings.orEmpty().forEach { warning ->
+            Text(warning, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        OutlinedButton(onClick = onEditProfile) {
+            Text("Изменить анкету")
+        }
+        Button(onClick = onLogout) {
+            Text("Выйти")
         }
     }
 }
