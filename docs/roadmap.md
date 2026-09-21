@@ -22,7 +22,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | 6 OpenAI text | **5** Text AI integration | готово |
 | 7 Recipes + Android recipe | **4** Recipe domain (+ Android **10**) | backend готово |
 | 8 Image generation | **7** Image pipeline and storage | не начато |
-| 9 Daily meal plan | **6** Meal planning (+ Android **10**) | не начато |
+| 9 Daily meal plan | **6** Meal planning (+ Android **10**) | готово |
 | 10 Weekly + shopping | **6**/**11** | не начато |
 | 11 Progress | **12** | не начато |
 | 12 AI chat | **13** | не начато |

@@ -61,3 +61,17 @@ class RecipeRepository:
             )
         )
         await self._session.flush()
+
+    async def user_has_recipe_in_plans(self, user_id: UUID, recipe_id: UUID) -> bool:
+        from app.meal_plans.models import MealPlan, MealPlanItem
+
+        statement = (
+            select(MealPlanItem.id)
+            .join(MealPlan, MealPlanItem.meal_plan_id == MealPlan.id)
+            .where(
+                MealPlan.user_id == user_id,
+                MealPlanItem.recipe_id == recipe_id,
+            )
+            .limit(1)
+        )
+        return (await self._session.execute(statement)).scalar_one_or_none() is not None

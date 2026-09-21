@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from fastapi import Depends, Request
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.cache import RedisCacheStore, TextAICache
+from app.ai.cache import MemoryCacheStore, RedisCacheStore, TextAICache
 from app.ai.mock import MockTextProvider
 from app.ai.provider import TextGenerationProvider
 from app.ai.service import TextAIService
@@ -13,7 +14,6 @@ from app.core.config import Settings
 from app.core.dependencies import get_db_session, get_redis, get_services
 from app.core.services import Services
 from app.integrations.openai.text import OpenAIResponsesProvider
-from redis.asyncio import Redis
 
 
 def get_text_provider(
@@ -42,8 +42,15 @@ def get_text_ai_service(
     provider: TextGenerationProvider = Depends(get_text_provider),
 ) -> TextAIService:
     settings: Settings = request.app.state.settings
+    store = getattr(request.app.state, "text_ai_cache_store", None)
+    if store is None:
+        if settings.app_env == "test":
+            store = MemoryCacheStore()
+            request.app.state.text_ai_cache_store = store
+        else:
+            store = RedisCacheStore(redis)
     cache = TextAICache(
-        RedisCacheStore(redis),
+        store,
         ttl_seconds=settings.ai_cache_ttl_seconds,
         schema_version=settings.openai_response_schema_version,
     )

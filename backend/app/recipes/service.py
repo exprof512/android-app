@@ -88,10 +88,11 @@ class RecipeService:
     async def dish_card(self, user_id: UUID, recipe_id: UUID) -> tuple[Recipe, bool]:
         recipe = await self._readable_recipe(recipe_id)
         is_favorite = await self._repository.is_favorite(user_id, recipe_id)
-        # Phase 6 adds access through the user's meal_plan_items.
-        if not is_favorite:
-            raise RecipeNotFound()
-        return recipe, is_favorite
+        if is_favorite or await self._repository.user_has_recipe_in_plans(
+            user_id, recipe_id
+        ):
+            return recipe, is_favorite
+        raise RecipeNotFound()
 
     async def add_favorite(self, user_id: UUID, recipe_id: UUID) -> None:
         await self._readable_recipe(recipe_id)

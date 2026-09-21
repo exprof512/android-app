@@ -2,6 +2,7 @@
 
 from app.ai.models import AiTextUsage
 from app.auth.models import RefreshToken, User
+from app.meal_plans.models import MealPlan, MealPlanItem
 from app.profiles.models import (
     AvailableProduct,
     FoodPreference,
@@ -23,6 +24,8 @@ __all__ = [
     "FoodRestriction",
     "Goal",
     "Ingredient",
+    "MealPlan",
+    "MealPlanItem",
     "Recipe",
     "RecipeIngredient",
     "RefreshToken",
