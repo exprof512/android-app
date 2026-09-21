@@ -232,7 +232,7 @@ Phase 4 реализует `GET /recipes/{recipe_id}` и favorite endpoints; п�
 }
 ```
 
-`ingredients[].grams` и `cost` относятся ко всему рецепту (`servings` порций), а `nutrition_per_serving` и `estimated_cost_per_serving` — к одной порции. `quantity`/`unit` — только для отображения; авторитетная величина — `grams`.
+`ingredients[].grams` и `cost` относятся ко всему рецепту (`servings` порций), а `nutrition_per_serving` и `estimated_cost_per_serving` — к одной порции. `quantity`/`unit` — только для отображения; авторитетная величина — `grams`. `name` в карточке — каноническое название из каталога, а не написание, которое прислала модель.
 
 Рецепт canonical и не содержит персональных данных, но карточка отдаётся только при связи с текущим user: в Phase 4 это favorite, с Phase 6 — ещё и `meal_plan_items`. Отсутствующий рецепт, рецепт не в статусе `ready` и рецепт без связи возвращают одинаковый `404 recipe_not_found`, чтобы не раскрывать существование id. `POST /recipes/{id}/favorite` работает для любого `ready` рецепта каталога и идемпотентен; `DELETE` тоже идемпотентен и закрывает доступ к карточке. Оба отвечают `204`.
 

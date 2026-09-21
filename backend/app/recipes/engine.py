@@ -112,7 +112,6 @@ class _ResolvedIngredient:
     """A catalog match while duplicate mentions are still being merged."""
 
     catalog_item: Ingredient
-    display_name: str
     grams: Decimal
     amounts: list[tuple[Decimal, str]]
 
@@ -126,7 +125,8 @@ class _ResolvedIngredient:
         price = self.catalog_item.reference_price_per_100g
         return CanonicalIngredient(
             ingredient_id=self.catalog_item.id,
-            display_name=self.display_name,
+            # Dish cards show the catalog spelling, not the candidate's.
+            display_name=self.catalog_item.canonical_name,
             quantity_g=_grams(self.grams),
             quantity_value=_grams(quantity_value),
             unit=unit,
@@ -301,7 +301,6 @@ class RecipeEngine:
             if accumulated is None:
                 resolved[catalog_item.id] = _ResolvedIngredient(
                     catalog_item=catalog_item,
-                    display_name=item.name.strip() or catalog_item.canonical_name,
                     grams=grams,
                     amounts=[(item.quantity, item.unit)],
                 )
@@ -309,7 +308,7 @@ class RecipeEngine:
             accumulated.grams += grams
             accumulated.amounts.append((item.quantity, item.unit))
             warnings.append(
-                f"Повторяющийся ингредиент «{accumulated.display_name}» объединён."
+                f"Повторяющийся ингредиент «{catalog_item.canonical_name}» объединён."
             )
 
         total_grams = sum((item.grams for item in resolved.values()), Decimal("0"))

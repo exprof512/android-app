@@ -214,7 +214,7 @@ async def test_favorite_opens_the_dish_card(client: AsyncClient, recipe: Recipe)
     }
     assert body["estimated_cost_per_serving"] == {"amount": 56.21, "currency": "RUB"}
     assert body["ingredients"][0] == {
-        "name": "куриная грудка",
+        "name": "Куриная грудка",
         "grams": 200.0,
         "quantity": 200.0,
         "unit": "g",

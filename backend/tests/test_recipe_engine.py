@@ -254,18 +254,19 @@ def test_non_convertible_unit_is_rejected() -> None:
 
 
 def test_ingredient_names_are_matched_case_and_punctuation_insensitively() -> None:
-    catalog = build_catalog(CHICKEN)
-
     recipe = build_engine().canonicalize(
         build_draft(
             ingredients=[
                 IngredientDraft(name="  КУРИНАЯ   Грудка. ", quantity=Decimal("150"), unit="g")
             ]
         ),
-        catalog,
+        build_catalog(CHICKEN),
     )
 
-    assert recipe.ingredients[0].ingredient_id == CHICKEN.id
+    item = recipe.ingredients[0]
+    assert item.ingredient_id == CHICKEN.id
+    # The dish card shows the catalog spelling, not what the candidate wrote.
+    assert item.display_name == "Куриная грудка"
 
 
 def test_repeated_ingredient_is_merged() -> None:
