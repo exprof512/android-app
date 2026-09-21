@@ -17,7 +17,8 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 1 — Backend foundation | готово: FastAPI, config, Alembic, `/health`, Compose/Nginx runtime |
 | 2 — Auth and session | готово: `users`/`refresh_tokens`, Argon2id, JWT access/refresh rotation, `/auth/*`, `/users/me`, ownership guard |
 | 3 — Profile and Nutrition Engine | готово: анкета, цели, предпочтения/ограничения/pantry, `GET`/`PUT /profile`, `POST /profile/calculate-target`, BMR/TDEE/macros с safety floors |
-| 4–16 | не начаты |
+| 4 — Recipe domain | готово: каталог ингредиентов, `RecipeEngine` (валидация, канонизация, единицы → граммы, fingerprint/dedup), пересчёт БЖУ и стоимости, `GET /recipes/{id}` и favorites |
+| 5–16 | не начаты |
 
 ## Локальный запуск
 
@@ -28,4 +29,4 @@ docker compose exec backend alembic upgrade head
 curl http://localhost:8080/health
 ```
 
-Тесты: `pytest` в `backend/` — без обращений к OpenAI, без Docker и без secrets.
+Тесты: `pytest` в `backend/` — без обращений к OpenAI, без Docker и без secrets. Все образы стека собраны и для `linux/arm64`, поэтому на Apple Silicon запускаются нативно; подробности — в [development.md](docs/development.md#локальный-запуск-на-macos).

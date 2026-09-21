@@ -120,6 +120,29 @@ MinIO образ тянется с `quay.io/minio/minio`: Docker Hub отвеч�
 
 Nginx разрешает адрес backend через Docker DNS на каждый request, поэтому пересборка backend (`docker compose up -d --build backend`) не требует перезапуска nginx и не приводит к `502`.
 
+### Локальный запуск на macOS
+
+Все образы стека (`postgres:17-alpine`, `redis:7-alpine`, `nginx:1.27-alpine`, `python:3.12-slim`, `quay.io/minio/minio`) публикуются для `linux/arm64`, поэтому на Apple Silicon они запускаются нативно, без Rosetta и без `--platform`.
+
+```bash
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # значение для JWT_SECRET
+# заполнить JWT_SECRET, POSTGRES_PASSWORD, MINIO_ROOT_*, S3_* в .env
+docker compose up -d --wait
+docker compose exec backend alembic upgrade head
+curl http://localhost:8080/health
+```
+
+Нужен работающий Docker Desktop (или другой Docker с поддержкой Compose v2). Порт публикует только nginx; при конфликте `8080` он меняется через `NGINX_PORT` в `.env`.
+
+Backend-тесты запускаются без Docker и без secrets:
+
+```bash
+cd backend
+python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+.venv/bin/python -m pytest
+```
+
 Phase 1 supplies the runtime files as `compose.yaml` and `nginx/nginx.conf`. After copying `.env.example` to an untracked `.env` and filling its empty secrets, start the stack with `docker compose up --build`; `docker compose up -d --wait` is the non-interactive readiness check. Nginx is the sole published service at `http://localhost:8080` by default and proxies `GET /health` to the internal backend port `8000`; backend, Redis, PostgreSQL and MinIO ports remain internal. Do not treat a provider OpenAI call as health check. `/health` checks service readiness needed to serve API but does not spend AI quota.
 
 ## Test policy
@@ -147,6 +170,7 @@ Use structured JSON logs. Every HTTP request carries or receives `X-Request-ID`;
 {
   "request_id": "uuid",
   "user_id": "uuid-or-null",
+  "recipe_id": "uuid-or-null",
   "endpoint": "/api/v1/meal-plans/generate",
   "method": "POST",
   "status_code": 201,

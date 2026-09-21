@@ -42,6 +42,14 @@ erDiagram
 | `weight_entries` | `id uuid PK`; `user_id uuid NOT NULL`; `weight_kg numeric(6,2)`; `measured_at timestamptz`; `note varchar(500) NULL`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; index `(user_id, measured_at DESC)` |
 | `nutrition_logs` | `id uuid PK`; `user_id uuid NOT NULL`; `meal_plan_item_id uuid NULL`; `logged_on date`; `calories_kcal integer`; `protein_g numeric(8,2)`; `fat_g numeric(8,2)`; `carbohydrate_g numeric(8,2)`; `source varchar(24)`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; `meal_plan_item_id → meal_plan_items` `SET NULL`; index `(user_id, logged_on)` |
 
+Phase 4 добавляет migration `0003_recipe_domain` c `ingredients`, `recipes`, `recipe_ingredients` и `user_recipe_favorites`. Три уточнения к схеме выше, зафиксированные реализацией:
+
+- `ingredients` получает `grams_per_piece numeric(8,2) NULL` и `density_g_per_ml numeric(6,3) NULL`. Без них единицы `piece`, `ml`, `l`, `tbsp` и `tsp` из AI-кандидата невозможно перевести в `quantity_g`, а именно граммы авторитетны для расчёта.
+- `recipe_fingerprint` считается от canonicalized `name + cooking_method + servings + отсортированных (ingredient_id, quantity_g)`. `servings` входит в hash, потому что nutrition и cost хранятся на порцию: одинаковый состав, разделённый на разное число порций, — разные рецепты.
+- full-text/GIN index по `recipes.name` не создаётся: в MVP нет поиска по названию, индекс появится вместе с первой поисковой функцией. Индекс `(status, updated_at DESC)` создан.
+
+Каталог наполняется seed-набором из 43 распространённых продуктов c `source='seed'`: значения на 100 г и цены приблизительные и заменяются curated-набором без изменения рецептов. `user_recipe_favorites` — единственная таблица без `updated_at`, поэтому у неё нет trigger.
+
 Phase 3 добавляет migration `0002_profile_and_nutrition` c `user_profiles`, `goals`, `food_preferences`, `food_restrictions` и `available_products`: CHECK-и на диапазоны и enum-значения, partial unique index `uq_goals_active_per_user` для единственной active goal, те же `set_updated_at` триггеры и backfill пустого `user_profiles` для уже существующих аккаунтов. `available_products.ingredient_id` создаётся nullable без foreign key — он появится вместе с каталогом `ingredients` в Phase 4. Пересчёт цели обновляет active goal на месте, а `start_weight_kg` остаётся весом на момент создания цели.
 
 Phase 2 создаёт первую migration `0001_auth_and_session` c `users` и `refresh_tokens`: `gen_random_uuid()` primary keys, unique index `lower(email)`, self-referential `replaced_by_id` и trigger-функция `set_updated_at()`, которая поддерживает `updated_at` для каждой таблицы с этой парой полей. Остальные таблицы появляются в своих фазах.

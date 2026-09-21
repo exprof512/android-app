@@ -213,6 +213,31 @@ Phase 3 фиксирует контракт этих endpoints. Обязател
 
 Полная карточка содержит `name`, nutrition от backend, `ingredients` с `grams`, estimated `cost`, `cook_time_minutes`, ordered `steps` и `image`. Не принимать nutrition, имя или image URL от Android как authoritative update.
 
+Phase 4 реализует `GET /recipes/{recipe_id}` и favorite endpoints; поле `image` добавится в Phase 7 вместе с image pipeline. Собственного endpoint создания рецепта нет: рецепты появляются при генерации плана в Phase 6, а `RecipeEngine` вызывается только backend.
+
+```json
+{
+  "id": "a86cebd6-e8c3-463d-92ea-a6fced7b9dcb",
+  "name": "Курица с рисом",
+  "description": "Простой ужин на двоих",
+  "cooking_method": "fry",
+  "cook_time_minutes": 30,
+  "servings": 2,
+  "status": "ready",
+  "nutrition_per_serving": {"calories_kcal": 398, "protein_g": 34.5, "fat_g": 11.0, "carbohydrate_g": 39.0},
+  "estimated_cost_per_serving": {"amount": 56.21, "currency": "RUB"},
+  "ingredients": [{"name": "куриная грудка", "grams": 200.0, "quantity": 200.0, "unit": "g", "cost": 90.0}],
+  "steps": ["Обжарить курицу.", "Отварить рис.", "Смешать и подать."],
+  "is_favorite": true
+}
+```
+
+`ingredients[].grams` и `cost` относятся ко всему рецепту (`servings` порций), а `nutrition_per_serving` и `estimated_cost_per_serving` — к одной порции. `quantity`/`unit` — только для отображения; авторитетная величина — `grams`.
+
+Рецепт canonical и не содержит персональных данных, но карточка отдаётся только при связи с текущим user: в Phase 4 это favorite, с Phase 6 — ещё и `meal_plan_items`. Отсутствующий рецепт, рецепт не в статусе `ready` и рецепт без связи возвращают одинаковый `404 recipe_not_found`, чтобы не раскрывать существование id. `POST /recipes/{id}/favorite` работает для любого `ready` рецепта каталога и идемпотентен; `DELETE` тоже идемпотентен и закрывает доступ к карточке. Оба отвечают `204`.
+
+`RecipeEngine` отклоняет кандидата с `422 recipe_validation_error` до записи в базу. Единицы ингредиентов (`g`, `kg`, `ml`, `l`, `tbsp`, `tsp`, `piece`) переводятся в граммы по данным каталога, поэтому `ml`/`tbsp`/`tsp` требуют плотности, а `piece` — веса штуки; иначе `unit_not_convertible`. `reason` бывает: `must_not_be_blank`, `too_long`, `unsafe_text`, `unsupported_value`, `out_of_range`, `grams_out_of_range`, `total_grams_out_of_range`, `unknown_ingredient`, `unit_not_convertible`, `mixed_currencies`. Присланные моделью calories/БЖУ не сохраняются никогда: backend пересчитывает их по каталогу и лишь сообщает об отклонении в `warnings`.
+
 Контракт image endpoint:
 
 ```json
