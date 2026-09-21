@@ -112,7 +112,7 @@ Future `compose.yaml` has exactly these services:
 | `nginx` | public reverse proxy/media delivery | config only | backend upstream reachable |
 | `minio` | S3-compatible private image bucket | named `minio_data` volume | MinIO readiness endpoint |
 
-Development startup is documented as `docker compose up --build` after Phase 1 adds the configuration. The public app talks to Nginx; backend, Redis, PostgreSQL and MinIO ports are internal by default. Do not treat a provider OpenAI call as health check. `/health` checks service readiness needed to serve API but does not spend AI quota.
+Phase 1 supplies the runtime files as `compose.yaml` and `nginx/nginx.conf`. After copying `.env.example` to an untracked `.env` and filling its empty secrets, start the stack with `docker compose up --build`; `docker compose up -d --wait` is the non-interactive readiness check. Nginx is the sole published service at `http://localhost:8080` by default and proxies `GET /health` to the internal backend port `8000`; backend, Redis, PostgreSQL and MinIO ports remain internal. Do not treat a provider OpenAI call as health check. `/health` checks service readiness needed to serve API but does not spend AI quota.
 
 ## Test policy
 
