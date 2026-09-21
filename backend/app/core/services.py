@@ -14,6 +14,10 @@ from app.core.redis import RedisClient
 
 logger = logging.getLogger(__name__)
 
+# Answer before the Docker/Nginx healthcheck gives up, so a stalled dependency
+# surfaces as 503 instead of a hanging request.
+HEALTHCHECK_TIMEOUT_SECONDS = 2.0
+
 
 class Services:
     """Explicit dependency container shared by HTTP handlers."""
@@ -56,12 +60,20 @@ class Services:
     async def start(self) -> None:
         logger.info("infrastructure_initialized")
 
-    async def check_health(self) -> None:
-        checks = await asyncio.gather(
-            self.database.ping(),
-            self.redis.ping(),
-            return_exceptions=True,
-        )
+    async def check_health(
+        self, *, timeout: float = HEALTHCHECK_TIMEOUT_SECONDS
+    ) -> None:
+        try:
+            checks = await asyncio.wait_for(
+                asyncio.gather(
+                    self.database.ping(),
+                    self.redis.ping(),
+                    return_exceptions=True,
+                ),
+                timeout=timeout,
+            )
+        except TimeoutError:
+            checks = [TimeoutError()]
         if any(isinstance(result, Exception) for result in checks):
             logger.warning("dependency_healthcheck_failed", extra={"error_code": "dependency_unavailable"})
             raise DependencyUnavailable()
