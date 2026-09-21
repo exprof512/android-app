@@ -16,7 +16,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | 0 Spec | **0** Product specification | готово |
 | 1 Docker + health | часть **1** Backend foundation | готово (`compose.yaml`, Nginx, MinIO, `/health`) |
 | 2 Backend foundation | **1** Backend foundation | готово |
-| 3 Auth + Android login | **2** Auth (+ Android позже в **8**) | backend готово; Android отсутствует |
+| 3 Auth + Android login | **2** Auth (+ Android позже в **8**) | backend готово; Android foundation в **8** |
 | 4 Profile + onboarding UI | **3** Profile/Nutrition (+ Android **9**) | backend готово |
 | 5 Nutrition engine | **3** Profile and Nutrition Engine | готово |
 | 6 OpenAI text | **5** Text AI integration | готово |
@@ -43,7 +43,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | **5 — Text AI integration** | Единственный OpenAI integration layer, Responses API structured outputs, TextAIService retry/repair, text usage/caching. | Provider mocked tests green; malformed AI output handled; no real API in automated tests. |
 | **6 — Meal planning** | Генерация, daily constraints, persisted week/today, replace/complete и idempotency. | Meal-plan validation/integration tests green; reopening plan has no AI call; rate/quota tests green. |
 | **7 — Image pipeline and storage** | `StorageProvider`, MinIO adapter, Arq worker, image providers, recipe-image metadata/status, dedup, Nginx-safe delivery. | Image/storage/dedup/retry tests use `MockImageProvider`; failure leaves recipe usable; no bytes in Postgres. |
-| **8 — Android foundation** | Kotlin app shell, Compose navigation, DI/network/auth secure token storage, design tokens and error/loading primitives. | Android debug compile; unit tests; login/session manual smoke flow. |
+| **8 — Android foundation** | Kotlin app shell, Compose navigation, DI/network/auth secure token storage, design tokens and error/loading primitives. | **готово**: debug APK, unit tests (token/session/error parse), login/register + session shell. |
 | **9 — Android onboarding/profile** | Семь onboarding screens с product-copy из architecture, target preview, preferences/restrictions/pantry and first-plan loading handoff. | Debug APK; UI/navigation tests; API error/disclaimer states verified. |
 | **10 — Android plan and recipe** | Home Today, Plan, recipe dish card, Coil thumbnail/full image states, replace/complete/favorite. | Debug APK; UI tests for pending/processing/ready/failed image states; plan data matches API. |
 | **11 — Shopping** | Генерация, merged ingredients, pantry exclusion, completion и Shopping navigation. | Backend + Android tests; debug APK flow from plan to checked list. |

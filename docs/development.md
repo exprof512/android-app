@@ -189,16 +189,14 @@ Alembic migration accompanies every schema change; do not use `create_all` as pr
 
 ## Android build policy
 
-Future Android uses Kotlin/Compose and gets only API base URL/non-secret build config. It never embeds OpenAI, database, Redis, MinIO keys or JWT secret. Access/refresh tokens are held in Android Keystore-backed encrypted storage; Coil cache stores only media fetched via FoodAI URL.
-
-После появления Android создаются (но не в Phase 0):
+Android (`android/`) — Kotlin/Compose, Hilt, Retrofit/OkHttp, Kotlinx Serialization. В BuildConfig попадает только `API_BASE_URL` (debug default `http://10.0.2.2:8080/api/v1/`). OpenAI, database, Redis, MinIO keys и JWT secret на устройство не попадают. Access/refresh хранятся в EncryptedSharedPreferences (Android Keystore master key); refresh выполняется single-flight через `TokenAuthenticator`.
 
 ```text
 scripts/build_android.sh
 scripts/install_android.sh
 ```
 
-`build_android.sh` запускает debug build и печатает абсолютный debug APK path (expected Gradle output: `android/app/build/outputs/apk/debug/app-debug.apk`). `install_android.sh` сначала проверяет `command -v adb`, наличие target device и существование APK; при отсутствии `adb` печатает понятную инструкцию и завершается без ложного успеха. Каждый implementation phase после Android foundation обязан собрать APK; install является дополнительной проверкой, когда `adb` есть.
+`build_android.sh` запускает `:app:assembleDebug` и печатает абсолютный путь к APK (`android/app/build/outputs/apk/debug/app-debug.apk`). `install_android.sh` проверяет `adb`, устройство и APK; без `adb` печатает инструкцию и выходит с ошибкой. Unit-тесты: `cd android && ./gradlew :app:testDebugUnitTest`. Каждый implementation phase после Android foundation обязан собрать APK.
 
 ## Phase gate и git workflow
 

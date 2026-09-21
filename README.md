@@ -21,10 +21,11 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 5 — Text AI | готово: `integrations/openai`, `TextAIService`, Structured Outputs, cache, `ai_text_usage`, `MockTextProvider` tests |
 | 6 — Meal planning | готово: generate/today/week/replace/complete, MealPlanEngine constraints, idempotent reuse |
 | 7 — Image pipeline | готово: StorageProvider/MinIO, RecipeImage, Arq worker, Mock/OpenAI providers, media URLs |
-| 8 — Android foundation | не начато ← **следующий шаг** |
-| 9–16 | не начаты |
+| 8 — Android foundation | готово: Kotlin/Compose shell, Hilt, Retrofit, EncryptedSharedPreferences, login/register, bottom nav |
+| 9 — Android onboarding/profile | не начато ← **следующий шаг** |
+| 10–16 | не начаты |
 
-Android-модуля (`android/`) пока нет. Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
+Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 
 ## Локальный запуск
 
@@ -35,4 +36,5 @@ docker compose exec backend alembic upgrade head
 curl http://localhost:8080/health
 ```
 
-Тесты: `pytest` в `backend/` — без обращений к OpenAI, без Docker и без secrets. Все образы стека собраны и для `linux/arm64`, поэтому на Apple Silicon запускаются нативно; подробности — в [development.md](docs/development.md#локальный-запуск-на-macos).
+Тесты backend: `pytest` в `backend/` — без OpenAI/Docker/secrets.  
+Android debug APK: `./scripts/build_android.sh` (нужны JDK 17 и `ANDROID_HOME`).

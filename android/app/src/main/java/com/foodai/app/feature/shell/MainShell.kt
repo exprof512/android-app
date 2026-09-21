@@ -1,0 +1,175 @@
+package com.foodai.app.feature.shell
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ShowChart
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.foodai.app.core.ui.ErrorPane
+import com.foodai.app.core.ui.LoadingPane
+import com.foodai.app.core.ui.theme.FoodAiTokens
+import com.foodai.app.navigation.Routes
+
+private data class TopTab(
+    val route: String,
+    val label: String,
+    val icon: ImageVector,
+)
+
+private val tabs = listOf(
+    TopTab(Routes.Home, "Home", Icons.Outlined.Home),
+    TopTab(Routes.Plan, "Plan", Icons.Outlined.CalendarMonth),
+    TopTab(Routes.Shopping, "Shopping", Icons.Outlined.ShoppingCart),
+    TopTab(Routes.Progress, "Progress", Icons.AutoMirrored.Outlined.ShowChart),
+    TopTab(Routes.Profile, "Profile", Icons.Outlined.Person),
+)
+
+@Composable
+fun MainShellRoute(
+    onSignedOut: () -> Unit,
+    viewModel: SessionViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    when {
+        state.loading && state.user == null -> LoadingPane("Проверяем сессию…")
+        state.error != null && state.user == null -> ErrorPane(
+            message = state.error ?: "Ошибка сессии",
+            onRetry = viewModel::refresh,
+        )
+        else -> MainShell(
+            email = state.user?.email ?: "—",
+            onLogout = { viewModel.logout(onSignedOut) },
+        )
+    }
+}
+
+@Composable
+fun MainShell(
+    email: String,
+    onLogout: () -> Unit,
+) {
+    val navController = rememberNavController()
+    val backStack by navController.currentBackStackEntryAsState()
+    val current = backStack?.destination?.route
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                tabs.forEach { tab ->
+                    NavigationBarItem(
+                        selected = current == tab.route,
+                        onClick = {
+                            navController.navigate(tab.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(tab.icon, contentDescription = tab.label) },
+                        label = { Text(tab.label) },
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = Routes.Home,
+            modifier = Modifier.padding(padding),
+        ) {
+            composable(Routes.Home) {
+                PlaceholderPane(
+                    title = "TODAY",
+                    body = "Домашний экран появится в Phase 10.",
+                )
+            }
+            composable(Routes.Plan) {
+                PlaceholderPane(
+                    title = "Plan",
+                    body = "Недельный план появится в Phase 10.",
+                )
+            }
+            composable(Routes.Shopping) {
+                PlaceholderPane(
+                    title = "Shopping",
+                    body = "Список покупок появится в Phase 11.",
+                )
+            }
+            composable(Routes.Progress) {
+                PlaceholderPane(
+                    title = "Progress",
+                    body = "Прогресс появится в Phase 12.",
+                )
+            }
+            composable(Routes.Profile) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(FoodAiTokens.SpaceLg.dp),
+                    verticalArrangement = Arrangement.spacedBy(FoodAiTokens.SpaceMd.dp),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text("Profile", style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        text = email,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Онбординг и редактирование профиля — Phase 9.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Button(onClick = onLogout) {
+                        Text("Выйти")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceholderPane(title: String, body: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(FoodAiTokens.SpaceLg.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(title, style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = body,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}

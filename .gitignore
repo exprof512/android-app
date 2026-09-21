@@ -21,3 +21,15 @@ venv/
 .vscode/
 postgres_data/
 minio_data/
+
+# Android
+android/local.properties
+android/.gradle/
+android/**/build/
+android/**/.cxx/
+*.apk
+*.ap_
+*.aab
+*.iml
+.DS_Store
+captures/
