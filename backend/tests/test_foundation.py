@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import socket
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
+from app.auth.passwords import PasswordHasher
+from app.auth.tokens import TokenService
 from app.core.config import Settings
 from app.core.errors import DependencyUnavailable
+from app.core.services import Services
 from app.main import create_app
 
 
@@ -60,6 +65,29 @@ def test_health_reports_dependency_failure_safely() -> None:
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "dependency_unavailable"
     assert "test@" not in response.text
+
+
+async def test_health_check_gives_up_on_a_stalled_dependency() -> None:
+    class StalledPing:
+        async def ping(self) -> None:
+            await asyncio.sleep(60)
+
+        async def close(self) -> None:
+            return None
+
+    services = Services(
+        database=StalledPing(),  # type: ignore[arg-type]
+        redis=StalledPing(),  # type: ignore[arg-type]
+        passwords=PasswordHasher(),
+        tokens=TokenService(
+            secret="unit-test-signing-key-with-enough-entropy",
+            access_ttl_seconds=900,
+            refresh_ttl_days=30,
+        ),
+    )
+
+    with pytest.raises(DependencyUnavailable):
+        await services.check_health(timeout=0.05)
 
 
 def test_settings_load_from_environment_without_network(monkeypatch) -> None:
