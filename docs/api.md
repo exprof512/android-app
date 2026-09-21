@@ -74,7 +74,7 @@ Phase 2 фиксирует поведение этих endpoints:
 
 Email нормализуется в lowercase и уникален без учёта регистра. Access JWT живёт `JWT_ACCESS_TTL_SECONDS` секунд (`expires_in`); от refresh token в `refresh_tokens` хранится только SHA-256 hash.
 
-Refresh token одноразовый: `POST /auth/refresh` отзывает предъявленный token, выдаёт новый в той же token family и связывает записи через `replaced_by_id`. Повторное предъявление уже отозванного token считается утечкой: вся family отзывается, и все её token'ы перестают работать. `POST /auth/logout` отзывает только указанную сессию и идемпотентен для уже отозванного token.
+Refresh token одноразовый: `POST /auth/refresh` отзывает предъявленный token, выдаёт новый в той же token family и связывает записи через `replaced_by_id`. Повторное предъявление уже отозванного token считается утечкой: вся family отзывается, и все её token'ы перестают работать. Ротация сериализуется row lock, поэтому при параллельных запросах с одним token ровно один получает новую пару, а остальные попадают под это правило — Android обязан не отправлять refresh параллельно и повторять его только после ответа. `POST /auth/logout` отзывает только указанную сессию и идемпотентен для уже отозванного token.
 
 Коды ошибок auth: `401 invalid_credentials` (неверный email или пароль — ответ одинаков, чтобы не раскрывать существование аккаунта), `401 invalid_token` (отсутствующий, истёкший, подделанный, не того типа или отозванный token; ответ содержит `WWW-Authenticate: Bearer`), `403 account_disabled`, `403 ownership_denied` (token принадлежит другому user), `409 email_already_registered`, `422 validation_error`.
 

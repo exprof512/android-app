@@ -85,7 +85,7 @@ class AuthService:
     async def rotate(self, refresh_token: str) -> TokenPair:
         claims = self._tokens.decode(refresh_token, expected_type=REFRESH_TOKEN_TYPE)
         stored = await self._repository.get_refresh_token_by_hash(
-            self._tokens.hash_token(refresh_token)
+            self._tokens.hash_token(refresh_token), for_update=True
         )
         if stored is None or stored.user_id != claims.user_id:
             raise InvalidToken()
@@ -127,7 +127,7 @@ class AuthService:
             raise OwnershipDenied()
 
         stored = await self._repository.get_refresh_token_by_hash(
-            self._tokens.hash_token(refresh_token)
+            self._tokens.hash_token(refresh_token), for_update=True
         )
         if stored is None:
             return

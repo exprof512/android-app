@@ -74,8 +74,13 @@ class AuthRepository:
         await self._session.flush()
         return refresh_token
 
-    async def get_refresh_token_by_hash(self, token_hash: str) -> RefreshToken | None:
+    async def get_refresh_token_by_hash(
+        self, token_hash: str, *, for_update: bool = False
+    ) -> RefreshToken | None:
         statement = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        if for_update:
+            # Serializes concurrent rotations of the same token.
+            statement = statement.with_for_update()
         return (await self._session.execute(statement)).scalar_one_or_none()
 
     async def revoke_refresh_token(
