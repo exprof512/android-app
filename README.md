@@ -1,6 +1,6 @@
 # FoodAI
 
-Phase 0 содержит утверждённую спецификацию Android + AI продукта FoodAI. Реализация ещё не начата.
+Android + AI продукт FoodAI. Спецификация утверждена в Phase 0; backend реализуется по [фазам 0–16](docs/roadmap.md).
 
 - [Архитектура](docs/architecture.md)
 - [REST API](docs/api.md)
@@ -9,4 +9,22 @@ Phase 0 содержит утверждённую спецификацию Andro
 - [Хранилище](docs/storage.md)
 - [Разработка и roadmap](docs/development.md), [фазы 0–16](docs/roadmap.md)
 
-Phase 1 возможна только после human confirmation Phase 0.
+## Статус
+
+| Phase | Состояние |
+|---|---|
+| 0 — Product specification | готово |
+| 1 — Backend foundation | готово: FastAPI, config, Alembic, `/health`, Compose/Nginx runtime |
+| 2 — Auth and session | готово: `users`/`refresh_tokens`, Argon2id, JWT access/refresh rotation, `/auth/*`, `/users/me`, ownership guard |
+| 3–16 | не начаты |
+
+## Локальный запуск
+
+```bash
+cp .env.example .env   # заполнить пустые secrets
+docker compose up -d --wait
+docker compose exec backend alembic upgrade head
+curl http://localhost:8080/health
+```
+
+Тесты: `pytest` в `backend/` — без обращений к OpenAI, без Docker и без secrets.

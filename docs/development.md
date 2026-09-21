@@ -99,6 +99,8 @@ AI_RATE_LIMIT_PREMIUM_PER_DAY=
 
 Production injects secrets from a secret manager/orchestrator, with distinct credentials per environment. `MINIO_ROOT_*` используются только bootstrap MinIO; backend/worker используют отдельные least-privilege `S3_*` keys. Rotate `OPENAI_API_KEY`, `JWT_SECRET`, database password and S3 keys independently. `JWT_SECRET=CHANGE_ME` or default database/S3 passwords are startup failures outside a disposable local test environment.
 
+Since Phase 2 the backend refuses to start with an empty `JWT_SECRET` in any environment, and rejects a sample value or a secret shorter than 32 characters (RFC 7518 HMAC-SHA256 minimum) whenever `APP_ENV` is not `development`/`test`. Startup errors name the setting only, never its value.
+
 ## Local services
 
 Future `compose.yaml` has exactly these services:
@@ -153,7 +155,7 @@ Never log password, password hash, access/refresh JWT, `OPENAI_API_KEY`, databas
 
 ## Database, migrations и backups
 
-Alembic migration accompanies every schema change; do not use `create_all` as production migration. A migration must be tested against an empty DB and a prior schema snapshot. PostgreSQL backup uses encrypted logical dump/PITR; MinIO uses separate object-storage replication/snapshot. Restore drill verifies that each `ready recipe_images` row points to both restored variants. `.env` secrets use secret-manager versioning/rotation, not database backup or git.
+Alembic migration accompanies every schema change; do not use `create_all` as production migration. A migration must be tested against an empty DB and a prior schema snapshot. In local Compose apply them with `docker compose exec backend alembic upgrade head`; `alembic check` must report no drift between models and the applied schema. PostgreSQL backup uses encrypted logical dump/PITR; MinIO uses separate object-storage replication/snapshot. Restore drill verifies that each `ready recipe_images` row points to both restored variants. `.env` secrets use secret-manager versioning/rotation, not database backup or git.
 
 ## Android build policy
 

@@ -42,6 +42,8 @@ erDiagram
 | `weight_entries` | `id uuid PK`; `user_id uuid NOT NULL`; `weight_kg numeric(6,2)`; `measured_at timestamptz`; `note varchar(500) NULL`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; index `(user_id, measured_at DESC)` |
 | `nutrition_logs` | `id uuid PK`; `user_id uuid NOT NULL`; `meal_plan_item_id uuid NULL`; `logged_on date`; `calories_kcal integer`; `protein_g numeric(8,2)`; `fat_g numeric(8,2)`; `carbohydrate_g numeric(8,2)`; `source varchar(24)`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; `meal_plan_item_id → meal_plan_items` `SET NULL`; index `(user_id, logged_on)` |
 
+Phase 2 создаёт первую migration `0001_auth_and_session` c `users` и `refresh_tokens`: `gen_random_uuid()` primary keys, unique index `lower(email)`, self-referential `replaced_by_id` и trigger-функция `set_updated_at()`, которая поддерживает `updated_at` для каждой таблицы с этой парой полей. Остальные таблицы появляются в своих фазах.
+
 `goals` сохраняет target snapshot: изменения анкеты не переписывают историю завершённых планов. `user_profiles.active_goal_id` должен ссылаться на goal того же user; это проверяется service layer и database trigger/constraint strategy.
 
 ## Каталог ингредиентов и рецепты

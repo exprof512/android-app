@@ -62,6 +62,24 @@ Authorization: Bearer <access_jwt>
 
 Пароль никогда не возвращается и не логируется. Refresh token передаётся только в body; его исходное значение не сохраняется в PostgreSQL.
 
+Phase 2 фиксирует поведение этих endpoints:
+
+| Endpoint | Success | Request body |
+|---|---|---|
+| `POST /auth/register` | `201` token pair | `email`, `password` (8–128 символов), optional `locale` (default `ru-RU`) и `accepted_terms_at` |
+| `POST /auth/login` | `200` token pair | `email`, `password` |
+| `POST /auth/refresh` | `200` token pair | `refresh_token` |
+| `POST /auth/logout` | `204` без body | `refresh_token`; требует access JWT владельца |
+| `GET /users/me` | `200` user summary | — |
+
+Email нормализуется в lowercase и уникален без учёта регистра. Access JWT живёт `JWT_ACCESS_TTL_SECONDS` секунд (`expires_in`); от refresh token в `refresh_tokens` хранится только SHA-256 hash.
+
+Refresh token одноразовый: `POST /auth/refresh` отзывает предъявленный token, выдаёт новый в той же token family и связывает записи через `replaced_by_id`. Повторное предъявление уже отозванного token считается утечкой: вся family отзывается, и все её token'ы перестают работать. `POST /auth/logout` отзывает только указанную сессию и идемпотентен для уже отозванного token.
+
+Коды ошибок auth: `401 invalid_credentials` (неверный email или пароль — ответ одинаков, чтобы не раскрывать существование аккаунта), `401 invalid_token` (отсутствующий, истёкший, подделанный, не того типа или отозванный token; ответ содержит `WWW-Authenticate: Bearer`), `403 account_disabled`, `403 ownership_denied` (token принадлежит другому user), `409 email_already_registered`, `422 validation_error`.
+
+`tier` в Phase 2 всегда `free`: реальный tier вычисляет `EntitlementsService` по `subscriptions` в Phase 14. Пустой `user_profiles` создаётся вместе с profile schema в Phase 3, поэтому Phase 2 регистрирует только `users` и сессию.
+
 ## Профиль и расчёт цели
 
 | Method / path | Назначение |
