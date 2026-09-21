@@ -280,6 +280,6 @@ URL всегда принадлежит FoodAI CDN/Nginx/backend; raw MinIO endp
 
 ## Health
 
-`GET /health` не требует auth и возвращает ровно `200 {"status":"ok"}` только когда API готово обслуживать request. В Phase 1 endpoint также используется Docker/Nginx healthcheck и доступен через public Nginx path `http://localhost:8080/health` в local Compose; provider OpenAI не вызывается healthcheck-ом.
+`GET /health` не требует auth и возвращает ровно `200 {"status":"ok"}` только когда API готово обслуживать request. Если PostgreSQL или Redis не отвечают в течение двух секунд, endpoint возвращает `503 dependency_unavailable`, а не подвисает до таймаута клиента. В Phase 1 endpoint также используется Docker/Nginx healthcheck и доступен через public Nginx path `http://localhost:8080/health` в local Compose; provider OpenAI не вызывается healthcheck-ом.
 
 Полный data contract: [database.md](database.md). Потоки и security: [architecture.md](architecture.md). Image semantics: [image-generation.md](image-generation.md).
