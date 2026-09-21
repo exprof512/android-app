@@ -161,17 +161,19 @@ Android строится как state-driven client: ViewModel получает 
 | **Progress** | weight entries, trend, target progress и дневной balance без guaranteed claims |
 | **Profile** | editable profile, preferences, restrictions, pantry, goal, tier/usage и logout |
 
-Онбординг — последовательность из семи resumable screens (draft хранится локально до submit):
+Онбординг — последовательность из семи resumable screens (draft хранится локально до submit). Заголовки экранов фиксированы product-copy:
 
-1. welcome, назначение ассистента и обязательный disclaimer;
-2. sex, age, height, current weight;
-3. target weight, goal и desired weekly change;
-4. activity level и daily calories либо deficit;
-5. meals per day, cooking time и household size;
-6. weekly grocery budget и продукты дома;
-7. liked/disliked foods, excluded foods и allergies с финальным review.
+| # | Экран | Собираемые поля |
+|---|---|---|
+| 1 | **Твоя цель** | `goal_type`, `target_weight_kg`, `desired_weekly_change_kg` + короткий disclaimer |
+| 2 | **Расскажи о себе** | `sex`, `age_years`, `height_cm`, `current_weight_kg` |
+| 3 | **Как ты питаешься?** | `activity_level`, `meals_per_day`, `daily_calorie_mode` / `daily_calorie_value` |
+| 4 | **Что ты любишь?** | `liked_foods`, `disliked_foods`, `excluded_foods`, `allergies` |
+| 5 | **Какой бюджет?** | `grocery_budget_weekly`, `currency`, `household_size` |
+| 6 | **Сколько времени готовишь?** | `max_cook_time_minutes` |
+| 7 | **Что есть дома?** | `available_products` + review всех ответов |
 
-После явного submit показывается «Создаём твой первый план...», Android вызывает `POST /meal-plans/generate` и затем отображает persisted response. Pending photos не задерживают этот экран: recipe cards переходят в `pending/processing/ready/failed` по image contract.
+Финальный loading-экран после явного submit: **«Создаём твой первый план...»**. Android вызывает `POST /meal-plans/generate` и показывает persisted response. Pending photos не задерживают этот экран: recipe cards переходят в `pending/processing/ready/failed` по image contract.
 
 Recipe screen всегда показывает: AI image или status state, name, favorite, calories/БЖУ, cook time, estimated cost, ingredients с граммами, ordered steps, а также actions **Replace**, **Cook**, **Add to shopping**, **Ask AI**. В lists Coil загружает thumbnail, в detail — large image; UI не пытается самостоятельно повторить provider generation.
 

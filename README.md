@@ -11,14 +11,17 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 
 ## Статус
 
-| Phase | Состояние |
+| Phase (roadmap репозитория) | Состояние |
 |---|---|
-| 0 — Product specification | готово |
-| 1 — Backend foundation | готово: FastAPI, config, Alembic, `/health`, Compose/Nginx runtime |
+| 0 — Product specification | готово (re-validated против master prompt; ждёт confirmation) |
+| 1 — Backend foundation | готово: FastAPI, config, Alembic, `/health`, Compose/Nginx/MinIO/worker runtime |
 | 2 — Auth and session | готово: `users`/`refresh_tokens`, Argon2id, JWT access/refresh rotation, `/auth/*`, `/users/me`, ownership guard |
 | 3 — Profile and Nutrition Engine | готово: анкета, цели, предпочтения/ограничения/pantry, `GET`/`PUT /profile`, `POST /profile/calculate-target`, BMR/TDEE/macros с safety floors |
 | 4 — Recipe domain | готово: каталог ингредиентов, `RecipeEngine` (валидация, канонизация, единицы → граммы, fingerprint/dedup), пересчёт БЖУ и стоимости, `GET /recipes/{id}` и favorites |
-| 5–16 | не начаты |
+| 5 — Text AI | не начато ← **следующий шаг после confirmation** |
+| 6–16 | не начаты |
+
+Android-модуля (`android/`) пока нет. Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 
 ## Локальный запуск
 

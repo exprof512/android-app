@@ -138,7 +138,7 @@ IMAGE_THUMBNAIL_MAX_EDGE=
 IMAGE_WEBP_QUALITY=
 ```
 
-`OPENAI_IMAGE_MODEL` default ориентирован на `gpt-image-2`/GPT-Image-2, но не hardcoded: model swap — config-only. `OpenAIImageProvider` хранит versioned capability map выбранной model и передаёт в Image Generation API только параметры, поддерживаемые этой model. Пустые/unsupported `size`, `quality` или `format` не отправляются; worker применяет local conversion when API returns PNG. Неподдерживаемая required configuration должна fail fast на startup/config validation, а не отправлять неизвестный параметр provider.
+`OPENAI_IMAGE_MODEL` default ориентирован на `gpt-image-2` (GPT-Image-2), но не hardcoded: model swap — config-only. Допустимые примеры без смены архитектуры: `gpt-image-2`, `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst` или dated snapshot. `OpenAIImageProvider` хранит versioned capability map выбранной model и передаёт в Image Generation API только параметры, поддерживаемые этой model (`size`, `quality`, `output_format`, compression и т.д.). Пустые/unsupported значения не отправляются; GPT Image models возвращают `b64_json`, а worker при необходимости конвертирует PNG → WEBP/JPEG и всегда пишет свои object keys. Неподдерживаемая required configuration должна fail fast на startup/config validation, а не отправлять неизвестный параметр provider. OpenAI не используется как permanent store.
 
 Не использовать OpenAI как permanent image store: результат скачивается/декодируется немедленно, сохраняется через `StorageProvider`, а provider URL/temporary asset не отдаётся Android.
 

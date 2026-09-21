@@ -1,6 +1,6 @@
 # Development workflow FoodAI
 
-Phase 0 фиксирует future layout и правила разработки. Эта фаза не создаёт application source, Docker Compose, API implementation, Gradle project или scripts.
+Phase 0 фиксирует layout и правила разработки. Спецификация ниже — source of truth даже после появления кода: реализация идёт по [roadmap.md](roadmap.md) и не должна расходиться с этими правилами без обновления docs.
 
 ## Целевая структура repository
 
@@ -105,7 +105,7 @@ Since Phase 2 the backend refuses to start with an empty `JWT_SECRET` in any env
 
 ## Local services
 
-Future `compose.yaml` has exactly these services:
+`compose.yaml` содержит ровно эти services:
 
 | Service | Role | Persistent data | Healthcheck intent |
 |---|---|---|---|
@@ -209,4 +209,4 @@ scripts/install_android.sh
 5. Проверить `git diff`, отсутствие secrets/generated credentials и актуальность `.env.example`.
 6. Создать отдельный descriptive git commit и report текущего status.
 
-Phase 0 завершается этими спецификациями и ожидает human confirmation. Она не разрешает начать Phase 1 foundation. Cross-links: [architecture.md](architecture.md), [api.md](api.md), [database.md](database.md), [ai.md](ai.md), [storage.md](storage.md).
+Phase 0 считается завершённой, когда все восемь docs согласованы и подтверждены человеком. Повторный Phase 0 review (re-validation) не откатывает уже реализованные фазы 1–4; после confirmation следующий шаг — Phase 5 по roadmap репозитория (см. маппинг в [roadmap.md](roadmap.md)). Cross-links: [architecture.md](architecture.md), [api.md](api.md), [database.md](database.md), [ai.md](ai.md), [storage.md](storage.md).
