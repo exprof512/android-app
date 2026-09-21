@@ -16,6 +16,7 @@ from app.core.db import Base, Database
 from app.core.redis import RedisClient
 from app.core.services import Services
 from app.main import create_app
+from app.nutrition.engine import NutritionEngine
 
 API_PREFIX = "/api/v1"
 TEST_JWT_SECRET = "unit-test-signing-key-with-enough-entropy"
@@ -48,6 +49,7 @@ async def services(test_settings: Settings) -> AsyncIterator[Services]:
             access_ttl_seconds=test_settings.jwt_access_ttl_seconds,
             refresh_ttl_days=test_settings.jwt_refresh_ttl_days,
         ),
+        nutrition=NutritionEngine.from_settings(test_settings),
     )
     try:
         yield container

@@ -13,6 +13,7 @@ from app.core.config import Settings
 from app.core.errors import DependencyUnavailable
 from app.core.services import Services
 from app.main import create_app
+from app.nutrition.engine import NutritionEngine
 
 
 class HealthyServices:
@@ -84,6 +85,7 @@ async def test_health_check_gives_up_on_a_stalled_dependency() -> None:
             access_ttl_seconds=900,
             refresh_ttl_days=30,
         ),
+        nutrition=NutritionEngine.from_settings(Settings(app_env="test")),
     )
 
     with pytest.raises(DependencyUnavailable):

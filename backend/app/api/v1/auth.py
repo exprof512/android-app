@@ -14,6 +14,8 @@ from app.auth.schemas import (
     UserSummary,
 )
 from app.auth.service import DEFAULT_TIER, AuthService, TokenPair
+from app.profiles.dependencies import get_profile_service
+from app.profiles.service import ProfileService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -31,6 +33,7 @@ def _token_pair_response(pair: TokenPair) -> TokenPairResponse:
 async def register(
     payload: RegisterRequest,
     auth_service: AuthService = Depends(get_auth_service),
+    profile_service: ProfileService = Depends(get_profile_service),
 ) -> TokenPairResponse:
     pair = await auth_service.register(
         email=payload.email,
@@ -38,6 +41,7 @@ async def register(
         locale=payload.locale,
         accepted_terms_at=payload.accepted_terms_at,
     )
+    await profile_service.ensure_profile(pair.user.id)
     return _token_pair_response(pair)
 
 

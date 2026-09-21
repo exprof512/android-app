@@ -115,20 +115,46 @@ Refresh token одноразовый: `POST /auth/refresh` отзывает пр
 }
 ```
 
-`POST /profile/calculate-target` принимает те же антропометрические/goal поля (без сохранения) и возвращает:
+`POST /profile/calculate-target` принимает те же антропометрические/goal поля (без сохранения). Для профиля выше с `daily_calorie_mode: auto` и `desired_weekly_change_kg: 0.4` ответ:
 
 ```json
 {
-  "bmr_kcal": 1424,
-  "tdee_kcal": 2207,
-  "recommended_calorie_target_kcal": 1807,
+  "bmr_kcal": 1458,
+  "tdee_kcal": 2260,
+  "recommended_calorie_target_kcal": 1820,
   "applied_safety_floor_kcal": 1200,
-  "macro_targets_g": {"protein": 115, "fat": 60, "carbohydrate": 195},
+  "macro_targets_g": {"protein": 116, "fat": 61, "carbohydrate": 203},
   "warnings": ["Расчёты приблизительны и не заменяют врача или диетолога."]
 }
 ```
 
 Backend отклоняет экстремальный target вместо того, чтобы передавать его AI.
+
+Phase 3 фиксирует контракт этих endpoints. Обязательные поля `PUT /profile`: `sex` (`female`/`male`/`other`), `age_years`, `height_cm`, `current_weight_kg`, `activity_level` (`sedentary`/`light`/`moderate`/`high`/`very_high`), `goal_type` (`lose_weight`/`maintain_weight`/`gain_weight`) и `meals_per_day`. Остальное опционально; `currency` по умолчанию `RUB`, `household_size` — `1`.
+
+`daily_calorie_mode` определяет, откуда берётся суточная цель:
+
+| Mode | Значение `daily_calorie_value` | Результат |
+|---|---|---|
+| `auto` | не используется | цель считается из `desired_weekly_change_kg` (1 кг ≈ 7700 ккал) |
+| `deficit` | ккал в день | `TDEE` минус значение; только для `lose_weight` |
+| `surplus` | ккал в день | `TDEE` плюс значение; только для `gain_weight` |
+| `target` | ккал в день | значение используется как есть |
+
+`PUT /profile` — полная замена editable анкеты: переданные `liked_foods`, `disliked_foods`, `excluded_foods`, `allergies` и `available_products` вытесняют предыдущие записи. Названия нормализуются (trim, lowercase, схлопывание пробелов) и дедуплицируются, отображается первое написание пользователя; pantry-позиции с одинаковым названием и unit суммируются. Допустимые unit: `g`, `kg`, `ml`, `l`, `piece`, `pack`, `tbsp`, `tsp`. `GET /profile` возвращает `profile`, `goal` (active goal или `null`), `preferences`, `restrictions`, `available_products` и `warnings`.
+
+Поле `warnings` всегда содержит disclaimer «Расчёты приблизительны и не заменяют врача или диетолога.», когда в ответе есть рассчитанная цель, и дополняется предупреждением о поднятии калорийности до safety floor. `applied_safety_floor_kcal` показывает применимый floor всегда, даже если цель выше него; для `other`/неизвестного пола используется более высокий floor.
+
+Небезопасные цели backend отклоняет с `422 nutrition_validation_error` до любой записи в базу; `details` содержит `field` и `reason`:
+
+| `field` | `reason` |
+|---|---|
+| `desired_weekly_change_kg` | `required`, `must_not_be_negative`, `exceeds_safe_weekly_change`, `must_be_zero_for_maintain_weight` |
+| `target_weight_kg` | `must_be_below_current_weight`, `must_be_above_current_weight`, `below_safe_bmi` |
+| `daily_calorie_value` | `required` |
+| `daily_calorie_mode` | `inconsistent_with_goal_type` |
+
+Нарушения схемы (диапазоны, enum, формат) по-прежнему возвращают `422 validation_error`. Расчёт целей выполняет только `NutritionEngine`: Android и AI не могут прислать готовые калории или БЖУ.
 
 ## Meal plans и plan items
 

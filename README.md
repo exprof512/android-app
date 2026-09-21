@@ -16,7 +16,8 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 0 — Product specification | готово |
 | 1 — Backend foundation | готово: FastAPI, config, Alembic, `/health`, Compose/Nginx runtime |
 | 2 — Auth and session | готово: `users`/`refresh_tokens`, Argon2id, JWT access/refresh rotation, `/auth/*`, `/users/me`, ownership guard |
-| 3–16 | не начаты |
+| 3 — Profile and Nutrition Engine | готово: анкета, цели, предпочтения/ограничения/pantry, `GET`/`PUT /profile`, `POST /profile/calculate-target`, BMR/TDEE/macros с safety floors |
+| 4–16 | не начаты |
 
 ## Локальный запуск
 
