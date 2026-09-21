@@ -66,6 +66,7 @@ def test_settings_load_from_environment_without_network(monkeypatch) -> None:
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://foodai:test@localhost/foodai")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("JWT_SECRET", "not-used-in-tests")
     monkeypatch.setenv("OPENAI_API_KEY", "not-used-in-tests")
     monkeypatch.setattr(
         socket,
@@ -79,10 +80,13 @@ def test_settings_load_from_environment_without_network(monkeypatch) -> None:
     assert settings.openai_api_key == "not-used-in-tests"
 
 
-def test_env_example_loads_without_secret_values() -> None:
+def test_env_example_loads_without_secret_values(monkeypatch) -> None:
+    for name in ("DATABASE_URL", "REDIS_URL", "JWT_SECRET"):
+        monkeypatch.delenv(name, raising=False)
     example = Path(__file__).parents[2] / ".env.example"
 
     settings = Settings(_env_file=example)
 
-    assert settings.required_runtime_settings() == ("DATABASE_URL",)
+    assert settings.required_runtime_settings() == ("DATABASE_URL", "JWT_SECRET")
+    assert settings.weak_runtime_settings() == ()
     assert settings.image_max_concurrent_jobs is None
