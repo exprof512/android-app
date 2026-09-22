@@ -42,6 +42,14 @@ class S3StorageProvider:
             config=Config(signature_version="s3v4"),
         )
 
+    async def ping(self) -> None:
+        """Lightweight bucket reachability check for health endpoints."""
+
+        def _head() -> None:
+            self._client.head_bucket(Bucket=self._bucket)
+
+        await asyncio.to_thread(_head)
+
     async def ensure_bucket(self) -> None:
         def _ensure() -> None:
             try:

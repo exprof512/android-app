@@ -11,18 +11,22 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
-/** Design tokens — Phase 8 foundation only; feature screens refine later. */
+/** FoodAI design tokens — green nutrition brand from product mockups. */
 object FoodAiTokens {
     val Forest = Color(0xFF1B5E4B)
     val ForestDeep = Color(0xFF0F3D32)
-    val Leaf = Color(0xFF3D8B6E)
-    val Mist = Color(0xFFF4F7F5)
-    val Fog = Color(0xFFE2EBE6)
+    val Leaf = Color(0xFF2F9B72)
+    val LeafSoft = Color(0xFFD8F0E4)
+    val Mist = Color(0xFFFAFCFA)
+    val Fog = Color(0xFFE8F3EC)
+    val NavBar = Color(0xFFF0EAF5)
+    val NavSelected = Color(0xFFE0D4F0)
     val Ink = Color(0xFF14201C)
     val Muted = Color(0xFF5A6B64)
     val Danger = Color(0xFFB42318)
     val Warning = Color(0xFFB54708)
     val Success = Color(0xFF027A48)
+    val Gold = Color(0xFFC9A227)
 
     val SpaceXs = 4
     val SpaceSm = 8
@@ -31,14 +35,15 @@ object FoodAiTokens {
     val SpaceXl = 32
 
     val RadiusSm = 8
-    val RadiusMd = 12
-    val RadiusLg = 20
+    val RadiusMd = 16
+    val RadiusLg = 24
+    val RadiusPill = 28
 }
 
 private val LightColors = lightColorScheme(
     primary = FoodAiTokens.Forest,
     onPrimary = Color.White,
-    primaryContainer = FoodAiTokens.Fog,
+    primaryContainer = FoodAiTokens.LeafSoft,
     onPrimaryContainer = FoodAiTokens.ForestDeep,
     secondary = FoodAiTokens.Leaf,
     onSecondary = Color.White,
@@ -120,6 +125,7 @@ fun FoodAiTheme(
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
+        // Product mockups are light-first; keep dark only when system forces it.
         colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = FoodAiTypography,
         content = content,

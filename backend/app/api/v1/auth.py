@@ -13,19 +13,25 @@ from app.auth.schemas import (
     TokenPairResponse,
     UserSummary,
 )
-from app.auth.service import DEFAULT_TIER, AuthService, TokenPair
+from app.auth.service import AuthService, TokenPair
+from app.entitlements.dependencies import get_entitlements_service
+from app.entitlements.service import EntitlementsService
 from app.profiles.dependencies import get_profile_service
 from app.profiles.service import ProfileService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _token_pair_response(pair: TokenPair) -> TokenPairResponse:
+async def _token_pair_response(
+    pair: TokenPair, entitlements: EntitlementsService
+) -> TokenPairResponse:
+    await entitlements.ensure_free_subscription(pair.user.id)
+    tier = await entitlements.get_tier(pair.user.id)
     return TokenPairResponse(
         access_token=pair.access_token,
         refresh_token=pair.refresh_token,
         expires_in=pair.expires_in,
-        user=UserSummary(id=pair.user.id, email=pair.user.email, tier=DEFAULT_TIER),
+        user=UserSummary(id=pair.user.id, email=pair.user.email, tier=tier),
     )
 
 
@@ -34,6 +40,7 @@ async def register(
     payload: RegisterRequest,
     auth_service: AuthService = Depends(get_auth_service),
     profile_service: ProfileService = Depends(get_profile_service),
+    entitlements: EntitlementsService = Depends(get_entitlements_service),
 ) -> TokenPairResponse:
     pair = await auth_service.register(
         email=payload.email,
@@ -42,25 +49,27 @@ async def register(
         accepted_terms_at=payload.accepted_terms_at,
     )
     await profile_service.ensure_profile(pair.user.id)
-    return _token_pair_response(pair)
+    return await _token_pair_response(pair, entitlements)
 
 
 @router.post("/login", response_model=TokenPairResponse)
 async def login(
     payload: LoginRequest,
     auth_service: AuthService = Depends(get_auth_service),
+    entitlements: EntitlementsService = Depends(get_entitlements_service),
 ) -> TokenPairResponse:
     pair = await auth_service.login(email=payload.email, password=payload.password)
-    return _token_pair_response(pair)
+    return await _token_pair_response(pair, entitlements)
 
 
 @router.post("/refresh", response_model=TokenPairResponse)
 async def refresh(
     payload: RefreshRequest,
     auth_service: AuthService = Depends(get_auth_service),
+    entitlements: EntitlementsService = Depends(get_entitlements_service),
 ) -> TokenPairResponse:
     pair = await auth_service.rotate(payload.refresh_token)
-    return _token_pair_response(pair)
+    return await _token_pair_response(pair, entitlements)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

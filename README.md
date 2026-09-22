@@ -27,7 +27,9 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 11 — Shopping | готово: generate/current/complete, pantry exclusion, Android Shopping tab |
 | 12 — Progress | готово: weight entries, summary, daily balance, Android Progress tab |
 | 13 — Contextual chat | готово: conversations/messages, safety refusal, Ask AI from recipe |
-| 14–16 | не начаты |
+| 14 — Entitlements abstraction | готово: subscriptions/usage_limits, Free/Premium limits, PaymentProvider stub, Android Free badge |
+| 15 — Hardening and observability | готово: log redaction, security headers, /health/deps, backup+restore drill scripts, cache smoke |
+| 16 — MVP release candidate | не начато |
 
 Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 

@@ -96,23 +96,49 @@ class Services:
     async def check_health(
         self, *, timeout: float = HEALTHCHECK_TIMEOUT_SECONDS
     ) -> None:
-        try:
-            checks = await asyncio.wait_for(
-                asyncio.gather(
-                    self.database.ping(),
-                    self.redis.ping(),
-                    return_exceptions=True,
-                ),
-                timeout=timeout,
-            )
-        except TimeoutError:
-            checks = [TimeoutError()]
-        if any(isinstance(result, Exception) for result in checks):
+        details = await self.check_health_details(timeout=timeout)
+        required = ("postgres", "redis")
+        if any(details[name] != "ok" for name in required):
             logger.warning(
                 "dependency_healthcheck_failed",
                 extra={"error_code": "dependency_unavailable"},
             )
             raise DependencyUnavailable()
+
+    async def check_health_details(
+        self, *, timeout: float = HEALTHCHECK_TIMEOUT_SECONDS
+    ) -> dict[str, str]:
+        """Return per-dependency status without secrets or connection strings."""
+
+        async def _status(coro: object, label: str) -> tuple[str, str]:
+            try:
+                await coro  # type: ignore[misc]
+                return label, "ok"
+            except Exception:
+                return label, "unavailable"
+
+        async def _gather() -> dict[str, str]:
+            jobs = [
+                _status(self.database.ping(), "postgres"),
+                _status(self.redis.ping(), "redis"),
+            ]
+            storage = self.storage
+            if storage is not None and hasattr(storage, "ping"):
+                jobs.append(_status(storage.ping(), "storage"))
+            results = await asyncio.gather(*jobs)
+            out = {name: status for name, status in results}
+            if "storage" not in out:
+                out["storage"] = "skipped"
+            return out
+
+        try:
+            return await asyncio.wait_for(_gather(), timeout=timeout)
+        except TimeoutError:
+            return {
+                "postgres": "unavailable",
+                "redis": "unavailable",
+                "storage": "unavailable",
+            }
 
     async def close(self) -> None:
         await asyncio.gather(

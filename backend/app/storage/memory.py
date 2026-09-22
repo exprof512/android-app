@@ -10,6 +10,9 @@ class MemoryStorageProvider:
         self._objects: dict[str, tuple[bytes, str]] = {}
         self._public_base_url = public_base_url.rstrip("/")
 
+    async def ping(self) -> None:
+        return None
+
     async def upload(
         self,
         key: str,

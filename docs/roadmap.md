@@ -26,9 +26,9 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | 10 Weekly + shopping | **6**/**11** | shopping: Phase **11** готово |
 | 11 Progress | **12** | готово |
 | 12 AI chat | **13** | готово |
-| 13 Monetization | **14** | не начато |
-| 14 Security | **15** Hardening | не начато |
-| 15 UX polish | **10–15** Android/UX | не начато |
+| 13 Monetization | **14** | готово |
+| 14 Security | **15** Hardening | готово |
+| 15 UX polish | **10–15** Android/UX | частично (design refresh в 14/15) |
 | 16 Release candidate | **16** MVP RC | не начато |
 
 После подтверждения Phase 0 **не** пересоздаём Docker/Auth/Profile: следующий implementation-шаг — **Phase 5 Text AI** по roadmap репозитория.
@@ -49,8 +49,8 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | **11 — Shopping** | Генерация, merged ingredients, pantry exclusion, completion и Shopping navigation. | **готово**: backend shopping APIs + tests; Android Shopping tab; debug APK. |
 | **12 — Progress** | Weight entry, progress summary, daily nutrition balance and Progress screen. | **готово**: weight-entries + summary APIs; Android Progress tab; disclaimer. |
 | **13 — Contextual chat** | Conversation/message API, bounded profile/plan context, safety handling, Chat UI entry from recipe. | **готово**: chat APIs + safety refusal; Ask AI from recipe; mocked tests. |
-| **14 — Entitlements abstraction** | Free/Premium limits, `require_premium()`, usage UX and `PaymentProvider` interface only. | Permission/rate/usage tests; Android paywall states; no real payment provider required. |
-| **15 — Hardening and observability** | Structured logs, request IDs, security review, healthchecks, backups/restore drill, performance/cache checks. | Sensitive-log audit; all service healthchecks; tested Postgres/MinIO restore procedure. |
+| **14 — Entitlements abstraction** | Free/Premium limits, `require_premium()`, usage UX and `PaymentProvider` interface only. | **готово**: `subscriptions`/`usage_limits`; EntitlementsService; Free limits; Premium-only image regenerate; Android Free/Premium badge + paywall copy; PaymentProvider stub. |
+| **15 — Hardening and observability** | Structured logs, request IDs, security review, healthchecks, backups/restore drill, performance/cache checks. | **готово**: log redaction audit; security headers; `/health`+`/health/deps`; Compose healthchecks; `scripts/backup.sh` + `restore_drill.sh` + `healthcheck_all.sh` + `cache_smoke.sh`. |
 | **16 — MVP release candidate** | End-to-end regression, accessibility/localization review, production config review, APK build/install evidence. | Full backend suite green; Android debug/release-candidate build succeeds; APK path reported; release checklist accepted. |
 
 ## MVP на Phase 16

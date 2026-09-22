@@ -1,21 +1,32 @@
-"""Docker healthcheck for the idle Arq worker."""
+"""Docker healthcheck for the idle Arq worker (Redis + Postgres)."""
 
 from __future__ import annotations
 
 import asyncio
+import sys
 
 from redis.asyncio import Redis
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_settings
 
 
 async def check() -> None:
-    client = Redis.from_url(get_settings().redis_url)
+    settings = get_settings()
+    redis = Redis.from_url(settings.redis_url)
+    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     try:
-        await client.ping()
+        await redis.ping()
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
     finally:
-        await client.aclose()
+        await redis.aclose()
+        await engine.dispose()
 
 
 if __name__ == "__main__":
-    asyncio.run(check())
+    try:
+        asyncio.run(check())
+    except Exception:
+        sys.exit(1)

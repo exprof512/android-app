@@ -14,16 +14,19 @@ PROMPTS: dict[str, str] = {
     "generate_recipe_candidates": (
         f"{BASE_SAFETY} Верни JSON со списком рецептов-кандидатов: "
         "название, порции, способ приготовления, время, ингредиенты с quantity/unit, "
-        "пошаговые инструкции. Единицы: g, kg, ml, l, tbsp, tsp, piece."
+        "пошаговые инструкции. Единицы: g, kg, ml, l, tbsp, tsp, piece. "
+        "Если в контексте есть allowed_ingredients — используй только эти названия."
     ),
     "generate_meal_plan_proposal": (
         f"{BASE_SAFETY} Верни предложение плана питания: набор recipe candidates и "
         "слоты (дата ISO, meal_type, recipe_index, servings). Соблюдай число приёмов "
-        "пищи и ограничения из контекста."
+        "пищи и ограничения из контекста. ingredients.name — только из "
+        "allowed_ingredients в контексте, без синонимов и новых продуктов."
     ),
     "replace_meal_item": (
         f"{BASE_SAFETY} Предложи замену одного блюда: 1–5 recipe candidates и reason. "
-        "Учти аллергии, exclusions и оставшийся дневной баланс."
+        "Учти аллергии, exclusions и оставшийся дневной баланс. "
+        "ingredients.name — только из allowed_ingredients, если список передан."
     ),
     "chat_answer": (
         f"{BASE_SAFETY} Ответь кратко и по делу. suggested_actions только из: "

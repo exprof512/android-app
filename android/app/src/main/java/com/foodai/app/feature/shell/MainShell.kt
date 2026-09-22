@@ -1,27 +1,38 @@
 package com.foodai.app.feature.shell
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ShoppingCart
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,6 +46,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.ui.ErrorPane
+import com.foodai.app.core.ui.FoodAiPrimaryButton
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.theme.FoodAiTokens
 import com.foodai.app.feature.chat.ChatRoute
@@ -74,6 +86,7 @@ fun MainShellRoute(
         )
         else -> MainShell(
             email = state.user?.email ?: "—",
+            tier = state.user?.tier ?: "free",
             profile = state.profile,
             onLogout = { viewModel.logout(onSignedOut) },
             onEditProfile = onEditProfile,
@@ -84,6 +97,7 @@ fun MainShellRoute(
 @Composable
 fun MainShell(
     email: String,
+    tier: String,
     profile: ProfileResponse?,
     onLogout: () -> Unit,
     onEditProfile: () -> Unit,
@@ -94,12 +108,17 @@ fun MainShell(
     val hideBottomBar = current?.startsWith("recipe/") == true || current?.startsWith("chat/") == true
 
     Scaffold(
+        containerColor = FoodAiTokens.Mist,
         bottomBar = {
             if (!hideBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = FoodAiTokens.NavBar,
+                    tonalElevation = 0.dp,
+                ) {
                     tabs.forEach { tab ->
+                        val selected = current == tab.route
                         NavigationBarItem(
-                            selected = current == tab.route,
+                            selected = selected,
                             onClick = {
                                 navController.navigate(tab.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
@@ -109,8 +128,36 @@ fun MainShell(
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(tab.icon, contentDescription = tab.label) },
-                            label = { Text(tab.label) },
+                            icon = {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(FoodAiTokens.RadiusPill.dp))
+                                        .background(
+                                            if (selected) FoodAiTokens.NavSelected else Color.Transparent,
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        tab.icon,
+                                        contentDescription = tab.label,
+                                        tint = if (selected) {
+                                            FoodAiTokens.Forest
+                                        } else {
+                                            FoodAiTokens.Muted
+                                        },
+                                    )
+                                }
+                            },
+                            label = {
+                                Text(
+                                    tab.label,
+                                    color = if (selected) FoodAiTokens.Forest else FoodAiTokens.Muted,
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = Color.Transparent,
+                            ),
                         )
                     }
                 }
@@ -145,6 +192,7 @@ fun MainShell(
             composable(Routes.Profile) {
                 ProfilePane(
                     email = email,
+                    tier = tier,
                     profile = profile,
                     onEditProfile = onEditProfile,
                     onLogout = onLogout,
@@ -179,6 +227,7 @@ fun MainShell(
 @Composable
 private fun ProfilePane(
     email: String,
+    tier: String,
     profile: ProfileResponse?,
     onEditProfile: () -> Unit,
     onLogout: () -> Unit,
@@ -188,14 +237,63 @@ private fun ProfilePane(
             .fillMaxSize()
             .padding(FoodAiTokens.SpaceLg.dp),
         verticalArrangement = Arrangement.spacedBy(FoodAiTokens.SpaceMd.dp),
-        horizontalAlignment = Alignment.Start,
     ) {
         Text("Profile", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            text = email,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(FoodAiTokens.LeafSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Person,
+                    contentDescription = null,
+                    tint = FoodAiTokens.Forest,
+                )
+            }
+            Column {
+                Text(email, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Surface(
+                    color = if (tier == "premium") FoodAiTokens.Gold.copy(alpha = 0.2f) else FoodAiTokens.Fog,
+                    shape = RoundedCornerShape(FoodAiTokens.RadiusPill.dp),
+                ) {
+                    Text(
+                        text = if (tier == "premium") "Premium" else "Free",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (tier == "premium") FoodAiTokens.Gold else FoodAiTokens.Forest,
+                    )
+                }
+            }
+        }
+        if (tier != "premium") {
+            Surface(
+                color = FoodAiTokens.LeafSoft,
+                shape = RoundedCornerShape(FoodAiTokens.RadiusMd.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(FoodAiTokens.SpaceMd.dp)) {
+                    Text("Premium", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Больше генераций плана, замен блюд, чата и перегенерация фото рецептов.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Оплата подключится позже — лимиты уже работают на сервере.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
         val goal = profile?.goal
         if (goal != null) {
             Text(
@@ -208,30 +306,7 @@ private fun ProfilePane(
         profile?.warnings.orEmpty().forEach { warning ->
             Text(warning, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        OutlinedButton(onClick = onEditProfile) {
-            Text("Изменить анкету")
-        }
-        Button(onClick = onLogout) {
-            Text("Выйти")
-        }
-    }
-}
-
-@Composable
-private fun PlaceholderPane(title: String, body: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(FoodAiTokens.SpaceLg.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineMedium)
-        Text(
-            text = body,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
+        FoodAiPrimaryButton(label = "Изменить анкету", onClick = onEditProfile)
+        FoodAiPrimaryButton(label = "Выйти", onClick = onLogout)
     }
 }

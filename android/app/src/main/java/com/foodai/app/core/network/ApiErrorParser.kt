@@ -17,7 +17,7 @@ object ApiErrorParser {
         val parsed = envelope?.error
             ?: runCatching { json.decodeFromString(ApiErrorBody.serializer(), raw) }.getOrNull()
         val details = parsed?.details.orEmpty()
-        val message = buildMessage(parsed?.message ?: parsed?.detail, details)
+        val message = humanize(parsed?.message ?: parsed?.detail, parsed?.code, details)
             ?: defaultMessage(code)
         val apiCode = parsed?.code
         return when (code) {
@@ -25,6 +25,7 @@ object ApiErrorParser {
             403 -> ApiException.Forbidden(message, apiCode)
             409 -> ApiException.Conflict(message, apiCode)
             422 -> ApiException.Validation(message, apiCode, details)
+            429 -> ApiException.RateLimited(message, apiCode)
             else -> ApiException.Unexpected(message, code, apiCode)
         }
     }
@@ -36,8 +37,27 @@ object ApiErrorParser {
         else -> ApiException.Unexpected(error.message ?: "Неизвестная ошибка")
     }
 
-    private fun buildMessage(base: String?, details: List<ApiErrorDetail>): String? {
+    private fun humanize(
+        base: String?,
+        code: String?,
+        details: List<ApiErrorDetail>,
+    ): String? {
+        if (code == "premium_required") {
+            return base ?: "Эта функция доступна в Premium."
+        }
+        if (code == "usage_limit_exceeded") {
+            return base ?: "Достигнут дневной лимит бесплатного тарифа."
+        }
+        val unknownIngredients = details.any { it.reason == "unknown_ingredient" }
+        if (code == "recipe_validation_error" || unknownIngredients) {
+            return "Не удалось собрать рецепт из справочника продуктов. Нажмите «Повторить» — " +
+                "мы соберём план из каталога."
+        }
         if (details.isEmpty()) return base
+        // Keep technical field:reason only for non-recipe validation (forms).
+        if (code == "recipe_validation_error") {
+            return base ?: "Рецепт не прошёл проверку."
+        }
         val detailText = details.joinToString("; ") { d ->
             listOfNotNull(d.field, d.reason).joinToString(": ")
         }
@@ -53,6 +73,7 @@ object ApiErrorParser {
         403 -> "Доступ запрещён"
         409 -> "Конфликт данных"
         422 -> "Проверьте введённые данные"
+        429 -> "Слишком много запросов. Попробуйте позже."
         else -> "Ошибка сервера ($code)"
     }
 }

@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.errors import OwnershipDenied
+from app.entitlements import constants as entitlement_constants
+from app.entitlements.service import EntitlementsService
 from app.images.errors import (
     ImageGenerationInProgress,
     ImageNotFound,
@@ -40,6 +42,7 @@ class ImageGenerationService:
         storage: StorageProvider,
         settings: Settings,
         redis_pool: ArqRedis | None = None,
+        entitlements: EntitlementsService | None = None,
     ) -> None:
         self._session = session
         self._repository = repository
@@ -47,6 +50,7 @@ class ImageGenerationService:
         self._storage = storage
         self._settings = settings
         self._redis_pool = redis_pool
+        self._entitlements = entitlements
 
     async def enqueue_for_recipe(
         self,
@@ -158,6 +162,10 @@ class ImageGenerationService:
 
     async def regenerate(self, user_id: UUID, recipe_id: UUID) -> RecipeImageOut:
         await self._ensure_recipe_access(user_id, recipe_id)
+        if self._entitlements is not None:
+            await self._entitlements.consume(
+                user_id, entitlement_constants.FEATURE_IMAGE_REGENERATE
+            )
         if await self._repository.has_active_job(recipe_id):
             raise ImageGenerationInProgress()
         count = await self._repository.count_regenerations_24h(recipe_id)

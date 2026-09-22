@@ -78,7 +78,7 @@ Refresh token одноразовый: `POST /auth/refresh` отзывает пр
 
 Коды ошибок auth: `401 invalid_credentials` (неверный email или пароль — ответ одинаков, чтобы не раскрывать существование аккаунта), `401 invalid_token` (отсутствующий, истёкший, подделанный, не того типа или отозванный token; ответ содержит `WWW-Authenticate: Bearer`), `403 account_disabled`, `403 ownership_denied` (token принадлежит другому user), `409 email_already_registered`, `422 validation_error`.
 
-`tier` в Phase 2 всегда `free`: реальный tier вычисляет `EntitlementsService` по `subscriptions` в Phase 14. Пустой `user_profiles` создаётся вместе с profile schema в Phase 3, поэтому Phase 2 регистрирует только `users` и сессию.
+`tier` вычисляет `EntitlementsService` по активной строке `subscriptions` (по умолчанию `free`). `GET /entitlements/me` отдаёт tier и дневные usage counters. Premium-only сейчас: `image_regenerate`. Real PaymentProvider не подключён.
 
 ## Профиль и расчёт цели
 
@@ -155,6 +155,15 @@ Phase 3 фиксирует контракт этих endpoints. Обязател
 | `daily_calorie_mode` | `inconsistent_with_goal_type` |
 
 Нарушения схемы (диапазоны, enum, формат) по-прежнему возвращают `422 validation_error`. Расчёт целей выполняет только `NutritionEngine`: Android и AI не могут прислать готовые калории или БЖУ.
+
+## Entitlements
+
+| Method / path | Назначение |
+|---|---|
+| `GET /users/me` | user summary с `tier` из EntitlementsService |
+| `GET /entitlements/me` | tier + дневные usage counters по feature |
+
+`429 usage_limit_exceeded` — исчерпан Free daily window. `403 premium_required` — feature только для Premium (сейчас `image_regenerate`).
 
 ## Meal plans и plan items
 
@@ -305,6 +314,6 @@ URL всегда принадлежит FoodAI CDN/Nginx/backend; raw MinIO endp
 
 ## Health
 
-`GET /health` не требует auth и возвращает ровно `200 {"status":"ok"}` только когда API готово обслуживать request. Если PostgreSQL или Redis не отвечают в течение двух секунд, endpoint возвращает `503 dependency_unavailable`, а не подвисает до таймаута клиента. В Phase 1 endpoint также используется Docker/Nginx healthcheck и доступен через public Nginx path `http://localhost:8080/health` в local Compose; provider OpenAI не вызывается healthcheck-ом.
+`GET /health` не требует auth и возвращает ровно `200 {"status":"ok"}` только когда API готово обслуживать request. Если PostgreSQL или Redis не отвечают в течение двух секунд, endpoint возвращает `503 dependency_unavailable`, а не подвисает до таймаута клиента. `GET /health/deps` отдаёт статусы `postgres`/`redis`/`storage` без секретов (для ops/`scripts/healthcheck_all.sh`). В Phase 1 endpoint также используется Docker/Nginx healthcheck и доступен через public Nginx path `http://localhost:8080/health` в local Compose; provider OpenAI не вызывается healthcheck-ом.
 
 Полный data contract: [database.md](database.md). Потоки и security: [architecture.md](architecture.md). Image semantics: [image-generation.md](image-generation.md).

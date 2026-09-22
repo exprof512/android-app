@@ -24,6 +24,7 @@ from app.core.errors import (
     validation_error_handler,
 )
 from app.core.logging import configure_logging
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.services import Services
 from app.images.api import media_router
 
@@ -62,6 +63,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = active_settings
     app.state.services = None
+    app.add_middleware(SecurityHeadersMiddleware)
 
     @app.middleware("http")
     async def request_logging(request: Request, call_next: object) -> Response:

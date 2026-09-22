@@ -23,6 +23,8 @@ from app.chat.schemas import (
 )
 from app.core.errors import OwnershipDenied
 from app.core.models import utcnow
+from app.entitlements import constants as entitlement_constants
+from app.entitlements.service import EntitlementsService
 from app.meal_plans.models import MealPlan, MealPlanItem
 from app.profiles.models import FoodPreference, FoodRestriction, Goal, UserProfile
 from app.recipes.models import Recipe
@@ -45,10 +47,12 @@ class ChatService:
         session: AsyncSession,
         repository: ChatRepository,
         text_ai: TextAIService,
+        entitlements: EntitlementsService | None = None,
     ) -> None:
         self._session = session
         self._repository = repository
         self._text_ai = text_ai
+        self._entitlements = entitlements
 
     async def create_or_get(
         self, user_id: UUID, payload: ConversationCreate
@@ -91,6 +95,11 @@ class ChatService:
             raise ConversationNotFound()
         if conversation.user_id != user_id:
             raise OwnershipDenied()
+
+        if self._entitlements is not None:
+            await self._entitlements.consume(
+                user_id, entitlement_constants.FEATURE_CHAT_MESSAGE
+            )
 
         user_message = AiMessage(
             conversation_id=conversation.id,

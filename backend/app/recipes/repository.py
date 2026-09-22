@@ -17,18 +17,34 @@ class RecipeRepository:
         self._session = session
 
     async def catalog_for_names(self, names: Iterable[str]) -> dict[str, Ingredient]:
-        """Look up active catalog entries by canonical key."""
+        """Look up active catalog entries by canonical key.
+
+        Loads the full active catalog when resolving AI drafts so aliases and
+        soft matching in ``RecipeEngine`` can map colloquial names.
+        """
         keys = {canonical_key(name) for name in names}
         keys.discard("")
         if not keys:
             return {}
-        statement = select(Ingredient).where(
-            Ingredient.normalized_name.in_(keys), Ingredient.is_active.is_(True)
-        )
+        # Full active catalog: alias/fuzzy resolution needs targets not present
+        # in the raw AI name set (e.g. «куриное филе» → «куриная грудка»).
+        return await self.active_catalog()
+
+    async def active_catalog(self) -> dict[str, Ingredient]:
+        """All active ingredients keyed by ``normalized_name``."""
+        statement = select(Ingredient).where(Ingredient.is_active.is_(True))
         return {
             ingredient.normalized_name: ingredient
             for ingredient in (await self._session.execute(statement)).scalars()
         }
+
+    async def active_canonical_names(self) -> list[str]:
+        statement = (
+            select(Ingredient.canonical_name)
+            .where(Ingredient.is_active.is_(True))
+            .order_by(Ingredient.canonical_name)
+        )
+        return list((await self._session.execute(statement)).scalars())
 
     async def get_by_fingerprint(self, fingerprint: str) -> Recipe | None:
         statement = select(Recipe).where(Recipe.recipe_fingerprint == fingerprint)

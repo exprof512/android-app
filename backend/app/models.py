@@ -3,6 +3,7 @@
 from app.ai.models import AiTextUsage
 from app.auth.models import RefreshToken, User
 from app.chat.models import AiConversation, AiMessage
+from app.entitlements.models import Subscription, UsageLimit
 from app.images.models import AiImageUsage, RecipeImage
 from app.meal_plans.models import MealPlan, MealPlanItem
 from app.profiles.models import (
@@ -39,6 +40,8 @@ __all__ = [
     "RefreshToken",
     "ShoppingList",
     "ShoppingListItem",
+    "Subscription",
+    "UsageLimit",
     "User",
     "UserProfile",
     "UserRecipeFavorite",

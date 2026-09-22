@@ -181,11 +181,34 @@ Use structured JSON logs. Every HTTP request carries or receives `X-Request-ID`;
 }
 ```
 
-Never log password, password hash, access/refresh JWT, `OPENAI_API_KEY`, database URL with password, MinIO/S3 credentials, plaintext signed URL, full profile, full food restrictions or raw prompt/provider payload. Error responses return `request_id`, but internal trace details remain server-side. Usage/cost audit belongs in `ai_text_usage`/`ai_image_usage`, not in sensitive logs.
+Never log password, password hash, access/refresh JWT, `OPENAI_API_KEY`, database URL with password, MinIO/S3 credentials, plaintext signed URL, full profile, full food restrictions or raw prompt/provider payload. `JsonFormatter` redacts sensitive keys and scrubs JWT-like / credential URL substrings from free-form messages. Error responses return `request_id`, but internal trace details remain server-side. Usage/cost audit belongs in `ai_text_usage`/`ai_image_usage`, not in sensitive logs.
+
+Security headers on every HTTP response: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Resource-Policy`; API paths also get `Cache-Control: no-store`. Nginx mirrors the baseline headers at the edge.
+
+## Healthchecks
+
+| Check | What it proves |
+|---|---|
+| Compose `healthcheck` on postgres/redis/minio/backend/worker/nginx | container-level readiness |
+| `GET /health` | Postgres + Redis reachable within 2s → `200 {"status":"ok"}` |
+| `GET /health/deps` | per-dependency `ok`/`unavailable`/`skipped` (storage); 503 if postgres/redis fail |
+| `scripts/healthcheck_all.sh` | all Compose services healthy + public health endpoints |
+| `scripts/cache_smoke.sh` | Redis via deps + AI text cache fingerprint stability |
+
+OpenAI / DeepSeek are **not** healthcheck dependencies.
 
 ## Database, migrations и backups
 
-Alembic migration accompanies every schema change; do not use `create_all` as production migration. A migration must be tested against an empty DB and a prior schema snapshot. In local Compose apply them with `docker compose exec backend alembic upgrade head`; `alembic check` must report no drift between models and the applied schema. PostgreSQL backup uses encrypted logical dump/PITR; MinIO uses separate object-storage replication/snapshot. Restore drill verifies that each `ready recipe_images` row points to both restored variants. `.env` secrets use secret-manager versioning/rotation, not database backup or git.
+Alembic migration accompanies every schema change; do not use `create_all` as production migration. A migration must be tested against an empty DB and a prior schema snapshot. In local Compose apply them with `docker compose exec backend alembic upgrade head`; `alembic check` must report no drift between models and the applied schema.
+
+Local backup/restore drill (Phase 15):
+
+```bash
+./scripts/backup.sh                 # → backups/<timestamp>/postgres.sql.gz + minio/
+./scripts/restore_drill.sh          # isolated DB restore + integrity checks; drops drill DB
+```
+
+PostgreSQL uses logical `pg_dump`; MinIO is mirrored with `mc` into `backups/` (gitignored). Restore drill never overwrites the live database. Production should use encrypted dump/PITR and separate object-storage replication; `.env` secrets stay in secret-manager, never in dumps or git.
 
 ## Android build policy
 

@@ -2,6 +2,9 @@
 .env.*
 !.env.example
 
+# Local backup artifacts (may contain production-like data)
+backups/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -46,6 +46,11 @@ sealed class ApiException(
         code: String? = null,
     ) : ApiException(message, code, 409)
 
+    class RateLimited(
+        message: String,
+        code: String? = "usage_limit_exceeded",
+    ) : ApiException(message, code, 429)
+
     class Validation(
         message: String,
         code: String? = "validation_error",

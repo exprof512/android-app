@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.dependencies import get_db_session, get_services
 from app.core.services import Services
+from app.entitlements.dependencies import get_entitlements_service
+from app.entitlements.service import EntitlementsService
 from app.images.repository import ImageRepository
 from app.images.service import ImageGenerationService
 from app.recipes.repository import RecipeRepository
@@ -37,6 +39,7 @@ def get_image_service(
     request: Request,
     session: AsyncSession = Depends(get_db_session),
     storage: StorageProvider = Depends(get_storage),
+    entitlements: EntitlementsService = Depends(get_entitlements_service),
 ) -> ImageGenerationService:
     settings: Settings = request.app.state.settings
     return ImageGenerationService(
@@ -46,4 +49,5 @@ def get_image_service(
         storage=storage,
         settings=settings,
         redis_pool=getattr(request.app.state, "arq_pool", None),
+        entitlements=entitlements,
     )

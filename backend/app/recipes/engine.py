@@ -14,6 +14,7 @@ from uuid import UUID
 
 from app.nutrition.engine import NutrientPortion, NutritionEngine, RecipeNutrition
 from app.recipes import constants
+from app.recipes.aliases import resolve_catalog_key
 from app.recipes.errors import RecipeValidationError
 from app.recipes.fingerprint import recipe_fingerprint
 from app.recipes.models import Ingredient
@@ -283,10 +284,15 @@ class RecipeEngine:
                 details.append({"field": f"{field_name}.unit", "reason": "unsupported_value"})
                 continue
 
-            catalog_item = catalog.get(canonical_key(item.name))
+            matched_key = resolve_catalog_key(item.name, catalog)
+            catalog_item = catalog.get(matched_key) if matched_key else None
             if catalog_item is None or not catalog_item.is_active:
                 details.append({"field": f"{field_name}.name", "reason": "unknown_ingredient"})
                 continue
+            if matched_key is not None and matched_key != canonical_key(item.name):
+                warnings.append(
+                    f"Ингредиент «{item.name}» сопоставлен с «{catalog_item.canonical_name}»."
+                )
 
             grams = ingredient_grams(catalog_item, item.quantity, item.unit)
             if grams is None:

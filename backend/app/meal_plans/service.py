@@ -37,9 +37,13 @@ from app.meal_plans.schemas import (
     MealPlanRegenerateRequest,
 )
 from app.profiles.service import ProfileService
+from app.entitlements import constants as entitlement_constants
+from app.entitlements.service import EntitlementsService
 from app.recipes.engine import RecipeEngine
+from app.recipes.errors import RecipeValidationError
 from app.recipes.models import Recipe
 from app.recipes.service import RecipeService
+from app.recipes.repository import RecipeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +71,7 @@ class MealPlanService:
         text_ai: TextAIService,
         ai_model: str,
         image_service: ImageGenerationService | None = None,
+        entitlements: EntitlementsService | None = None,
     ) -> None:
         self._session = session
         self._repository = repository
@@ -77,6 +82,7 @@ class MealPlanService:
         self._text_ai = text_ai
         self._ai_model = ai_model
         self._images = image_service
+        self._entitlements = entitlements
 
     async def generate(
         self, user_id: UUID, payload: MealPlanGenerateRequest
@@ -97,7 +103,12 @@ class MealPlanService:
         if existing is not None:
             return await self._to_out(existing, warnings=[], reused=True)
 
-        context = self._build_generation_context(
+        if self._entitlements is not None:
+            await self._entitlements.consume(
+                user_id, entitlement_constants.FEATURE_MEAL_PLAN_GENERATE
+            )
+
+        context = await self._build_generation_context(
             snapshot=snapshot,
             start_date=payload.start_date,
             end_date=end_date,
@@ -120,14 +131,16 @@ class MealPlanService:
                 meals_per_day=snapshot.profile.meals_per_day or 3,
             )
             warnings.append(
-                "План собран из каталога: OpenAI временно недоступен (проверьте квоту/биллинг)."
+                "План собран из каталога: AI временно недоступен."
             )
 
-        stored_recipes: list[Recipe] = []
-        for candidate in proposal.recipes:
-            draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
-            stored = await self._recipes.create_recipe(draft)
-            stored_recipes.append(stored.recipe)
+        stored_recipes, proposal = await self._persist_proposal_recipes(
+            proposal=proposal,
+            warnings=warnings,
+            start_date=payload.start_date,
+            end_date=end_date,
+            meals_per_day=snapshot.profile.meals_per_day or 3,
+        )
 
         slots: list[PlannedSlot] = []
         for index, slot in enumerate(proposal.slots):
@@ -259,6 +272,11 @@ class MealPlanService:
         if plan.user_id != user_id:
             raise OwnershipDenied()
 
+        if self._entitlements is not None:
+            await self._entitlements.consume(
+                user_id, entitlement_constants.FEATURE_MEAL_REPLACE
+            )
+
         snapshot = await self._profiles.get_snapshot(user_id)
         if snapshot.goal is None:
             raise ProfileIncomplete()
@@ -268,6 +286,7 @@ class MealPlanService:
             for r in snapshot.restrictions
             if r.restriction_type in {"allergy", "excluded"}
         ]
+        allowed = await RecipeRepository(self._session).active_canonical_names()
         context = {
             "locale": "ru-RU",
             "meal_type": item.meal_type,
@@ -280,6 +299,7 @@ class MealPlanService:
                 for p in snapshot.preferences
                 if p.preference_type == "liked"
             ],
+            "allowed_ingredients": allowed,
             "replace_recipe_name": item.recipe.name if item.recipe else None,
         }
         fallback_warnings: list[str] = []
@@ -288,6 +308,28 @@ class MealPlanService:
                 context=context, user_id=user_id, use_cache=False
             )
             candidate = replacement.recipes[0]
+            draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
+            try:
+                stored = await self._recipes.create_recipe(draft)
+            except RecipeValidationError:
+                logger.warning(
+                    "replace_meal_recipe_validation_fallback",
+                    extra={"error_code": "recipe_validation_error"},
+                )
+                fallback = await build_catalog_meal_plan_proposal(
+                    self._session,
+                    start_date=item.planned_date,
+                    end_date=item.planned_date,
+                    meals_per_day=1,
+                )
+                candidate = fallback.recipes[0].model_copy(
+                    update={"name": f"Замена: {fallback.recipes[0].name}"}
+                )
+                draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
+                stored = await self._recipes.create_recipe(draft)
+                fallback_warnings.append(
+                    "Замена из каталога: AI предложил неизвестные ингредиенты."
+                )
         except (TextAIQuotaExhausted, TextAIUnavailable):
             logger.warning(
                 "replace_meal_ai_fallback",
@@ -302,11 +344,11 @@ class MealPlanService:
             candidate = fallback.recipes[0].model_copy(
                 update={"name": f"Замена: {fallback.recipes[0].name}"}
             )
+            draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
+            stored = await self._recipes.create_recipe(draft)
             fallback_warnings.append(
-                "Замена из каталога: OpenAI временно недоступен (проверьте квоту/биллинг)."
+                "Замена из каталога: AI временно недоступен."
             )
-        draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
-        stored = await self._recipes.create_recipe(draft)
         recipe = stored.recipe
 
         slot = PlannedSlot(
@@ -410,7 +452,48 @@ class MealPlanService:
             ),
         )
 
-    def _build_generation_context(
+    async def _persist_proposal_recipes(
+        self,
+        *,
+        proposal,
+        warnings: list[str],
+        start_date: date,
+        end_date: date,
+        meals_per_day: int,
+    ) -> tuple[list[Recipe], object]:
+        """Persist AI recipes; on unknown ingredients fall back to catalog templates."""
+        try:
+            stored_recipes: list[Recipe] = []
+            for candidate in proposal.recipes:
+                draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
+                stored = await self._recipes.create_recipe(draft)
+                stored_recipes.append(stored.recipe)
+            return stored_recipes, proposal
+        except RecipeValidationError as exc:
+            logger.warning(
+                "meal_plan_recipe_validation_fallback",
+                extra={
+                    "error_code": "recipe_validation_error",
+                    "detail_count": len(exc.details or []),
+                },
+            )
+            warnings.append(
+                "План собран из каталога: AI предложил продукты вне справочника."
+            )
+            proposal = await build_catalog_meal_plan_proposal(
+                self._session,
+                start_date=start_date,
+                end_date=end_date,
+                meals_per_day=meals_per_day,
+            )
+            stored_recipes = []
+            for candidate in proposal.recipes:
+                draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
+                stored = await self._recipes.create_recipe(draft)
+                stored_recipes.append(stored.recipe)
+            return stored_recipes, proposal
+
+    async def _build_generation_context(
         self, *, snapshot, start_date: date, end_date: date, notes: str | None
     ) -> dict:
         meals = constants.MEALS_BY_COUNT.get(
@@ -426,6 +509,7 @@ class MealPlanService:
                 }
             )
             cursor = cursor + timedelta(days=1)
+        allowed = await RecipeRepository(self._session).active_canonical_names()
         return {
             "locale": "ru-RU",
             "calorie_target_kcal": snapshot.goal.calorie_target_kcal,
@@ -457,11 +541,13 @@ class MealPlanService:
                 if r.restriction_type in {"allergy", "excluded"}
             ],
             "available_products": [p.display_name for p in snapshot.pantry],
+            "allowed_ingredients": allowed,
             "days": days,
             "notes": notes,
             "instructions": (
                 "Верни recipes[] и slots[]: каждый day/meal_type ровно один slot, "
                 "recipe_index указывает на recipes. Не используй запрещённые продукты. "
+                "Названия ingredients.name — ТОЛЬКО из allowed_ingredients (как в списке). "
                 "Порции servings обычно 1. Калории дня близки к calorie_target_kcal."
             ),
         }

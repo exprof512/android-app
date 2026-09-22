@@ -49,10 +49,11 @@ flowchart TD
 
 1. timeout, invalid JSON, schema error и unknown ingredient не создают partial recipe/plan;
 2. один repair retry использует validation feedback без profile secrets; maximum attempts задаётся `AI_TEXT_MAX_ATTEMPTS`;
-3. если validation не проходит после repair, API возвращает `422 ai_output_invalid` / `422 plan_constraints_unsatisfied`;
-4. при `ai_quota_exhausted` / provider unavailable meal-plan generate/replace использует **каталожный fallback** (без OpenAI), добавляя warning в ответ — Android получает план, а не вечный 503;
-4. final nutrition/cost берутся исключительно из пересчёта backend и snapshot в `meal_plan_items`;
-5. AI output/response model/version, latency, token counts, operation и estimated cost записываются в `ai_text_usage`; raw prompts с PII не пишутся в logs.
+3. если validation не проходит после repair, meal-plan generate/replace **не отдаёт 422 пользователю**: делается каталожный fallback с warning; прямой `POST /recipes` по-прежнему может вернуть `422 recipe_validation_error`;
+4. при `ai_quota_exhausted` / provider unavailable meal-plan generate/replace использует **каталожный fallback** (без live AI), добавляя warning в ответ — Android получает план, а не вечный 503;
+5. AI ingredient names сопоставляются со справочником через exact key, aliases и soft token match; в prompt передаётся `allowed_ingredients`;
+6. final nutrition/cost берутся исключительно из пересчёта backend и snapshot в `meal_plan_items`;
+7. AI output/response model/version, latency, token counts, operation и estimated cost записываются в `ai_text_usage`; raw prompts с PII не пишутся в logs.
 
 ## Nutrition Engine: authoritative math
 
@@ -92,11 +93,13 @@ flowchart TD
 | Механизм | Policy |
 |---|---|
 | `usage_limits` | Atomic check/increment до paid provider call; quotas раздельны для plan, replacement, chat и image |
+| `EntitlementsService` | `get_tier()`, `require_premium()`, `consume(feature)`; Free defaults: 3 plan/day, 5 replace/day, 20 chat/day; `image_regenerate` — Premium only |
+| `PaymentProvider` | Interface only (`NullPaymentProvider`); Google Play / RU / international adapters later |
 | `ai_text_usage` | operation/model/tokens/latency/status/estimated cost; без secrets и unnecessary raw context |
 | Redis cache | key содержит operation, schema version, normalized non-sensitive request fingerprint и model config version; TTL environment-configurable |
 | Persisted plans | `GET today/week` читает PostgreSQL, не вызывает AI |
 | Idempotency | `Idempotency-Key` предотвращает двойную генерацию от retry Android |
-| Rate limiting | per-user + per-IP на auth; per-user/tier на costly AI calls; `429` с safe retry guidance |
+| Rate limiting | per-user + per-IP на auth; per-user/tier на costly AI calls; `429 usage_limit_exceeded` с Retry-After |
 | Dedup | canonical `recipe_fingerprint` повторно использует existing recipe/image при идентичном блюде |
 
 Cache hit не расходует provider quota/cost, но audit должен отличать `cached` от real call. Entitlement проверяется server-side через `require_premium()`; Android лишь отображает результат.
