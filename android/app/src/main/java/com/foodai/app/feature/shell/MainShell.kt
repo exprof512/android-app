@@ -92,9 +92,10 @@ fun MainShellRoute(
         else -> MainShell(
             email = state.user?.email ?: "—",
             tier = state.user?.tier ?: "free",
+            user = state.user,
             profile = state.profile,
             onLogout = { viewModel.logout(onSignedOut) },
-            onEditProfile = onEditProfile,
+            onEditQuestionnaire = onEditProfile,
         )
     }
 }
@@ -103,9 +104,10 @@ fun MainShellRoute(
 fun MainShell(
     email: String,
     tier: String,
+    user: com.foodai.app.core.network.UserSummaryDto?,
     profile: ProfileResponse?,
     onLogout: () -> Unit,
-    onEditProfile: () -> Unit,
+    onEditQuestionnaire: () -> Unit,
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -113,7 +115,10 @@ fun MainShell(
     val hideBottomBar = current?.startsWith("recipe/") == true ||
         current?.startsWith("chat") == true ||
         current == "premium" ||
-        current == Routes.Shopping
+        current == Routes.Shopping ||
+        current == "settings" ||
+        current == "notifications" ||
+        current == "profile-details"
 
     Scaffold(
         containerColor = FoodAIColors.Background,
@@ -121,7 +126,11 @@ fun MainShell(
             if (!hideBottomBar) {
                 FoodAINavigationBar(
                     items = mainTabs,
-                    currentRoute = current,
+                    currentRoute = when {
+                        current == "settings" || current == "notifications" || current == "profile-details" ->
+                            Routes.Profile
+                        else -> current
+                    },
                     onSelect = { route ->
                         navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) {
@@ -147,6 +156,15 @@ fun MainShell(
                         navController.navigate("recipe/$recipeId?itemId=$itemId")
                     },
                     onOpenShopping = { navController.navigate(Routes.Shopping) },
+                    onOpenProgress = {
+                        navController.navigate(Routes.Progress) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
             }
             composable(Routes.Plan) {
@@ -168,9 +186,32 @@ fun MainShell(
                     email = email,
                     tier = tier,
                     profile = profile,
-                    onEditProfile = onEditProfile,
+                    onOpenDetails = { navController.navigate("profile-details") },
+                    onOpenSettings = { navController.navigate("settings") },
+                    onOpenNotifications = { navController.navigate("notifications") },
+                    onEditQuestionnaire = onEditQuestionnaire,
                     onPremium = { navController.navigate("premium") },
                     onLogout = onLogout,
+                )
+            }
+            composable("settings") {
+                com.foodai.app.feature.profile.SettingsRoute(
+                    onBack = { navController.popBackStack() },
+                    onEditQuestionnaire = onEditQuestionnaire,
+                )
+            }
+            composable("notifications") {
+                com.foodai.app.feature.profile.NotificationsRoute(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable("profile-details") {
+                com.foodai.app.feature.profile.ProfileDetailsRoute(
+                    email = email,
+                    user = user,
+                    profile = profile,
+                    onBack = { navController.popBackStack() },
+                    onEditQuestionnaire = onEditQuestionnaire,
                 )
             }
             composable("premium") {
@@ -230,7 +271,10 @@ private fun ProfilePane(
     email: String,
     tier: String,
     profile: ProfileResponse?,
-    onEditProfile: () -> Unit,
+    onOpenDetails: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    onEditQuestionnaire: () -> Unit,
     onPremium: () -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -261,7 +305,7 @@ private fun ProfilePane(
                 modifier = Modifier
                     .clip(FoodAIShapes.Pill)
                     .background(FoodAIColors.PrimarySoft)
-                    .clickable(onClick = onEditProfile)
+                    .clickable(onClick = onOpenSettings)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -271,7 +315,7 @@ private fun ProfilePane(
             }
         }
 
-        FoodAICard(onClick = onEditProfile) {
+        FoodAICard(onClick = onOpenDetails) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 FoodAIAvatar(initials = name.take(2))
                 Spacer(Modifier.size(FoodAIDimens.Space12))
@@ -314,7 +358,7 @@ private fun ProfilePane(
                         "Изменить",
                         color = FoodAIColors.Primary,
                         style = FoodAITypography.labelMedium,
-                        modifier = Modifier.clickable(onClick = onEditProfile),
+                        modifier = Modifier.clickable(onClick = onEditQuestionnaire),
                     )
                 }
                 Spacer(Modifier.height(FoodAIDimens.Space12))
@@ -341,7 +385,7 @@ private fun ProfilePane(
 
         Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
             MetricMini("Ккал", "${goal?.calorieTargetKcal ?: "—"}", Icons.Outlined.LocalFireDepartment, Modifier.weight(1f))
-            MetricMini("Активность", "3–4", Icons.Outlined.FitnessCenter, Modifier.weight(1f))
+            MetricMini("Активность", p?.activityLevel ?: "—", Icons.Outlined.FitnessCenter, Modifier.weight(1f))
             MetricMini("Вода", "2.0 л", Icons.Outlined.WaterDrop, Modifier.weight(1f))
         }
 
@@ -373,8 +417,18 @@ private fun ProfilePane(
             }
         }
 
-        ProfileMenuItem("Мои данные", "Возраст, рост, вес, цели", Icons.Outlined.Person, onEditProfile)
-        ProfileMenuItem("Уведомления", "Напоминания, советы, мотивация", Icons.Outlined.Notifications, onEditProfile)
+        ProfileMenuItem(
+            "Мои данные",
+            "Возраст, рост, вес, цели — анкета питания",
+            Icons.Outlined.Person,
+            onEditQuestionnaire,
+        )
+        ProfileMenuItem(
+            "Уведомления",
+            "Напоминания, советы, мотивация",
+            Icons.Outlined.Notifications,
+            onOpenNotifications,
+        )
         ProfileMenuItem(
             "Выйти из аккаунта",
             null,

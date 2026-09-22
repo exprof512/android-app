@@ -22,22 +22,30 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.MonitorWeight
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.Manifest
+import android.os.Build
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.network.MealPlanItemDto
@@ -58,9 +66,18 @@ import kotlin.math.min
 fun TodayRoute(
     onOpenRecipe: (recipeId: String, itemId: String) -> Unit,
     onOpenShopping: () -> Unit = {},
+    onOpenProgress: () -> Unit = {},
     viewModel: TodayViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* steps update via sensor flow when granted */ }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+    }
     when {
         state.loading || state.generating -> LoadingPane(
             if (state.generating) "Создаём план питания…" else "Загружаем сегодня…",
@@ -77,8 +94,10 @@ fun TodayRoute(
             onRebuild = viewModel::rebuildPlan,
             onComplete = viewModel::complete,
             onReplace = viewModel::replace,
+            onAddWater = viewModel::addWater,
             onOpenRecipe = onOpenRecipe,
             onOpenShopping = onOpenShopping,
+            onOpenProgress = onOpenProgress,
         )
     }
 }
@@ -90,8 +109,10 @@ fun TodayScreen(
     onRebuild: () -> Unit,
     onComplete: (MealPlanItemDto) -> Unit,
     onReplace: (MealPlanItemDto) -> Unit,
+    onAddWater: () -> Unit,
     onOpenRecipe: (recipeId: String, itemId: String) -> Unit,
     onOpenShopping: () -> Unit = {},
+    onOpenProgress: () -> Unit = {},
 ) {
     val plan = state.plan
     val goal = state.profile?.goal
@@ -104,6 +125,8 @@ fun TodayScreen(
     val progress = if (target > 0) min(1f, eaten.toFloat() / target.toFloat()) else 0f
     val macros = goal?.macroTargetsG
     val weight = state.profile?.profile?.currentWeightKg
+    val metrics = state.metrics
+    val waterLiters = metrics.waterMl / 1000f
 
     LazyColumn(
         modifier = Modifier
@@ -114,12 +137,27 @@ fun TodayScreen(
         contentPadding = PaddingValues(top = FoodAIDimens.Space16, bottom = FoodAIDimens.Space32),
     ) {
         item {
-            Text("Привет! 👋", style = FoodAITypography.headlineMedium)
-            Text(
-                "Вкусное и полезное питание сегодня — это шаг к большим целям!",
-                style = FoodAITypography.bodyMedium,
-                color = FoodAIColors.TextSecondary,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Привет! 👋", style = FoodAITypography.headlineMedium)
+                    Text(
+                        "Вкусное и полезное питание сегодня — это шаг к большим целям!",
+                        style = FoodAITypography.bodyMedium,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        Icons.Outlined.Refresh,
+                        contentDescription = "Обновить план на сегодня",
+                        tint = FoodAIColors.Primary,
+                    )
+                }
+            }
         }
         item {
             Column(
@@ -179,13 +217,8 @@ fun TodayScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Приёмы пищи", style = FoodAITypography.titleLarge)
-                Row {
-                    TextButton(onClick = onRebuild) {
-                        Text("Пересобрать", color = FoodAIColors.Primary)
-                    }
-                    TextButton(onClick = onRefresh) {
-                        Text("Обновить", color = FoodAIColors.TextSecondary)
-                    }
+                TextButton(onClick = onRebuild) {
+                    Text("Пересобрать", color = FoodAIColors.Primary)
                 }
             }
         }
@@ -209,16 +242,44 @@ fun TodayScreen(
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
-                TodayMetric("Вода", "—", Icons.Outlined.WaterDrop, Modifier.weight(1f))
-                TodayMetric("Активность", "—", Icons.AutoMirrored.Outlined.DirectionsWalk, Modifier.weight(1f))
                 TodayMetric(
-                    "Вес",
-                    weight?.let { "${it.toInt()} кг" } ?: "—",
-                    Icons.Outlined.MonitorWeight,
-                    Modifier.weight(1f),
+                    title = "Вода",
+                    value = String.format("%.1f / %.0f л", waterLiters, metrics.waterGoalMl / 1000f),
+                    icon = Icons.Outlined.WaterDrop,
+                    modifier = Modifier.weight(1f),
+                    onClick = onAddWater,
                 )
-                TodayMetric("Прогресс", "Смотреть", Icons.AutoMirrored.Outlined.ShowChart, Modifier.weight(1f))
+                TodayMetric(
+                    title = "Шаги",
+                    value = if (metrics.stepsAvailable || metrics.steps > 0) {
+                        "%,d".format(metrics.steps)
+                    } else {
+                        "Нет датчика"
+                    },
+                    icon = Icons.AutoMirrored.Outlined.DirectionsWalk,
+                    modifier = Modifier.weight(1f),
+                    onClick = null,
+                )
+                TodayMetric(
+                    title = "Вес",
+                    value = weight?.let { "${it.toInt()} кг" } ?: "—",
+                    icon = Icons.Outlined.MonitorWeight,
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenProgress,
+                )
+                TodayMetric(
+                    title = "Прогресс",
+                    value = "Смотреть",
+                    icon = Icons.AutoMirrored.Outlined.ShowChart,
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenProgress,
+                )
             }
+            Text(
+                "Нажми «Вода», чтобы добавить 250 мл. Шаги берутся с шагомера телефона.",
+                style = FoodAITypography.labelSmall,
+                color = FoodAIColors.TextMuted,
+            )
         }
         item {
             FoodAIOutlinedButton(
@@ -269,18 +330,20 @@ private fun TodayMetric(
     value: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
             .clip(FoodAIShapes.Card)
             .background(FoodAIColors.Surface)
             .border(1.dp, FoodAIColors.Divider, FoodAIShapes.Card)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(vertical = FoodAIDimens.Space12, horizontal = FoodAIDimens.Space8),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, null, tint = FoodAIColors.Primary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.height(4.dp))
-        Text(value, style = FoodAITypography.labelMedium, color = FoodAIColors.TextPrimary)
+        Text(value, style = FoodAITypography.labelMedium, color = FoodAIColors.TextPrimary, maxLines = 1)
         Text(title, style = FoodAITypography.labelSmall)
     }
 }
@@ -325,7 +388,9 @@ fun WeekScreen(
     val plan = state.plan
     val goalKcal = state.profile?.goal?.calorieTargetKcal
         ?: plan?.dailyTargets?.caloriesKcal
-    val dates = plan?.items.orEmpty().map { it.date }.distinct().sorted()
+    val dates = state.weekDates.ifEmpty {
+        plan?.items.orEmpty().map { it.date }.distinct().sorted()
+    }
     val dayItems = plan?.items.orEmpty().filter { it.date == state.selectedDate }
     LazyColumn(
         modifier = Modifier
@@ -336,22 +401,34 @@ fun WeekScreen(
         contentPadding = PaddingValues(top = FoodAIDimens.Space16, bottom = FoodAIDimens.Space32),
     ) {
         item {
-            Text("План на неделю", style = FoodAITypography.headlineMedium)
-            Text(
-                "Вкусное, полезное и разнообразное питание по твоим целям.",
-                style = FoodAITypography.bodyMedium,
-                color = FoodAIColors.TextSecondary,
-            )
-            if (goalKcal != null) {
-                Text(
-                    "Цель: $goalKcal ккал/день · ${dates.size} дн.",
-                    style = FoodAITypography.bodySmall,
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("План на неделю", style = FoodAITypography.headlineMedium)
+                    Text(
+                        "Вкусное, полезное и разнообразное питание по твоим целям.",
+                        style = FoodAITypography.bodyMedium,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                    if (goalKcal != null) {
+                        Text(
+                            "Цель: $goalKcal ккал/день · ${dates.size} дн.",
+                            style = FoodAITypography.bodySmall,
+                        )
+                    }
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        Icons.Outlined.Refresh,
+                        contentDescription = "Обновить план на неделю",
+                        tint = FoodAIColors.Primary,
+                    )
+                }
             }
-            Row {
-                TextButton(onClick = onRebuild) { Text("Пересобрать", color = FoodAIColors.Primary) }
-                TextButton(onClick = onRefresh) { Text("Обновить", color = FoodAIColors.TextSecondary) }
-            }
+            TextButton(onClick = onRebuild) { Text("Пересобрать", color = FoodAIColors.Primary) }
             if (state.actionError != null) {
                 Text(state.actionError, color = FoodAIColors.Error)
             }
@@ -363,6 +440,10 @@ fun WeekScreen(
             LazyRow(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
                 items(dates) { date ->
                     val selected = date == state.selectedDate
+                    val dayLabel = runCatching {
+                        val d = java.time.LocalDate.parse(date)
+                        "${d.dayOfMonth}.${d.monthValue.toString().padStart(2, '0')}"
+                    }.getOrDefault(date.takeLast(5))
                     Box(
                         modifier = Modifier
                             .clip(FoodAIShapes.Pill)
@@ -371,7 +452,7 @@ fun WeekScreen(
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Text(
-                            date.takeLast(5),
+                            dayLabel,
                             color = if (selected) FoodAIColors.TextOnPrimary else FoodAIColors.TextPrimary,
                             style = FoodAITypography.labelLarge,
                         )
@@ -447,25 +528,29 @@ fun MealItemCard(
                 "${recipe.caloriesKcal} ккал · ${recipe.cookTimeMinutes} мин",
                 style = FoodAITypography.bodySmall,
             )
-            if (onComplete != null || onReplace != null) {
-                Spacer(Modifier.height(FoodAIDimens.Space8))
-                Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
-                    if (onComplete != null) {
-                        Text(
-                            if (item.isCompleted) "Снять" else "Съедено",
-                            color = FoodAIColors.Primary,
-                            style = FoodAITypography.labelMedium,
-                            modifier = Modifier.clickable(onClick = onComplete),
-                        )
-                    }
-                    if (onReplace != null) {
-                        Text(
-                            "Заменить",
-                            color = FoodAIColors.TextSecondary,
-                            style = FoodAITypography.labelMedium,
-                            modifier = Modifier.clickable(onClick = onReplace),
-                        )
-                    }
+            Spacer(Modifier.height(FoodAIDimens.Space8))
+            Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12)) {
+                Text(
+                    "Рецепт",
+                    color = FoodAIColors.Primary,
+                    style = FoodAITypography.labelMedium,
+                    modifier = Modifier.clickable(onClick = onOpen),
+                )
+                if (onComplete != null) {
+                    Text(
+                        if (item.isCompleted) "Снять" else "Съедено",
+                        color = FoodAIColors.Primary,
+                        style = FoodAITypography.labelMedium,
+                        modifier = Modifier.clickable(onClick = onComplete),
+                    )
+                }
+                if (onReplace != null) {
+                    Text(
+                        "Заменить",
+                        color = FoodAIColors.TextSecondary,
+                        style = FoodAITypography.labelMedium,
+                        modifier = Modifier.clickable(onClick = onReplace),
+                    )
                 }
             }
         }

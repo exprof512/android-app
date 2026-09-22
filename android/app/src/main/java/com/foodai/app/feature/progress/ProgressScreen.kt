@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,13 +12,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
@@ -71,13 +76,27 @@ fun ProgressScreen(
         verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space16),
     ) {
         item {
-            Text("Прогресс", style = FoodAITypography.headlineMedium)
-            Text(
-                "Ты делаешь это отлично! Маленькие шаги приводят к большим результатам.",
-                style = FoodAITypography.bodyMedium,
-                color = FoodAIColors.TextSecondary,
-            )
-            TextButton(onClick = onRefresh) { Text("Обновить", color = FoodAIColors.Primary) }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Прогресс", style = FoodAITypography.headlineMedium)
+                    Text(
+                        "Ты делаешь это отлично! Маленькие шаги приводят к большим результатам.",
+                        style = FoodAITypography.bodyMedium,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = "Синхронизировать вес и калории с сервера",
+                        tint = FoodAIColors.Primary,
+                    )
+                }
+            }
         }
         item {
             Text(

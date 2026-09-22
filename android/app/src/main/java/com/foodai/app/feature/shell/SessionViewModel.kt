@@ -53,6 +53,7 @@ class SessionViewModel @Inject constructor(
     fun logout(onDone: () -> Unit) {
         viewModelScope.launch {
             authRepository.logout()
+            _state.value = SessionUiState(loading = false)
             onDone()
         }
     }

@@ -51,16 +51,14 @@ import com.foodai.app.core.ui.theme.FoodAITypography
 fun WelcomeRoute(
     onStart: () -> Unit,
     onLogin: () -> Unit,
-    onSkip: () -> Unit = onStart,
 ) {
-    WelcomeScreen(onStart = onStart, onLogin = onLogin, onSkip = onSkip)
+    WelcomeScreen(onStart = onStart, onLogin = onLogin)
 }
 
 @Composable
 fun WelcomeScreen(
     onStart: () -> Unit,
     onLogin: () -> Unit,
-    onSkip: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -69,16 +67,10 @@ fun WelcomeScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(horizontal = FoodAIDimens.ScreenPadding)
-            .padding(bottom = FoodAIDimens.Space24)
+            .padding(top = FoodAIDimens.Space24, bottom = FoodAIDimens.Space24)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onSkip) {
-                Text("Пропустить", color = FoodAIColors.TextSecondary, style = FoodAITypography.labelLarge)
-            }
-        }
-        Spacer(Modifier.height(FoodAIDimens.Space8))
         FoodAILogo(markSize = 48.dp, textSize = 28.sp)
         Spacer(Modifier.height(FoodAIDimens.Space20))
         Text(

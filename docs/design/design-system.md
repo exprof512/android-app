@@ -84,6 +84,31 @@ Prefer subtle elevation (1–2 dp) or thin borders — no heavy Material shadows
 Main tabs: Сегодня · План · center FAB (Ask AI) · Прогресс · Профиль.  
 Shopping opens from Plan/Today CTA. Chat from FAB or recipe.
 
+### Profile destinations (do not all open questionnaire)
+
+| Entry | Destination |
+|-------|-------------|
+| Avatar / name card | Profile details (read-only summary) |
+| Настройки | Settings (language, tips, link to questionnaire) |
+| Мои данные / Изменить цель | Onboarding questionnaire (`generatePlan=false`) |
+| Уведомления | Notifications toggles (local prefs) |
+| Премиум → Управлять | Premium screen |
+
+### Today metrics
+
+- **Вода** — tap adds 250 ml (local, scoped by user id).
+- **Шаги** — `TYPE_STEP_COUNTER` + `ACTIVITY_RECOGNITION` permission.
+- **Вес / Прогресс** — open Progress tab.
+- Refresh actions use a circular refresh icon; rebuild stays as «Пересобрать».
+
+### Week plan
+
+`GET /meal-plans/week` returns items for the full plan window (`start_date`…`end_date`). UI date chips always cover that range.
+
+### Account switch
+
+Login / register / logout clear onboarding draft and daily metrics via `LocalSessionCleaner` so a new account never sees the previous user's local questionnaire or water/steps.
+
 ## Light mode
 
 Primary product experience is light. Dark `ColorScheme` is wired for later — not auto-enabled.

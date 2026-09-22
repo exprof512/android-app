@@ -17,6 +17,7 @@ class AuthRepository @Inject constructor(
     @Named("bare") private val bareAuthApi: AuthApi,
     @Named("authed") private val authedAuthApi: AuthApi,
     private val tokenStore: TokenStore,
+    private val localSessionCleaner: LocalSessionCleaner,
 ) {
     fun hasSession(): Boolean = tokenStore.hasSession()
 
@@ -28,6 +29,7 @@ class AuthRepository @Inject constructor(
 
     suspend fun login(email: String, password: String): TokenPairResponse =
         wrap {
+            localSessionCleaner.clearBeforeNewSession()
             val pair = bareAuthApi.login(LoginRequest(email.trim(), password))
             tokenStore.saveSession(pair)
             // Existing account: Boot decides by profile completeness.
@@ -37,6 +39,7 @@ class AuthRepository @Inject constructor(
 
     suspend fun register(email: String, password: String): TokenPairResponse =
         wrap {
+            localSessionCleaner.clearBeforeNewSession()
             val pair = bareAuthApi.register(
                 RegisterRequest(
                     email = email.trim(),
@@ -68,6 +71,7 @@ class AuthRepository @Inject constructor(
         }
 
     suspend fun logout() {
+        val previousUserId = tokenStore.user()?.id
         val refresh = tokenStore.refreshToken()
         try {
             if (!refresh.isNullOrBlank()) {
@@ -76,6 +80,7 @@ class AuthRepository @Inject constructor(
         } catch (_: Exception) {
             // Local clear always wins — logout is idempotent server-side.
         } finally {
+            localSessionCleaner.clearOnLogout(previousUserId)
             tokenStore.clear()
         }
     }

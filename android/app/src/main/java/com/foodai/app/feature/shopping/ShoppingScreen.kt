@@ -11,8 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -102,22 +106,37 @@ fun ShoppingScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("Исключать продукты из кладовой", style = FoodAITypography.bodyMedium)
+                Column(Modifier.weight(1f)) {
+                    Text("Уже есть дома", style = FoodAITypography.titleSmall)
+                    Text(
+                        "Скрыть из списка продукты, которые ты отметил в кладовой",
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
                 Switch(
                     checked = state.excludePantry,
                     onCheckedChange = onToggleExclude,
                     colors = SwitchDefaults.colors(checkedTrackColor = FoodAIColors.Primary),
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TextButton(onClick = onRegenerate, enabled = !state.regenerating) {
                     Text(
-                        if (state.regenerating) "Обновляем…" else "Пересобрать",
+                        if (state.regenerating) "Собираем…" else "Пересобрать список",
                         color = FoodAIColors.Primary,
                     )
                 }
-                TextButton(onClick = onRefresh) {
-                    Text("Обновить", color = FoodAIColors.TextSecondary)
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = "Обновить список покупок с сервера",
+                        tint = FoodAIColors.Primary,
+                    )
                 }
             }
             if (state.actionError != null) {

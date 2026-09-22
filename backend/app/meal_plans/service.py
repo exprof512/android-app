@@ -255,9 +255,11 @@ class MealPlanService:
         plan = await self._repository.find_covering(user_id, on_date=start_date)
         if plan is None:
             raise MealPlanNotFound()
-        end_date = start_date + timedelta(days=6)
+        # Always return the full active plan window (typically 7 days),
+        # not only [request_date .. request_date+6] which collapses to "today"
+        # when the plan ends on that day.
         items = await self._repository.list_items_for_dates(
-            plan.id, from_date=start_date, to_date=min(end_date, plan.end_date)
+            plan.id, from_date=plan.start_date, to_date=plan.end_date
         )
         return await self._to_out(plan, warnings=[], items_override=items)
 

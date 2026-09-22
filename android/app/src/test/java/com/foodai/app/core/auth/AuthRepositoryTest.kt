@@ -45,7 +45,7 @@ class AuthRepositoryTest {
                 user = UserSummaryDto("u1", "anna@example.com", "free"),
             ),
         )
-        val repo = AuthRepository(api, api, store)
+        val repo = AuthRepository(api, api, store, NoOpLocalSessionCleaner)
 
         val pair = repo.login("Anna@Example.com", "password123")
 
@@ -74,8 +74,13 @@ class AuthRepositoryTest {
                 error("boom")
             }
         }
-        val repo = AuthRepository(failing, failing, store)
+        val repo = AuthRepository(failing, failing, store, NoOpLocalSessionCleaner)
         repo.logout()
         assertThat(store.hasSession()).isFalse()
     }
+}
+
+private object NoOpLocalSessionCleaner : LocalSessionCleaner {
+    override fun clearBeforeNewSession() = Unit
+    override fun clearOnLogout(userId: String?) = Unit
 }
