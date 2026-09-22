@@ -12,6 +12,7 @@ from openai import APITimeoutError, AsyncOpenAI, OpenAIError
 from app.ai.errors import TextAIProviderError
 from app.ai.provider import TextGenerationRequest, TextGenerationResult
 from app.integrations.openai.client import create_openai_client
+from app.integrations.openai.errors import classify_openai_error
 
 logger = logging.getLogger(__name__)
 
@@ -70,14 +71,19 @@ class OpenAIResponsesProvider:
                 retryable=True,
             ) from exc
         except OpenAIError as exc:
+            code, message, retryable = classify_openai_error(exc)
             logger.warning(
                 "openai_text_provider_error",
-                extra={"error_code": "ai_provider_error", "operation": request.operation},
+                extra={
+                    "error_code": code,
+                    "operation": request.operation,
+                    "http_status": getattr(exc, "status_code", None),
+                },
             )
             raise TextAIProviderError(
-                code="ai_provider_error",
-                message="AI provider is temporarily unavailable.",
-                retryable=True,
+                code=code,
+                message=message,
+                retryable=retryable,
             ) from exc
 
         content = _extract_output_text(response)

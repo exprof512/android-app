@@ -335,3 +335,32 @@ data class DishCardDto(
     val steps: List<String> = emptyList(),
     @SerialName("is_favorite") val isFavorite: Boolean = false,
 )
+
+@Serializable
+data class ShoppingGenerateRequest(
+    @SerialName("meal_plan_id") val mealPlanId: String,
+    @SerialName("from_date") val fromDate: String? = null,
+    @SerialName("to_date") val toDate: String? = null,
+    @SerialName("exclude_available_products") val excludeAvailableProducts: Boolean = true,
+)
+
+@Serializable
+data class ShoppingListItemDto(
+    val id: String,
+    @SerialName("display_name") val displayName: String,
+    @SerialName("quantity_value") val quantityValue: Double,
+    val unit: String,
+    @SerialName("is_completed") val isCompleted: Boolean = false,
+    @SerialName("source_recipe_count") val sourceRecipeCount: Int = 1,
+)
+
+@Serializable
+data class ShoppingListDto(
+    val id: String,
+    @SerialName("meal_plan_id") val mealPlanId: String,
+    @SerialName("from_date") val fromDate: String,
+    @SerialName("to_date") val toDate: String,
+    val status: String,
+    val items: List<ShoppingListItemDto> = emptyList(),
+    val warnings: List<String> = emptyList(),
+)

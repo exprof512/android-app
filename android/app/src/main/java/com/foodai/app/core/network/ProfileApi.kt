@@ -52,3 +52,17 @@ interface RecipeApi {
     @DELETE("recipes/{recipeId}/favorite")
     suspend fun removeFavorite(@Path("recipeId") recipeId: String)
 }
+
+interface ShoppingApi {
+    @POST("shopping-lists/generate")
+    suspend fun generate(@Body body: ShoppingGenerateRequest): ShoppingListDto
+
+    @GET("shopping-lists/current")
+    suspend fun current(@Query("meal_plan_id") mealPlanId: String? = null): ShoppingListDto
+
+    @POST("shopping-list-items/{itemId}/complete")
+    suspend fun completeItem(
+        @Path("itemId") itemId: String,
+        @Query("completed") completed: Boolean = true,
+    ): ShoppingListItemDto
+}

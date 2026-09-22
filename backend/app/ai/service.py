@@ -13,7 +13,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.cache import TextAICache
-from app.ai.errors import TextAIProviderError, TextAIUnavailable, TextAIValidationFailed
+from app.ai.errors import TextAIProviderError, TextAIQuotaExhausted, TextAIUnavailable, TextAIValidationFailed
 from app.ai.models import AiTextUsage
 from app.ai.prompts import system_prompt_for
 from app.ai.provider import TextGenerationProvider, TextGenerationRequest
@@ -176,6 +176,8 @@ class TextAIService:
                     model=self._model,
                 )
                 if not exc.retryable or attempt >= self._max_attempts:
+                    if exc.code == "ai_quota_exhausted":
+                        raise TextAIQuotaExhausted() from exc
                     raise TextAIUnavailable() from exc
                 continue
 

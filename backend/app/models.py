@@ -17,6 +17,7 @@ from app.recipes.models import (
     RecipeIngredient,
     UserRecipeFavorite,
 )
+from app.shopping.models import ShoppingList, ShoppingListItem
 
 __all__ = [
     "AiImageUsage",
@@ -32,6 +33,8 @@ __all__ = [
     "RecipeImage",
     "RecipeIngredient",
     "RefreshToken",
+    "ShoppingList",
+    "ShoppingListItem",
     "User",
     "UserProfile",
     "UserRecipeFavorite",

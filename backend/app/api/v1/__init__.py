@@ -8,6 +8,7 @@ from app.api.v1.recipes import router as recipes_router
 from app.api.v1.users import router as users_router
 from app.images.api import router as images_router
 from app.meal_plans.api import router as meal_plans_router
+from app.shopping.api import router as shopping_router
 
 
 def create_api_router(prefix: str) -> APIRouter:
@@ -18,6 +19,7 @@ def create_api_router(prefix: str) -> APIRouter:
     router.include_router(recipes_router)
     router.include_router(meal_plans_router)
     router.include_router(images_router)
+    router.include_router(shopping_router)
     return router
 
 

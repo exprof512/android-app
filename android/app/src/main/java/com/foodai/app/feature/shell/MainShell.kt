@@ -40,6 +40,7 @@ import com.foodai.app.core.ui.theme.FoodAiTokens
 import com.foodai.app.feature.plan.TodayRoute
 import com.foodai.app.feature.plan.WeekRoute
 import com.foodai.app.feature.recipe.RecipeRoute
+import com.foodai.app.feature.shopping.ShoppingRoute
 import com.foodai.app.navigation.Routes
 
 private data class TopTab(
@@ -134,10 +135,7 @@ fun MainShell(
                 )
             }
             composable(Routes.Shopping) {
-                PlaceholderPane(
-                    title = "Shopping",
-                    body = "Список покупок появится в Phase 11.",
-                )
+                ShoppingRoute()
             }
             composable(Routes.Progress) {
                 PlaceholderPane(

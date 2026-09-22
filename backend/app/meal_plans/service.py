@@ -12,6 +12,8 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.drafts import recipe_candidate_to_draft
+from app.ai.errors import TextAIQuotaExhausted, TextAIUnavailable
+from app.ai.fallback_plans import build_catalog_meal_plan_proposal
 from app.ai.service import TextAIService
 from app.core.errors import OwnershipDenied
 from app.core.models import utcnow
@@ -101,9 +103,25 @@ class MealPlanService:
             end_date=end_date,
             notes=payload.notes,
         )
-        proposal = await self._text_ai.generate_meal_plan_proposal(
-            context=context, user_id=user_id, use_cache=True
-        )
+        warnings: list[str] = []
+        try:
+            proposal = await self._text_ai.generate_meal_plan_proposal(
+                context=context, user_id=user_id, use_cache=True
+            )
+        except (TextAIQuotaExhausted, TextAIUnavailable) as exc:
+            logger.warning(
+                "meal_plan_ai_fallback",
+                extra={"error_code": getattr(exc, "code", "ai_generation_unavailable")},
+            )
+            proposal = await build_catalog_meal_plan_proposal(
+                self._session,
+                start_date=payload.start_date,
+                end_date=end_date,
+                meals_per_day=snapshot.profile.meals_per_day or 3,
+            )
+            warnings.append(
+                "План собран из каталога: OpenAI временно недоступен (проверьте квоту/биллинг)."
+            )
 
         stored_recipes: list[Recipe] = []
         for candidate in proposal.recipes:
@@ -148,7 +166,7 @@ class MealPlanService:
             restricted_names=restricted,
             start_date=payload.start_date,
             end_date=end_date,
-        )
+        ) + warnings
 
         plan = MealPlan(
             user_id=user_id,
@@ -264,10 +282,29 @@ class MealPlanService:
             ],
             "replace_recipe_name": item.recipe.name if item.recipe else None,
         }
-        replacement = await self._text_ai.replace_meal_item(
-            context=context, user_id=user_id, use_cache=False
-        )
-        candidate = replacement.recipes[0]
+        fallback_warnings: list[str] = []
+        try:
+            replacement = await self._text_ai.replace_meal_item(
+                context=context, user_id=user_id, use_cache=False
+            )
+            candidate = replacement.recipes[0]
+        except (TextAIQuotaExhausted, TextAIUnavailable):
+            logger.warning(
+                "replace_meal_ai_fallback",
+                extra={"error_code": "ai_generation_unavailable"},
+            )
+            fallback = await build_catalog_meal_plan_proposal(
+                self._session,
+                start_date=item.planned_date,
+                end_date=item.planned_date,
+                meals_per_day=1,
+            )
+            candidate = fallback.recipes[0].model_copy(
+                update={"name": f"Замена: {fallback.recipes[0].name}"}
+            )
+            fallback_warnings.append(
+                "Замена из каталога: OpenAI временно недоступен (проверьте квоту/биллинг)."
+            )
         draft = recipe_candidate_to_draft(candidate, ai_model=self._ai_model)
         stored = await self._recipes.create_recipe(draft)
         recipe = stored.recipe
@@ -303,7 +340,7 @@ class MealPlanService:
                         recipe=existing.recipe,
                     )
                 )
-        warnings = self._engine.validate_plan(
+        warnings = fallback_warnings + self._engine.validate_plan(
             slots=slots,
             targets=targets,
             meals_per_day=len(slots),

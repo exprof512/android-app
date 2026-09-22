@@ -49,7 +49,8 @@ flowchart TD
 
 1. timeout, invalid JSON, schema error и unknown ingredient не создают partial recipe/plan;
 2. один repair retry использует validation feedback без profile secrets; maximum attempts задаётся `AI_TEXT_MAX_ATTEMPTS`;
-3. если validation не проходит, API возвращает controlled retryable `503 ai_generation_unavailable` либо `422 plan_constraints_unsatisfied` — не fabricated fallback;
+3. если validation не проходит после repair, API возвращает `422 ai_output_invalid` / `422 plan_constraints_unsatisfied`;
+4. при `ai_quota_exhausted` / provider unavailable meal-plan generate/replace использует **каталожный fallback** (без OpenAI), добавляя warning в ответ — Android получает план, а не вечный 503;
 4. final nutrition/cost берутся исключительно из пересчёта backend и snapshot в `meal_plan_items`;
 5. AI output/response model/version, latency, token counts, operation и estimated cost записываются в `ai_text_usage`; raw prompts с PII не пишутся в logs.
 

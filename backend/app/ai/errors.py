@@ -16,11 +16,23 @@ class TextAIProviderError(Exception):
 
 
 class TextAIUnavailable(ApiError):
+    def __init__(
+        self,
+        *,
+        code: str = "ai_generation_unavailable",
+        message: str = "Не удалось получить ответ AI. Попробуйте позже.",
+    ) -> None:
+        super().__init__(status_code=503, code=code, message=message)
+
+
+class TextAIQuotaExhausted(TextAIUnavailable):
     def __init__(self) -> None:
         super().__init__(
-            status_code=503,
-            code="ai_generation_unavailable",
-            message="Не удалось получить ответ AI. Попробуйте позже.",
+            code="ai_quota_exhausted",
+            message=(
+                "Квота OpenAI исчерпана. План будет собран из каталога (fallback), "
+                "пока баланс не пополнен."
+            ),
         )
 
 
