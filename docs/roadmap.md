@@ -29,7 +29,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | 13 Monetization | **14** | готово |
 | 14 Security | **15** Hardening | готово |
 | 15 UX polish | **10–15** Android/UX | частично (design refresh в 14/15) |
-| 16 Release candidate | **16** MVP RC | не начато |
+| 16 Release candidate | **16** MVP RC | **готово (RC)**, phone smoke + human sign-off |
 
 После подтверждения Phase 0 **не** пересоздаём Docker/Auth/Profile: следующий implementation-шаг — **Phase 5 Text AI** по roadmap репозитория.
 
@@ -51,7 +51,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | **13 — Contextual chat** | Conversation/message API, bounded profile/plan context, safety handling, Chat UI entry from recipe. | **готово**: chat APIs + safety refusal; Ask AI from recipe; mocked tests. |
 | **14 — Entitlements abstraction** | Free/Premium limits, `require_premium()`, usage UX and `PaymentProvider` interface only. | **готово**: `subscriptions`/`usage_limits`; EntitlementsService; Free limits; Premium-only image regenerate; Android Free/Premium badge + paywall copy; PaymentProvider stub. |
 | **15 — Hardening and observability** | Structured logs, request IDs, security review, healthchecks, backups/restore drill, performance/cache checks. | **готово**: log redaction audit; security headers; `/health`+`/health/deps`; Compose healthchecks; `scripts/backup.sh` + `restore_drill.sh` + `healthcheck_all.sh` + `cache_smoke.sh`. |
-| **16 — MVP release candidate** | End-to-end regression, accessibility/localization review, production config review, APK build/install evidence. | Full backend suite green; Android debug/release-candidate build succeeds; APK path reported; release checklist accepted. |
+| **16 — MVP release candidate** | End-to-end regression, accessibility/localization review, production config review, APK build/install evidence. | **готово (RC)**: full pytest green; release checklist; version `0.1.0-rc1`; debug APK path; phone smoke items ожидают human confirmation. |
 
 ## MVP на Phase 16
 

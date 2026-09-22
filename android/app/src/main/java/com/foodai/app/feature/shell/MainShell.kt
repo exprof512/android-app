@@ -252,7 +252,7 @@ private fun ProfilePane(
             ) {
                 Icon(
                     Icons.Outlined.Person,
-                    contentDescription = null,
+                    contentDescription = "Аватар профиля",
                     tint = FoodAiTokens.Forest,
                 )
             }

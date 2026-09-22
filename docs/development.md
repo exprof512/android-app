@@ -221,6 +221,22 @@ scripts/install_android.sh
 
 `build_android.sh` запускает `:app:assembleDebug` и печатает абсолютный путь к APK (`android/app/build/outputs/apk/debug/app-debug.apk`). `install_android.sh` проверяет `adb`, устройство и APK; без `adb` печатает инструкцию и выходит с ошибкой. Unit-тесты: `cd android && ./gradlew :app:testDebugUnitTest`. Каждый implementation phase после Android foundation обязан собрать APK.
 
+## Production config review (Phase 16)
+
+Перед публичным деплоем:
+
+| Item | Development | Production |
+|---|---|---|
+| `APP_ENV` | `development` | `production` (rejects weak `JWT_SECRET`) |
+| TLS | optional HTTP to public IP for phone debug | required on Nginx/CDN edge |
+| `MEDIA_PUBLIC_BASE_URL` | `http://host:8080/media` | HTTPS CDN/domain |
+| Secrets | local `.env` (gitignored) | secret manager; rotate JWT/MinIO/AI keys |
+| OpenAI/DeepSeek | optional fallbacks | keys required for live AI; catalog fallback remains |
+| Backups | `scripts/backup.sh` + restore drill | encrypted dump/PITR + object replication |
+| Observability | JSON logs + request ids | ship logs to aggregator; alert on `/health` 503 |
+
+Release gate document: [release-checklist.md](release-checklist.md). Smoke: `scripts/release_check.sh`.
+
 ## Phase gate и git workflow
 
 1. Работать только в scope текущей фазы из [roadmap.md](roadmap.md).

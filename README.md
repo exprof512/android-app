@@ -8,6 +8,7 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 - [AI](docs/ai.md) и [генерация изображений](docs/image-generation.md)
 - [Хранилище](docs/storage.md)
 - [Разработка и roadmap](docs/development.md), [фазы 0–16](docs/roadmap.md)
+- [Release checklist](docs/release-checklist.md)
 
 ## Статус
 
@@ -29,7 +30,7 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 13 — Contextual chat | готово: conversations/messages, safety refusal, Ask AI from recipe |
 | 14 — Entitlements abstraction | готово: subscriptions/usage_limits, Free/Premium limits, PaymentProvider stub, Android Free badge |
 | 15 — Hardening and observability | готово: log redaction, security headers, /health/deps, backup+restore drill scripts, cache smoke |
-| 16 — MVP release candidate | не начато |
+| 16 — MVP release candidate | готово (RC): pytest green, `0.1.0-rc1`, [release-checklist.md](docs/release-checklist.md); phone smoke ожидает подтверждения |
 
 Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 
