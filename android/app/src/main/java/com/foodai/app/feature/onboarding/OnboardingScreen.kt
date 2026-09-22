@@ -137,9 +137,14 @@ private fun GoalStep(
     Field("Целевой вес, кг", draft.targetWeightKg) {
         onDraftChange { d -> d.copy(targetWeightKg = it) }
     }
-    Field("Скорость, кг/нед", draft.desiredWeeklyChangeKg) {
+    Field("Скорость, кг/нед (макс. 1.0)", draft.desiredWeeklyChangeKg) {
         onDraftChange { d -> d.copy(desiredWeeklyChangeKg = it) }
     }
+    Text(
+        "Безопасный максимум NutritionEngine — 1 кг в неделю.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable
@@ -238,7 +243,7 @@ private fun ColumnScope.PantryStep(
     onRefreshPreview: () -> Unit,
 ) {
     Text(
-        "Проверьте ответы и укажите продукты дома (по строке: яйца 10 piece).",
+        "Проверьте ответы. Продукты дома — по строке: «яйца», «яйца 10» или «рис 2 kg».",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

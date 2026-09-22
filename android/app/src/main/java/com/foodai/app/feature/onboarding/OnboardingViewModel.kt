@@ -86,7 +86,9 @@ class OnboardingViewModel @Inject constructor(
                 val preview = profileRepository.previewTarget(previewBody)
                 _state.update { it.copy(preview = preview, error = null) }
             } catch (error: ApiException) {
-                _state.update { it.copy(error = error.toUiMessage(), preview = null) }
+                _state.update {
+                    it.copy(preview = null, error = friendlyApiMessage(error))
+                }
             }
         }
     }
@@ -110,7 +112,7 @@ class OnboardingViewModel @Inject constructor(
                     it.copy(
                         isSubmitting = false,
                         step = OnboardingStep.Pantry,
-                        error = error.toUiMessage(),
+                        error = friendlyApiMessage(error),
                     )
                 }
             } catch (error: Exception) {
@@ -123,6 +125,13 @@ class OnboardingViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun friendlyApiMessage(error: ApiException): String {
+        val fromDetails = error.details.firstNotNullOfOrNull { detail ->
+            humanizeNutritionError(detail.field, detail.reason)
+        }
+        return fromDetails ?: error.toUiMessage()
     }
 
     private fun persistStep(step: OnboardingStep) {

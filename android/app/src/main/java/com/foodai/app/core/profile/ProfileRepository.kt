@@ -2,8 +2,8 @@ package com.foodai.app.core.profile
 
 import com.foodai.app.core.network.ApiErrorParser
 import com.foodai.app.core.network.MealPlanApi
+import com.foodai.app.core.network.MealPlanDto
 import com.foodai.app.core.network.MealPlanGenerateRequest
-import com.foodai.app.core.network.MealPlanSummaryResponse
 import com.foodai.app.core.network.ProfileApi
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.network.ProfileUpdateRequest
@@ -26,7 +26,7 @@ class ProfileRepository @Inject constructor(
     suspend fun previewTarget(body: TargetPreviewRequest): TargetPreviewResponse =
         wrap { profileApi.calculateTarget(body) }
 
-    suspend fun generateFirstPlan(days: Int = 7): MealPlanSummaryResponse =
+    suspend fun generateFirstPlan(days: Int = 7): MealPlanDto =
         wrap {
             mealPlanApi.generate(
                 MealPlanGenerateRequest(

@@ -27,14 +27,19 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.theme.FoodAiTokens
+import com.foodai.app.feature.plan.TodayRoute
+import com.foodai.app.feature.plan.WeekRoute
+import com.foodai.app.feature.recipe.RecipeRoute
 import com.foodai.app.navigation.Routes
 
 private data class TopTab(
@@ -83,25 +88,28 @@ fun MainShell(
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
+    val hideBottomBar = current?.startsWith("recipe/") == true
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                tabs.forEach { tab ->
-                    NavigationBarItem(
-                        selected = current == tab.route,
-                        onClick = {
-                            navController.navigate(tab.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            if (!hideBottomBar) {
+                NavigationBar {
+                    tabs.forEach { tab ->
+                        NavigationBarItem(
+                            selected = current == tab.route,
+                            onClick = {
+                                navController.navigate(tab.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
-                    )
+                            },
+                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            label = { Text(tab.label) },
+                        )
+                    }
                 }
             }
         },
@@ -112,15 +120,17 @@ fun MainShell(
             modifier = Modifier.padding(padding),
         ) {
             composable(Routes.Home) {
-                PlaceholderPane(
-                    title = "TODAY",
-                    body = "Домашний экран появится в Phase 10.",
+                TodayRoute(
+                    onOpenRecipe = { recipeId, itemId ->
+                        navController.navigate("recipe/$recipeId?itemId=$itemId")
+                    },
                 )
             }
             composable(Routes.Plan) {
-                PlaceholderPane(
-                    title = "Plan",
-                    body = "Недельный план появится в Phase 10.",
+                WeekRoute(
+                    onOpenRecipe = { recipeId, itemId ->
+                        navController.navigate("recipe/$recipeId?itemId=$itemId")
+                    },
                 )
             }
             composable(Routes.Shopping) {
@@ -142,6 +152,19 @@ fun MainShell(
                     onEditProfile = onEditProfile,
                     onLogout = onLogout,
                 )
+            }
+            composable(
+                route = "recipe/{recipeId}?itemId={itemId}",
+                arguments = listOf(
+                    navArgument("recipeId") { type = NavType.StringType },
+                    navArgument("itemId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
+                RecipeRoute(onBack = { navController.popBackStack() })
             }
         }
     }

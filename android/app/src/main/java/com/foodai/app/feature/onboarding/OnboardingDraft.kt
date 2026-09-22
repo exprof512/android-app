@@ -21,6 +21,9 @@ enum class OnboardingStep(val index: Int, val title: String) {
     }
 }
 
+/** Matches NutritionEngine DEFAULT_MAX_WEEKLY_WEIGHT_CHANGE_KG. */
+const val MAX_SAFE_WEEKLY_CHANGE_KG = 1.0
+
 @Serializable
 data class OnboardingDraft(
     val goalType: String = "lose_weight",
@@ -83,7 +86,10 @@ fun OnboardingDraft.toUpdateRequest(): ProfileUpdateRequest {
         goalType = goalType,
         mealsPerDay = meals,
         targetWeightKg = targetWeightKg.toDoubleOrNull(),
-        desiredWeeklyChangeKg = desiredWeeklyChangeKg.toDoubleOrNull(),
+        desiredWeeklyChangeKg = when (goalType) {
+            "maintain_weight" -> 0.0
+            else -> desiredWeeklyChangeKg.toDoubleOrNull()
+        },
         dailyCalorieMode = dailyCalorieMode,
         dailyCalorieValue = dailyCalorieValue.toIntOrNull(),
         groceryBudgetWeekly = groceryBudgetWeekly.toDoubleOrNull(),
@@ -98,27 +104,55 @@ fun OnboardingDraft.toUpdateRequest(): ProfileUpdateRequest {
     )
 }
 
+fun normalizePantryUnit(raw: String): String {
+    val key = raw.trim().lowercase()
+    return when (key) {
+        "шт", "штука", "штуки", "pcs", "pc" -> "piece"
+        "г", "гр", "грамм", "грамма" -> "g"
+        "кг", "килограмм" -> "kg"
+        "мл", "миллилитр" -> "ml"
+        "л", "литр" -> "l"
+        "уп", "упаковка", "пачка" -> "pack"
+        "ст.л", "стл", "ложк" -> "tbsp"
+        "ч.л", "чл" -> "tsp"
+        else -> key
+    }
+}
+
 fun parsePantry(raw: String): List<PantryItemDto> =
     raw.lines()
         .map { it.trim() }
         .filter { it.isNotEmpty() }
-        .mapNotNull { line ->
+        .map { line ->
             val parts = line.split(Regex("\\s+"))
             when {
-                parts.size >= 3 && parts[1].toDoubleOrNull() != null ->
-                    PantryItemDto(name = parts[0], quantity = parts[1].toDouble(), unit = parts[2])
-                parts.size == 2 && parts[1].toDoubleOrNull() != null ->
-                    PantryItemDto(name = parts[0], quantity = parts[1].toDouble(), unit = "piece")
+                parts.size >= 3 && parts[parts.lastIndex - 1].toDoubleOrNull() != null -> {
+                    val qty = parts[parts.lastIndex - 1].toDouble()
+                    val unit = normalizePantryUnit(parts.last())
+                    val name = parts.dropLast(2).joinToString(" ")
+                    PantryItemDto(name = name, quantity = qty, unit = unit)
+                }
+                parts.size >= 2 && parts.last().toDoubleOrNull() != null -> {
+                    val qty = parts.last().toDouble()
+                    val name = parts.dropLast(1).joinToString(" ")
+                    PantryItemDto(name = name, quantity = qty, unit = "piece")
+                }
                 else -> PantryItemDto(name = line, quantity = 1.0, unit = "piece")
             }
         }
 
 fun OnboardingDraft.validateStep(step: OnboardingStep): String? = when (step) {
-    OnboardingStep.Goal -> when {
-        goalType.isBlank() -> "Выберите цель"
-        goalType != "maintain_weight" &&
-            desiredWeeklyChangeKg.toDoubleOrNull() == null -> "Укажите скорость изменения веса"
-        else -> null
+    OnboardingStep.Goal -> {
+        when {
+            goalType.isBlank() -> "Выберите цель"
+            goalType == "maintain_weight" -> null
+            desiredWeeklyChangeKg.toDoubleOrNull() == null ->
+                "Укажите скорость изменения веса (до $MAX_SAFE_WEEKLY_CHANGE_KG кг/нед)"
+            desiredWeeklyChangeKg.toDouble() > MAX_SAFE_WEEKLY_CHANGE_KG ->
+                "Безопасный максимум — $MAX_SAFE_WEEKLY_CHANGE_KG кг в неделю"
+            desiredWeeklyChangeKg.toDouble() < 0 -> "Скорость не может быть отрицательной"
+            else -> null
+        }
     }
     OnboardingStep.AboutYou -> when {
         ageYears.toIntOrNull() == null -> "Укажите возраст"
@@ -134,4 +168,22 @@ fun OnboardingDraft.validateStep(step: OnboardingStep): String? = when (step) {
     }
     OnboardingStep.Foods, OnboardingStep.Budget, OnboardingStep.CookTime, OnboardingStep.Pantry -> null
     OnboardingStep.Loading -> null
+}
+
+fun humanizeNutritionError(field: String?, reason: String?): String? = when {
+    field == "desired_weekly_change_kg" && reason == "exceeds_safe_weekly_change" ->
+        "Слишком быстрое изменение веса. Максимум $MAX_SAFE_WEEKLY_CHANGE_KG кг в неделю."
+    field == "desired_weekly_change_kg" && reason == "required" ->
+        "Укажите желаемую скорость изменения веса"
+    field == "desired_weekly_change_kg" && reason == "must_be_zero_for_maintain_weight" ->
+        "При сохранении веса скорость должна быть 0"
+    field == "target_weight_kg" && reason == "must_be_below_current_weight" ->
+        "Целевой вес должен быть меньше текущего"
+    field == "target_weight_kg" && reason == "must_be_above_current_weight" ->
+        "Целевой вес должен быть больше текущего"
+    field == "target_weight_kg" && reason == "below_safe_bmi" ->
+        "Целевой вес слишком низкий для безопасного ИМТ"
+    field?.startsWith("available_products") == true && reason == "missing" ->
+        "Укажите продукт в формате: яйца 10 piece (или просто «яйца»)"
+    else -> null
 }

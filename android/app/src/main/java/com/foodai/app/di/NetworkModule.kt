@@ -8,6 +8,7 @@ import com.foodai.app.core.network.AuthApiProvider
 import com.foodai.app.core.network.AuthInterceptor
 import com.foodai.app.core.network.MealPlanApi
 import com.foodai.app.core.network.ProfileApi
+import com.foodai.app.core.network.RecipeApi
 import com.foodai.app.core.network.TokenAuthenticator
 import dagger.Binds
 import dagger.Module
@@ -113,6 +114,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideMealPlanApi(retrofit: Retrofit): MealPlanApi = retrofit.create(MealPlanApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideRecipeApi(retrofit: Retrofit): RecipeApi = retrofit.create(RecipeApi::class.java)
 
     private fun buildRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()

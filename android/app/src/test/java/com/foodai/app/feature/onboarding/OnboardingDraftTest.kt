@@ -25,12 +25,34 @@ class OnboardingDraftTest {
         assertThat(body.likedFoods).containsExactly("гречка", "лосось")
         assertThat(body.availableProducts).hasSize(2)
         assertThat(body.availableProducts[0].name).isEqualTo("яйца")
+        assertThat(body.availableProducts[0].unit).isEqualTo("piece")
         assertThat(body.availableProducts[1].unit).isEqualTo("kg")
+    }
+
+    @Test
+    fun parsesBareProductNameWithDefaultUnit() {
+        val items = parsePantry("яйца")
+        assertThat(items).hasSize(1)
+        assertThat(items[0].name).isEqualTo("яйца")
+        assertThat(items[0].quantity).isEqualTo(1.0)
+        assertThat(items[0].unit).isEqualTo("piece")
+    }
+
+    @Test
+    fun rejectsUnsafeWeeklyChangeLocally() {
+        val draft = OnboardingDraft(desiredWeeklyChangeKg = "1.5")
+        assertThat(draft.validateStep(OnboardingStep.Goal)).contains("1.0")
     }
 
     @Test
     fun validatesRequiredAboutFields() {
         val draft = OnboardingDraft(ageYears = "", heightCm = "170", currentWeightKg = "70")
         assertThat(draft.validateStep(OnboardingStep.AboutYou)).contains("возраст")
+    }
+
+    @Test
+    fun humanizesWeeklyChangeError() {
+        val msg = humanizeNutritionError("desired_weekly_change_kg", "exceeds_safe_weekly_change")
+        assertThat(msg).contains("1.0")
     }
 }

@@ -16,7 +16,7 @@ coroutines = "1.9.0"
 junit = "4.13.2"
 mockwebserver = "4.12.0"
 truth = "1.4.4"
-robolectric = "4.14.1"
+coil = "2.7.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -51,7 +51,7 @@ hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", ve
 
 junit = { module = "junit:junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }
-robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

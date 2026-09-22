@@ -1,5 +1,7 @@
 package com.foodai.app.core.network
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -101,10 +103,13 @@ data class LogoutRequest(
     @SerialName("refresh_token") val refreshToken: String,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class PantryItemDto(
     val name: String,
     val quantity: Double,
+    // Must encode always: kotlinx omits Kotlin defaults when encodeDefaults=false.
+    @EncodeDefault
     val unit: String = "piece",
     @SerialName("expires_on") val expiresOn: String? = null,
 )
@@ -237,10 +242,96 @@ data class MealPlanGenerateRequest(
 )
 
 @Serializable
-data class MealPlanSummaryResponse(
+data class RecipeImageDto(
+    val id: String? = null,
+    @SerialName("recipe_id") val recipeId: String? = null,
+    val status: String = "pending",
+    val url: String? = null,
+    @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
+    @SerialName("retry_allowed") val retryAllowed: Boolean = false,
+)
+
+@Serializable
+data class DailyTargetsDto(
+    @SerialName("calories_kcal") val caloriesKcal: Int,
+    @SerialName("protein_g") val proteinG: Double,
+    @SerialName("fat_g") val fatG: Double,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double,
+)
+
+@Serializable
+data class MealPlanRecipeSummaryDto(
+    val id: String,
+    val name: String,
+    @SerialName("calories_kcal") val caloriesKcal: Int,
+    @SerialName("cook_time_minutes") val cookTimeMinutes: Int = 0,
+    val image: RecipeImageDto = RecipeImageDto(),
+)
+
+@Serializable
+data class MealPlanItemDto(
+    val id: String,
+    val date: String,
+    @SerialName("meal_type") val mealType: String,
+    val servings: Double = 1.0,
+    @SerialName("sort_order") val sortOrder: Int = 0,
+    val status: String = "planned",
+    @SerialName("is_completed") val isCompleted: Boolean = false,
+    val nutrition: DailyTargetsDto? = null,
+    @SerialName("estimated_cost_amount") val estimatedCostAmount: Double? = null,
+    val recipe: MealPlanRecipeSummaryDto,
+)
+
+@Serializable
+data class MealPlanDto(
     val id: String,
     @SerialName("start_date") val startDate: String,
     @SerialName("end_date") val endDate: String,
     val status: String,
+    @SerialName("daily_targets") val dailyTargets: DailyTargetsDto,
+    val items: List<MealPlanItemDto> = emptyList(),
     val warnings: List<String> = emptyList(),
+    val reused: Boolean = false,
+)
+
+/** @deprecated alias kept for generateFirstPlan return type clarity */
+typealias MealPlanSummaryResponse = MealPlanDto
+
+@Serializable
+data class DishCardNutritionDto(
+    @SerialName("calories_kcal") val caloriesKcal: Int,
+    @SerialName("protein_g") val proteinG: Double,
+    @SerialName("fat_g") val fatG: Double,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double,
+)
+
+@Serializable
+data class DishCardCostDto(
+    val amount: Double,
+    val currency: String,
+)
+
+@Serializable
+data class DishCardIngredientDto(
+    val name: String,
+    val grams: Double,
+    val quantity: Double,
+    val unit: String,
+    val cost: Double? = null,
+)
+
+@Serializable
+data class DishCardDto(
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    @SerialName("cooking_method") val cookingMethod: String,
+    @SerialName("cook_time_minutes") val cookTimeMinutes: Int,
+    val servings: Int,
+    val status: String,
+    @SerialName("nutrition_per_serving") val nutritionPerServing: DishCardNutritionDto,
+    @SerialName("estimated_cost_per_serving") val estimatedCostPerServing: DishCardCostDto,
+    val ingredients: List<DishCardIngredientDto> = emptyList(),
+    val steps: List<String> = emptyList(),
+    @SerialName("is_favorite") val isFavorite: Boolean = false,
 )

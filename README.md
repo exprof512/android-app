@@ -23,8 +23,9 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 7 — Image pipeline | готово: StorageProvider/MinIO, RecipeImage, Arq worker, Mock/OpenAI providers, media URLs |
 | 8 — Android foundation | готово: Kotlin/Compose shell, Hilt, Retrofit, EncryptedSharedPreferences, login/register, bottom nav |
 | 9 — Android onboarding/profile | готово: 7 экранов, draft, calculate-target preview, first-plan loading, Profile tab |
-| 10 — Android plan and recipe | не начато ← **следующий шаг** |
-| 11–16 | не начаты |
+| 10 — Android plan and recipe | готово: Today/Plan, dish card, Coil image states, replace/complete/favorite |
+| 11 — Shopping | не начато ← **следующий шаг** |
+| 12–16 | не начаты |
 
 Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 

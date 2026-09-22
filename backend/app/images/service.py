@@ -144,6 +144,11 @@ class ImageGenerationService:
             return await self.enqueue_for_recipe(recipe_id, user_id=user_id)
         return self._to_out(image)
 
+    async def peek_primary(self, recipe_id: UUID) -> RecipeImageOut | None:
+        """Return primary image metadata without enqueue or ownership checks."""
+        image = await self._repository.get_primary(recipe_id)
+        return self._to_out(image) if image is not None else None
+
     async def list_for_user(
         self, user_id: UUID, recipe_id: UUID
     ) -> list[RecipeImageOut]:

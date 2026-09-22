@@ -464,7 +464,23 @@ class MealPlanService:
                 recipe = await self._session.get(Recipe, item.recipe_id)
             if recipe is None:
                 continue
-            out_items.append(self._item_out(item, recipe))
+            image_payload: dict[str, object] = {
+                "status": "pending",
+                "thumbnail_url": None,
+                "url": None,
+            }
+            if self._images is not None:
+                peeked = await self._images.peek_primary(recipe.id)
+                if peeked is not None:
+                    image_payload = {
+                        "id": str(peeked.id),
+                        "recipe_id": str(peeked.recipe_id),
+                        "status": peeked.status,
+                        "url": peeked.url,
+                        "thumbnail_url": peeked.thumbnail_url,
+                        "retry_allowed": peeked.retry_allowed,
+                    }
+            out_items.append(self._item_out(item, recipe, image_payload))
         return MealPlanOut(
             id=plan.id,
             start_date=plan.start_date,
@@ -482,7 +498,11 @@ class MealPlanService:
         )
 
     @staticmethod
-    def _item_out(item: MealPlanItem, recipe: Recipe) -> MealPlanItemOut:
+    def _item_out(
+        item: MealPlanItem,
+        recipe: Recipe,
+        image: dict[str, object] | None = None,
+    ) -> MealPlanItemOut:
         return MealPlanItemOut(
             id=item.id,
             date=item.planned_date,
@@ -503,6 +523,8 @@ class MealPlanService:
                 name=recipe.name,
                 calories_kcal=recipe.calories_kcal,
                 cook_time_minutes=recipe.cook_time_minutes,
+                image=image
+                or {"status": "pending", "thumbnail_url": None, "url": None},
             ),
         )
 
