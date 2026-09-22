@@ -26,6 +26,7 @@ data class TodayUiState(
     val error: String? = null,
     val missingPlan: Boolean = false,
     val actionError: String? = null,
+    val infoMessage: String? = null,
 )
 
 @HiltViewModel
@@ -69,15 +70,31 @@ class TodayViewModel @Inject constructor(
 
     fun generatePlan() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(generating = true, error = null, actionError = null)
+            _state.value = _state.value.copy(generating = true, error = null, actionError = null, infoMessage = null)
             try {
-                profiles.generateFirstPlan(days = 7)
+                profiles.generateFirstPlan(days = 7, force = true)
                 refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     generating = false,
                     error = error.toUiMessage(),
                     missingPlan = error.code == "meal_plan_not_found" || error.httpStatus == 404,
+                )
+            }
+        }
+    }
+
+    fun rebuildPlan() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(generating = true, actionError = null, infoMessage = null)
+            try {
+                profiles.regeneratePlan(days = 7)
+                refresh()
+                _state.value = _state.value.copy(infoMessage = "План на неделю пересобран.")
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    generating = false,
+                    actionError = error.toUiMessage(),
                 )
             }
         }
@@ -114,9 +131,12 @@ data class WeekUiState(
     val loading: Boolean = true,
     val generating: Boolean = false,
     val plan: MealPlanDto? = null,
+    val profile: ProfileResponse? = null,
     val selectedDate: String = LocalDate.now().toString(),
     val error: String? = null,
     val missingPlan: Boolean = false,
+    val actionError: String? = null,
+    val infoMessage: String? = null,
 )
 
 @HiltViewModel
@@ -136,9 +156,11 @@ class WeekViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, error = null, missingPlan = false)
             try {
                 val plan = mealPlans.week(LocalDate.now())
+                val profile = runCatching { profiles.getProfile() }.getOrNull()
                 _state.value = WeekUiState(
                     loading = false,
                     plan = plan,
+                    profile = profile,
                     selectedDate = _state.value.selectedDate.ifBlank { LocalDate.now().toString() },
                 )
             } catch (error: ApiException) {
@@ -159,15 +181,31 @@ class WeekViewModel @Inject constructor(
 
     fun generatePlan() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(generating = true, error = null)
+            _state.value = _state.value.copy(generating = true, error = null, actionError = null)
             try {
-                profiles.generateFirstPlan(days = 7)
+                profiles.generateFirstPlan(days = 7, force = true)
                 refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     generating = false,
                     error = error.toUiMessage(),
                     missingPlan = error.code == "meal_plan_not_found" || error.httpStatus == 404,
+                )
+            }
+        }
+    }
+
+    fun rebuildPlan() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(generating = true, actionError = null, infoMessage = null)
+            try {
+                profiles.regeneratePlan(days = 7)
+                refresh()
+                _state.value = _state.value.copy(infoMessage = "План на неделю пересобран.")
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    generating = false,
+                    actionError = error.toUiMessage(),
                 )
             }
         }

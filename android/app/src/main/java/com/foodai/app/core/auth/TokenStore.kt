@@ -15,6 +15,8 @@ interface TokenStore {
     fun refreshToken(): String?
     fun user(): UserSummaryDto?
     fun hasSession(): Boolean
+    fun pendingOnboarding(): Boolean
+    fun setPendingOnboarding(value: Boolean)
     fun saveSession(pair: TokenPairResponse)
     fun clear()
 }
@@ -39,6 +41,12 @@ class SecureTokenStore @Inject constructor(
     override fun hasSession(): Boolean =
         !accessToken().isNullOrBlank() && !refreshToken().isNullOrBlank()
 
+    override fun pendingOnboarding(): Boolean = prefs.getBoolean(KEY_PENDING_ONBOARDING, false)
+
+    override fun setPendingOnboarding(value: Boolean) {
+        prefs.edit().putBoolean(KEY_PENDING_ONBOARDING, value).apply()
+    }
+
     override fun saveSession(pair: TokenPairResponse) {
         prefs.edit()
             .putString(KEY_ACCESS, pair.accessToken)
@@ -60,6 +68,7 @@ class SecureTokenStore @Inject constructor(
         private const val KEY_USER_ID = "user_id"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_TIER = "user_tier"
+        private const val KEY_PENDING_ONBOARDING = "pending_onboarding"
 
         fun createPrefs(context: Context): SharedPreferences {
             val masterKey = MasterKey.Builder(context)
@@ -81,11 +90,16 @@ class InMemoryTokenStore : TokenStore {
     private var access: String? = null
     private var refresh: String? = null
     private var summary: UserSummaryDto? = null
+    private var pendingOnboarding: Boolean = false
 
     override fun accessToken(): String? = access
     override fun refreshToken(): String? = refresh
     override fun user(): UserSummaryDto? = summary
     override fun hasSession(): Boolean = !access.isNullOrBlank() && !refresh.isNullOrBlank()
+    override fun pendingOnboarding(): Boolean = pendingOnboarding
+    override fun setPendingOnboarding(value: Boolean) {
+        pendingOnboarding = value
+    }
 
     override fun saveSession(pair: TokenPairResponse) {
         access = pair.accessToken
@@ -97,5 +111,6 @@ class InMemoryTokenStore : TokenStore {
         access = null
         refresh = null
         summary = null
+        pendingOnboarding = false
     }
 }

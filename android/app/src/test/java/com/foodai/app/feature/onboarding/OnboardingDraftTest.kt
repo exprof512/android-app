@@ -41,7 +41,7 @@ class OnboardingDraftTest {
     @Test
     fun rejectsUnsafeWeeklyChangeLocally() {
         val draft = OnboardingDraft(desiredWeeklyChangeKg = "1.5")
-        assertThat(draft.validateStep(OnboardingStep.Goal)).contains("1.0")
+        assertThat(draft.validateStep(OnboardingStep.GoalDetails)).contains("1.0")
     }
 
     @Test

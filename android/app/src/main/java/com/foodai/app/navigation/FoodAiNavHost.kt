@@ -13,12 +13,14 @@ import com.foodai.app.feature.auth.AuthRoute
 import com.foodai.app.feature.boot.BootRoute
 import com.foodai.app.feature.onboarding.OnboardingRoute
 import com.foodai.app.feature.shell.MainShellRoute
+import com.foodai.app.feature.welcome.WelcomeRoute
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 
 object Routes {
+    const val Welcome = "welcome"
     const val Auth = "auth"
     const val Boot = "boot"
     const val Onboarding = "onboarding"
@@ -46,10 +48,24 @@ fun FoodAiNavHost() {
             context,
             AuthRepositoryEntryPoint::class.java,
         ).authRepository()
-        if (repo.hasSession()) Routes.Boot else Routes.Auth
+        if (repo.hasSession()) Routes.Boot else Routes.Welcome
     }
 
     NavHost(navController = navController, startDestination = start) {
+        composable(Routes.Welcome) {
+            WelcomeRoute(
+                onStart = {
+                    navController.navigate(Routes.Auth) {
+                        popUpTo(Routes.Welcome) { inclusive = true }
+                    }
+                },
+                onLogin = {
+                    navController.navigate(Routes.Auth) {
+                        popUpTo(Routes.Welcome) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable(Routes.Auth) {
             AuthRoute(
                 onSignedIn = {
@@ -72,7 +88,7 @@ fun FoodAiNavHost() {
                     }
                 },
                 onSignedOut = {
-                    navController.navigate(Routes.Auth) {
+                    navController.navigate(Routes.Welcome) {
                         popUpTo(Routes.Boot) { inclusive = true }
                     }
                 },
@@ -100,7 +116,7 @@ fun FoodAiNavHost() {
         composable(Routes.Main) {
             MainShellRoute(
                 onSignedOut = {
-                    navController.navigate(Routes.Auth) {
+                    navController.navigate(Routes.Welcome) {
                         popUpTo(Routes.Main) { inclusive = true }
                     }
                 },

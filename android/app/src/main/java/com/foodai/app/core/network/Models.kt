@@ -244,6 +244,7 @@ data class MealPlanGenerateRequest(
     @SerialName("start_date") val startDate: String,
     val days: Int = 7,
     val notes: String? = null,
+    val force: Boolean = false,
 )
 
 @Serializable

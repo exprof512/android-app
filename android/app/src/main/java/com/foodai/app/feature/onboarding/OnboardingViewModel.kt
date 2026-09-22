@@ -2,9 +2,11 @@ package com.foodai.app.feature.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.foodai.app.core.auth.AuthRepository
 import com.foodai.app.core.auth.toUiMessage
 import com.foodai.app.core.network.ApiException
 import com.foodai.app.core.network.TargetPreviewResponse
+import com.foodai.app.core.network.isComplete
 import com.foodai.app.core.profile.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +22,7 @@ data class OnboardingUiState(
     val preview: TargetPreviewResponse? = null,
     val isSubmitting: Boolean = false,
     val generatePlan: Boolean = true,
+    val hydrating: Boolean = true,
     val error: String? = null,
     val finished: Boolean = false,
 )
@@ -28,16 +31,38 @@ data class OnboardingUiState(
 class OnboardingViewModel @Inject constructor(
     private val draftStore: OnboardingDraftStore,
     private val profileRepository: ProfileRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
-    private val initialDraft = draftStore.load()
-    private val _state = MutableStateFlow(
-        OnboardingUiState(
-            draft = initialDraft,
-            step = OnboardingStep.formSteps
-                .getOrElse(initialDraft.stepIndex.coerceIn(0, 6)) { OnboardingStep.Goal },
-        ),
-    )
+    private val _state = MutableStateFlow(OnboardingUiState())
     val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
+
+    init {
+        hydrate()
+    }
+
+    private fun hydrate() {
+        viewModelScope.launch {
+            val local = draftStore.load()
+            val profile = runCatching { profileRepository.getProfile() }.getOrNull()
+            val draft = when {
+                profile != null && profile.isComplete() -> profile.toOnboardingDraft(stepIndex = 0)
+                local.hasMeaningfulInput() -> local
+                profile != null -> profile.toOnboardingDraft(local.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2))
+                else -> local
+            }
+            val step = OnboardingStep.formSteps
+                .getOrElse(draft.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2)) { OnboardingStep.Goal }
+            draftStore.save(draft)
+            _state.value = OnboardingUiState(
+                draft = draft,
+                step = step,
+                hydrating = false,
+            )
+            if (step == OnboardingStep.Meals || step == OnboardingStep.Pantry) {
+                refreshPreview()
+            }
+        }
+    }
 
     fun setGeneratePlan(value: Boolean) {
         _state.update { it.copy(generatePlan = value) }
@@ -62,7 +87,7 @@ class OnboardingViewModel @Inject constructor(
         if (idx < OnboardingStep.formSteps.lastIndex) {
             val nextStep = OnboardingStep.formSteps[idx + 1]
             persistStep(nextStep)
-            if (nextStep == OnboardingStep.Eating || nextStep == OnboardingStep.Pantry) {
+            if (nextStep == OnboardingStep.Meals || nextStep == OnboardingStep.Pantry) {
                 refreshPreview()
             }
         } else {
@@ -103,12 +128,17 @@ class OnboardingViewModel @Inject constructor(
                 val body = _state.value.draft.toUpdateRequest()
                 profileRepository.updateProfile(body)
                 if (shouldGenerate) {
-                    profileRepository.generateFirstPlan(days = 7)
+                    profileRepository.generateFirstPlan(days = 7, force = true)
                 } else {
-                    // Profile edits used to skip generation — ensure a plan exists.
-                    profileRepository.ensurePlan(days = 7)
+                    profileRepository.regeneratePlan(days = 7)
                 }
                 draftStore.clear()
+                // Keep a fresh snapshot so reopening the questionnaire is filled.
+                runCatching { profileRepository.getProfile() }
+                    .getOrNull()
+                    ?.toOnboardingDraft()
+                    ?.let { draftStore.save(it) }
+                authRepository.setPendingOnboarding(false)
                 _state.update { it.copy(isSubmitting = false, finished = true) }
             } catch (error: ApiException) {
                 _state.update {

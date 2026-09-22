@@ -22,10 +22,16 @@ class AuthRepository @Inject constructor(
 
     fun currentUser(): UserSummaryDto? = tokenStore.user()
 
+    fun pendingOnboarding(): Boolean = tokenStore.pendingOnboarding()
+
+    fun setPendingOnboarding(value: Boolean) = tokenStore.setPendingOnboarding(value)
+
     suspend fun login(email: String, password: String): TokenPairResponse =
         wrap {
             val pair = bareAuthApi.login(LoginRequest(email.trim(), password))
             tokenStore.saveSession(pair)
+            // Existing account: Boot decides by profile completeness.
+            tokenStore.setPendingOnboarding(false)
             pair
         }
 
@@ -39,6 +45,7 @@ class AuthRepository @Inject constructor(
                 ),
             )
             tokenStore.saveSession(pair)
+            tokenStore.setPendingOnboarding(true)
             pair
         }
 

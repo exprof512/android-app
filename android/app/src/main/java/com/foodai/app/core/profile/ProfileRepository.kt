@@ -26,12 +26,13 @@ class ProfileRepository @Inject constructor(
     suspend fun previewTarget(body: TargetPreviewRequest): TargetPreviewResponse =
         wrap { profileApi.calculateTarget(body) }
 
-    suspend fun generateFirstPlan(days: Int = 7): MealPlanDto =
+    suspend fun generateFirstPlan(days: Int = 7, force: Boolean = false): MealPlanDto =
         wrap {
             mealPlanApi.generate(
                 MealPlanGenerateRequest(
                     startDate = LocalDate.now().toString(),
                     days = days,
+                    force = force,
                 ),
             )
         }
@@ -48,6 +49,10 @@ class ProfileRepository @Inject constructor(
                 throw parsed
             }
         }
+
+    /** Force a fresh week plan (ignores idempotent hash reuse). */
+    suspend fun regeneratePlan(days: Int = 7): MealPlanDto =
+        generateFirstPlan(days = days, force = true)
 
     private suspend fun <T> wrap(block: suspend () -> T): T =
         try {

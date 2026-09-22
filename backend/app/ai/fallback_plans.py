@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import date, timedelta
 from typing import Any
 
@@ -14,6 +15,7 @@ from app.ai.schemas import (
     RecipeCandidate,
     RecipeIngredientCandidate,
 )
+from app.meal_plans import constants
 from app.recipes.models import Ingredient
 
 _TEMPLATES: list[tuple[str, str, list[tuple[str, float, str]]]] = [
@@ -74,7 +76,12 @@ async def build_catalog_meal_plan_proposal(
             raise RuntimeError("ingredient_catalog_empty")
         by_name = {row.canonical_name: row for row in any_rows}
 
-    meal_cycle = ["breakfast", "lunch", "dinner", "snack"][: max(1, min(meals_per_day, 4))]
+    meal_cycle = list(
+        constants.MEALS_BY_COUNT.get(
+            max(1, min(meals_per_day, max(constants.MEALS_BY_COUNT))),
+            constants.MEALS_BY_COUNT[3],
+        )
+    )
     recipes: list[RecipeCandidate] = []
     slots: list[MealPlanSlotProposal] = []
     day = start_date

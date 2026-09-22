@@ -45,6 +45,10 @@ class BootViewModel @Inject constructor(
                 _destination.value = BootDestination.Error("Нет сессии")
                 return@launch
             }
+            if (authRepository.pendingOnboarding()) {
+                _destination.value = BootDestination.Onboarding
+                return@launch
+            }
             try {
                 val profile = profileRepository.getProfile()
                 _destination.value = if (profile.isComplete()) {

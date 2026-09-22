@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections import Counter
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
@@ -92,16 +93,23 @@ class MealPlanService:
             raise ProfileIncomplete()
 
         end_date = payload.start_date + timedelta(days=payload.days - 1)
+        meals_per_day = snapshot.profile.meals_per_day or 3
         request_hash = self._request_hash(
             user_id=user_id,
             goal_id=snapshot.goal.id,
             start_date=payload.start_date,
             days=payload.days,
             notes=payload.notes,
+            force_nonce=str(utcnow().timestamp()) if payload.force else None,
         )
-        existing = await self._repository.get_by_hash(user_id, request_hash)
-        if existing is not None:
-            return await self._to_out(existing, warnings=[], reused=True)
+        if not payload.force:
+            existing = await self._repository.get_by_hash(user_id, request_hash)
+            if existing is not None:
+                return await self._to_out(existing, warnings=[], reused=True)
+        else:
+            await self._archive_overlapping(
+                user_id, start_date=payload.start_date, end_date=end_date
+            )
 
         if self._entitlements is not None:
             await self._entitlements.consume(
@@ -117,7 +125,7 @@ class MealPlanService:
         warnings: list[str] = []
         try:
             proposal = await self._text_ai.generate_meal_plan_proposal(
-                context=context, user_id=user_id, use_cache=True
+                context=context, user_id=user_id, use_cache=not payload.force
             )
         except (TextAIQuotaExhausted, TextAIUnavailable) as exc:
             logger.warning(
@@ -128,10 +136,30 @@ class MealPlanService:
                 self._session,
                 start_date=payload.start_date,
                 end_date=end_date,
-                meals_per_day=snapshot.profile.meals_per_day or 3,
+                meals_per_day=meals_per_day,
             )
             warnings.append(
                 "План собран из каталога: AI временно недоступен."
+            )
+
+        if not self._proposal_covers_range(
+            proposal,
+            start_date=payload.start_date,
+            end_date=end_date,
+            meals_per_day=meals_per_day,
+        ):
+            logger.warning(
+                "meal_plan_incomplete_slots_fallback",
+                extra={"error_code": "incomplete_slots"},
+            )
+            proposal = await build_catalog_meal_plan_proposal(
+                self._session,
+                start_date=payload.start_date,
+                end_date=end_date,
+                meals_per_day=meals_per_day,
+            )
+            warnings.append(
+                f"План дополнен из каталога: нужно {payload.days}×{meals_per_day} приёмов."
             )
 
         stored_recipes, proposal = await self._persist_proposal_recipes(
@@ -139,7 +167,7 @@ class MealPlanService:
             warnings=warnings,
             start_date=payload.start_date,
             end_date=end_date,
-            meals_per_day=snapshot.profile.meals_per_day or 3,
+            meals_per_day=meals_per_day,
         )
 
         slots: list[PlannedSlot] = []
@@ -258,7 +286,7 @@ class MealPlanService:
         return await self.generate(
             user_id,
             MealPlanGenerateRequest(
-                start_date=start, days=days, notes=payload.notes
+                start_date=start, days=days, notes=payload.notes, force=True
             ),
         )
 
@@ -545,12 +573,54 @@ class MealPlanService:
             "days": days,
             "notes": notes,
             "instructions": (
-                "Верни recipes[] и slots[]: каждый day/meal_type ровно один slot, "
+                "Верни recipes[] и slots[]: ДЛЯ КАЖДОГО дня из days и КАЖДОГО "
+                "meal_type из day.meal_types ровно один slot. "
+                f"Всего слотов должно быть ровно "
+                f"{(end_date - start_date).days + 1} × {snapshot.profile.meals_per_day}. "
                 "recipe_index указывает на recipes. Не используй запрещённые продукты. "
                 "Названия ingredients.name — ТОЛЬКО из allowed_ingredients (как в списке). "
                 "Порции servings обычно 1. Калории дня близки к calorie_target_kcal."
             ),
         }
+
+    async def _archive_overlapping(
+        self, user_id: UUID, *, start_date: date, end_date: date
+    ) -> None:
+        """Archive ready plans that overlap the requested range so force regenerate works."""
+        cursor = start_date
+        seen: set[UUID] = set()
+        while cursor <= end_date:
+            plan = await self._repository.find_covering(user_id, on_date=cursor)
+            if plan is not None and plan.id not in seen:
+                seen.add(plan.id)
+                plan.status = "archived"
+                plan.generation_request_hash = None
+            cursor = cursor + timedelta(days=1)
+        if seen:
+            await self._session.flush()
+
+    @staticmethod
+    def _proposal_covers_range(
+        proposal,
+        *,
+        start_date: date,
+        end_date: date,
+        meals_per_day: int,
+    ) -> bool:
+        expected = Counter(
+            constants.MEALS_BY_COUNT.get(meals_per_day, constants.MEALS_BY_COUNT[4])
+        )
+        by_day: dict[str, Counter[str]] = {}
+        for slot in proposal.slots:
+            by_day.setdefault(slot.planned_date, Counter())[slot.meal_type] += 1
+        cursor = start_date
+        while cursor <= end_date:
+            key = cursor.isoformat()
+            meals = by_day.get(key, Counter())
+            if meals != expected:
+                return False
+            cursor = cursor + timedelta(days=1)
+        return True
 
     @staticmethod
     def _request_hash(
@@ -560,6 +630,7 @@ class MealPlanService:
         start_date: date,
         days: int,
         notes: str | None,
+        force_nonce: str | None = None,
     ) -> str:
         payload = {
             "user_id": str(user_id),
@@ -568,6 +639,8 @@ class MealPlanService:
             "days": days,
             "notes": notes or "",
         }
+        if force_nonce:
+            payload["force_nonce"] = force_nonce
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Left leaf -->
+    <path
+        android:fillColor="#2FA84F"
+        android:pathData="M52,78 C40,70 28,52 30,34 C42,36 52,50 54,66 C54,70 54,74 52,78 Z"/>
+    <!-- Right leaf -->
+    <path
+        android:fillColor="#21883E"
+        android:pathData="M54,78 C66,68 80,48 78,28 C64,30 54,48 52,66 C52,70 52,74 54,78 Z"/>
+    <!-- Highlight -->
+    <path
+        android:fillColor="#5BC76F"
+        android:pathData="M58,40 C66,38 72,34 74,30 C68,36 62,42 56,50 C56,46 56,42 58,40 Z"/>
+    <!-- Stem vein -->
+    <path
+        android:strokeWidth="3.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M53,78 C50,60 42,42 34,32"/>
+    <path
+        android:strokeWidth="3.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M53,78 C56,58 66,40 76,30"/>
+</vector>

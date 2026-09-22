@@ -19,6 +19,7 @@ data class AuthUiState(
     val isRegisterMode: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
+    val successMessage: String? = null,
     val signedIn: Boolean = false,
 )
 
@@ -34,7 +35,7 @@ class AuthViewModel @Inject constructor(
     fun onPasswordChange(value: String) = _state.update { it.copy(password = value, error = null) }
 
     fun toggleMode() = _state.update {
-        it.copy(isRegisterMode = !it.isRegisterMode, error = null)
+        it.copy(isRegisterMode = !it.isRegisterMode, error = null, successMessage = null)
     }
 
     fun submit() {
@@ -44,14 +45,22 @@ class AuthViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            _state.update { it.copy(isLoading = true, error = null, successMessage = null) }
             try {
                 if (snapshot.isRegisterMode) {
                     authRepository.register(snapshot.email, snapshot.password)
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            signedIn = true,
+                            password = "",
+                            successMessage = "Регистрация прошла успешно. Заполните анкету.",
+                        )
+                    }
                 } else {
                     authRepository.login(snapshot.email, snapshot.password)
+                    _state.update { it.copy(isLoading = false, signedIn = true, password = "") }
                 }
-                _state.update { it.copy(isLoading = false, signedIn = true, password = "") }
             } catch (error: ApiException) {
                 _state.update { it.copy(isLoading = false, error = error.toUiMessage()) }
             }

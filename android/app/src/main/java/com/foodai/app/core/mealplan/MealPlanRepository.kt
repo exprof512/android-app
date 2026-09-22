@@ -23,15 +23,18 @@ class MealPlanRepository @Inject constructor(
     suspend fun week(start: LocalDate = LocalDate.now()): MealPlanDto =
         wrap { mealPlanApi.week(start.toString()) }
 
-    suspend fun generate(days: Int = 7): MealPlanDto =
+    suspend fun generate(days: Int = 7, force: Boolean = false): MealPlanDto =
         wrap {
             mealPlanApi.generate(
                 MealPlanGenerateRequest(
                     startDate = LocalDate.now().toString(),
                     days = days,
+                    force = force,
                 ),
             )
         }
+
+    suspend fun regenerate(days: Int = 7): MealPlanDto = generate(days = days, force = true)
 
     suspend fun replaceItem(itemId: String): MealPlanDto =
         wrap { mealPlanApi.replaceItem(itemId) }

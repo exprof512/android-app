@@ -32,8 +32,12 @@ fun AuthRoute(
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(state.signedIn) {
-        if (state.signedIn) onSignedIn()
+    LaunchedEffect(state.signedIn, state.successMessage) {
+        if (!state.signedIn) return@LaunchedEffect
+        if (state.successMessage != null) {
+            kotlinx.coroutines.delay(1_200)
+        }
+        onSignedIn()
     }
     AuthScreen(
         state = state,
@@ -100,6 +104,14 @@ fun AuthScreen(
             Text(
                 text = state.error,
                 color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (state.successMessage != null) {
+            Spacer(Modifier.height(FoodAiTokens.SpaceMd.dp))
+            Text(
+                text = state.successMessage,
+                color = FoodAiTokens.Forest,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

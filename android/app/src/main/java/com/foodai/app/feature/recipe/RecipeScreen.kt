@@ -1,5 +1,6 @@
 package com.foodai.app.feature.recipe
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,12 +15,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -27,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -41,7 +38,11 @@ import com.foodai.app.core.network.RecipeImageDto
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.RecipeImagePane
-import com.foodai.app.core.ui.theme.FoodAiTokens
+import com.foodai.app.core.ui.components.FoodAIOutlinedButton
+import com.foodai.app.core.ui.components.FoodAIPrimaryButton
+import com.foodai.app.core.ui.theme.FoodAIColors
+import com.foodai.app.core.ui.theme.FoodAIDimens
+import com.foodai.app.core.ui.theme.FoodAITypography
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,6 +71,8 @@ class RecipeViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(RecipeUiState())
     val state: StateFlow<RecipeUiState> = _state.asStateFlow()
+
+    fun planItemId(): String? = itemId
 
     init {
         refresh()
@@ -154,7 +157,7 @@ class RecipeViewModel @Inject constructor(
 @Composable
 fun RecipeRoute(
     onBack: () -> Unit,
-    onAskAi: (recipeId: String) -> Unit = {},
+    onAskAi: (recipeId: String, itemId: String?) -> Unit = { _, _ -> },
     viewModel: RecipeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -193,7 +196,9 @@ fun RecipeRoute(
                 state = state,
                 onComplete = viewModel::complete,
                 onReplace = viewModel::replace,
-                onAskAi = { state.recipe?.id?.let(onAskAi) },
+                onAskAi = {
+                    state.recipe?.id?.let { id -> onAskAi(id, viewModel.planItemId()) }
+                },
                 modifier = Modifier.padding(padding),
             )
         }
@@ -212,51 +217,56 @@ fun RecipeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(FoodAIColors.Background)
             .verticalScroll(rememberScrollState())
-            .padding(FoodAiTokens.SpaceMd.dp),
-        verticalArrangement = Arrangement.spacedBy(FoodAiTokens.SpaceMd.dp),
+            .padding(FoodAIDimens.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space16),
     ) {
         RecipeImagePane(
             image = state.image,
             contentDescription = recipe.name,
             useFull = true,
         )
-        Text(recipe.name, style = MaterialTheme.typography.headlineMedium)
+        Text(recipe.name, style = FoodAITypography.headlineMedium)
         val n = recipe.nutritionPerServing
         Text(
             "${n.caloriesKcal} ккал · Б ${n.proteinG} / Ж ${n.fatG} / У ${n.carbohydrateG}",
-            style = MaterialTheme.typography.titleMedium,
+            style = FoodAITypography.titleMedium,
         )
         Text(
             "${recipe.cookTimeMinutes} мин · ${recipe.estimatedCostPerServing.amount} ${recipe.estimatedCostPerServing.currency}",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = FoodAITypography.bodyMedium,
+            color = FoodAIColors.TextSecondary,
         )
         if (state.actionError != null) {
-            Text(state.actionError, color = MaterialTheme.colorScheme.error)
+            Text(state.actionError, color = FoodAIColors.Error)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
         ) {
-            OutlinedButton(onClick = onReplace, modifier = Modifier.weight(1f)) {
-                Text("Replace")
-            }
-            Button(onClick = onComplete, modifier = Modifier.weight(1f)) {
-                Text("Cook")
-            }
+            FoodAIOutlinedButton(
+                label = "Заменить",
+                onClick = onReplace,
+                modifier = Modifier.weight(1f),
+            )
+            FoodAIPrimaryButton(
+                label = "Съедено",
+                onClick = onComplete,
+                showArrow = false,
+                modifier = Modifier.weight(1f),
+            )
         }
-        OutlinedButton(onClick = onAskAi, modifier = Modifier.fillMaxWidth()) {
-            Text("Ask AI")
-        }
-        Text("Ингредиенты", style = MaterialTheme.typography.titleLarge)
+        FoodAIOutlinedButton(label = "Спросить AI", onClick = onAskAi)
+        Text("Ингредиенты", style = FoodAITypography.titleLarge)
         recipe.ingredients.forEach { ing ->
-            Text("• ${ing.name} — ${ing.grams} g")
+            Text("• ${ing.name} — ${ing.grams} г", style = FoodAITypography.bodyMedium)
         }
-        Spacer(Modifier.height(8.dp))
-        Text("Шаги", style = MaterialTheme.typography.titleLarge)
+        Spacer(Modifier.height(FoodAIDimens.Space8))
+        Text("Шаги", style = FoodAITypography.titleLarge)
         recipe.steps.forEachIndexed { index, step ->
-            Text("${index + 1}. $step")
+            Text("${index + 1}. $step", style = FoodAITypography.bodyMedium)
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(FoodAIDimens.Space24))
     }
 }

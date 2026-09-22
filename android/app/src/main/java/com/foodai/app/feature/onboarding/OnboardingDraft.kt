@@ -2,22 +2,26 @@ package com.foodai.app.feature.onboarding
 
 import kotlinx.serialization.Serializable
 import com.foodai.app.core.network.PantryItemDto
+import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.network.ProfileUpdateRequest
 import com.foodai.app.core.network.TargetPreviewRequest
 
-enum class OnboardingStep(val index: Int, val title: String) {
-    Goal(0, "Твоя цель"),
-    AboutYou(1, "Расскажи о себе"),
-    Eating(2, "Как ты питаешься?"),
-    Foods(3, "Что ты любишь?"),
-    Budget(4, "Какой бюджет?"),
-    CookTime(5, "Сколько времени готовишь?"),
-    Pantry(6, "Что есть дома?"),
-    Loading(7, "Создаём твой первый план..."),
+enum class OnboardingStep(val index: Int, val title: String, val subtitle: String) {
+    Goal(0, "Какая у тебя цель?", "Мы подберём оптимальный план питания именно для тебя"),
+    AboutYou(1, "Расскажи о себе", "Эти данные помогут точнее рассчитать твой план питания"),
+    GoalDetails(2, "Параметры цели", "Укажи целевой вес и комфортную скорость изменений"),
+    Activity(3, "Твой уровень активности", "Это поможет правильно рассчитать калорийность и подобрать план питания"),
+    Meals(4, "Как тебе удобно питаться?", "Мы подберём оптимальное количество приёмов пищи"),
+    Foods(5, "Твои предпочтения", "Выбери продукты, которые ты любишь. Мы будем учитывать их при создании твоего плана питания."),
+    Budget(6, "Какой у тебя бюджет на питание?", "Мы подберём рецепты и продукты с учётом твоих финансовых возможностей."),
+    CookTime(7, "Сколько времени ты готов готовить?", "Мы подберём рецепты, которые подходят под твой график и образ жизни."),
+    Pantry(8, "Какие продукты у тебя есть дома?", "Отметь то, что уже есть — план станет практичнее и дешевле."),
+    Loading(9, "AI создает твой персональный план", "Мы анализируем твои ответы и подбираем лучшие рецепты специально для тебя."),
     ;
 
     companion object {
         val formSteps = entries.filter { it != Loading }
+        const val TOTAL = 10
     }
 }
 
@@ -41,13 +45,23 @@ data class OnboardingDraft(
     val dislikedFoods: String = "",
     val excludedFoods: String = "",
     val allergies: String = "",
-    val groceryBudgetWeekly: String = "",
+    val groceryBudgetWeekly: String = "8000",
     val currency: String = "RUB",
     val householdSize: String = "1",
-    val maxCookTimeMinutes: String = "35",
+    val maxCookTimeMinutes: String = "20",
+    val preferredStores: String = "",
+    val considerDiscounts: Boolean = true,
     val pantryText: String = "",
     val stepIndex: Int = 0,
 )
+
+fun OnboardingDraft.hasMeaningfulInput(): Boolean =
+    ageYears.isNotBlank() ||
+        heightCm.isNotBlank() ||
+        currentWeightKg.isNotBlank() ||
+        targetWeightKg.isNotBlank() ||
+        likedFoods.isNotBlank() ||
+        pantryText.isNotBlank()
 
 fun OnboardingDraft.splitCsv(value: String): List<String> =
     value.split(',', ';', '\n')
@@ -104,6 +118,37 @@ fun OnboardingDraft.toUpdateRequest(): ProfileUpdateRequest {
     )
 }
 
+fun ProfileResponse.toOnboardingDraft(stepIndex: Int = 0): OnboardingDraft {
+    val goalType = goal?.goalType ?: "lose_weight"
+    val pantryLines = availableProducts.joinToString("\n") { item ->
+        "${item.name} ${item.quantity} ${item.unit}"
+    }
+    return OnboardingDraft(
+        goalType = goalType,
+        targetWeightKg = goal?.targetWeightKg?.toString().orEmpty(),
+        desiredWeeklyChangeKg = goal?.desiredWeeklyChangeKg?.toString()
+            ?: if (goalType == "maintain_weight") "0" else "0.4",
+        sex = profile.sex ?: "female",
+        ageYears = profile.ageYears?.toString().orEmpty(),
+        heightCm = profile.heightCm?.toString().orEmpty(),
+        currentWeightKg = profile.currentWeightKg?.toString().orEmpty(),
+        activityLevel = profile.activityLevel ?: "moderate",
+        mealsPerDay = profile.mealsPerDay?.toString() ?: "3",
+        dailyCalorieMode = profile.dailyCalorieMode ?: "auto",
+        dailyCalorieValue = profile.dailyCalorieValue?.toString().orEmpty(),
+        likedFoods = preferences.likedFoods.joinToString(", "),
+        dislikedFoods = preferences.dislikedFoods.joinToString(", "),
+        excludedFoods = restrictions.excludedFoods.joinToString(", "),
+        allergies = restrictions.allergies.joinToString(", "),
+        groceryBudgetWeekly = profile.groceryBudgetWeekly?.toString().orEmpty(),
+        currency = profile.currency ?: "RUB",
+        householdSize = profile.householdSize?.toString() ?: "1",
+        maxCookTimeMinutes = profile.maxCookTimeMinutes?.toString() ?: "35",
+        pantryText = pantryLines,
+        stepIndex = stepIndex,
+    )
+}
+
 fun normalizePantryUnit(raw: String): String {
     val key = raw.trim().lowercase()
     return when (key) {
@@ -145,12 +190,6 @@ fun OnboardingDraft.validateStep(step: OnboardingStep): String? = when (step) {
     OnboardingStep.Goal -> {
         when {
             goalType.isBlank() -> "Выберите цель"
-            goalType == "maintain_weight" -> null
-            desiredWeeklyChangeKg.toDoubleOrNull() == null ->
-                "Укажите скорость изменения веса (до $MAX_SAFE_WEEKLY_CHANGE_KG кг/нед)"
-            desiredWeeklyChangeKg.toDouble() > MAX_SAFE_WEEKLY_CHANGE_KG ->
-                "Безопасный максимум — $MAX_SAFE_WEEKLY_CHANGE_KG кг в неделю"
-            desiredWeeklyChangeKg.toDouble() < 0 -> "Скорость не может быть отрицательной"
             else -> null
         }
     }
@@ -160,13 +199,33 @@ fun OnboardingDraft.validateStep(step: OnboardingStep): String? = when (step) {
         currentWeightKg.toDoubleOrNull() == null -> "Укажите текущий вес"
         else -> null
     }
-    OnboardingStep.Eating -> when {
+    OnboardingStep.GoalDetails -> {
+        when {
+            goalType == "maintain_weight" -> null
+            desiredWeeklyChangeKg.toDoubleOrNull() == null ->
+                "Укажите скорость изменения веса (до $MAX_SAFE_WEEKLY_CHANGE_KG кг/нед)"
+            desiredWeeklyChangeKg.toDouble() > MAX_SAFE_WEEKLY_CHANGE_KG ->
+                "Безопасный максимум — $MAX_SAFE_WEEKLY_CHANGE_KG кг в неделю"
+            desiredWeeklyChangeKg.toDouble() < 0 -> "Скорость не может быть отрицательной"
+            else -> null
+        }
+    }
+    OnboardingStep.Activity -> when {
+        activityLevel.isBlank() -> "Выберите уровень активности"
+        else -> null
+    }
+    OnboardingStep.Budget -> null
+    OnboardingStep.CookTime -> when {
+        maxCookTimeMinutes.toIntOrNull() == null -> "Выберите время готовки"
+        else -> null
+    }
+    OnboardingStep.Meals -> when {
         mealsPerDay.toIntOrNull() == null -> "Укажите число приёмов пищи"
         dailyCalorieMode != "auto" && dailyCalorieValue.toIntOrNull() == null ->
             "Укажите значение калорийности"
         else -> null
     }
-    OnboardingStep.Foods, OnboardingStep.Budget, OnboardingStep.CookTime, OnboardingStep.Pantry -> null
+    OnboardingStep.Foods, OnboardingStep.Pantry -> null
     OnboardingStep.Loading -> null
 }
 
