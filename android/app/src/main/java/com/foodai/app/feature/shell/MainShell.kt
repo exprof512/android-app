@@ -39,6 +39,7 @@ import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.theme.FoodAiTokens
 import com.foodai.app.feature.plan.TodayRoute
 import com.foodai.app.feature.plan.WeekRoute
+import com.foodai.app.feature.progress.ProgressRoute
 import com.foodai.app.feature.recipe.RecipeRoute
 import com.foodai.app.feature.shopping.ShoppingRoute
 import com.foodai.app.navigation.Routes
@@ -138,10 +139,7 @@ fun MainShell(
                 ShoppingRoute()
             }
             composable(Routes.Progress) {
-                PlaceholderPane(
-                    title = "Progress",
-                    body = "Прогресс появится в Phase 12.",
-                )
+                ProgressRoute()
             }
             composable(Routes.Profile) {
                 ProfilePane(

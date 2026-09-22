@@ -364,3 +364,47 @@ data class ShoppingListDto(
     val items: List<ShoppingListItemDto> = emptyList(),
     val warnings: List<String> = emptyList(),
 )
+
+@Serializable
+data class WeightEntryCreateRequest(
+    @SerialName("measured_at") val measuredAt: String,
+    @SerialName("weight_kg") val weightKg: Double,
+    val note: String? = null,
+)
+
+@Serializable
+data class WeightEntryDto(
+    val id: String,
+    @SerialName("measured_at") val measuredAt: String,
+    @SerialName("weight_kg") val weightKg: Double,
+    val note: String? = null,
+)
+
+@Serializable
+data class DailyNutritionBalanceDto(
+    val date: String,
+    @SerialName("target_calories_kcal") val targetCaloriesKcal: Int? = null,
+    @SerialName("consumed_calories_kcal") val consumedCaloriesKcal: Int = 0,
+    @SerialName("planned_calories_kcal") val plannedCaloriesKcal: Int = 0,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("fat_g") val fatG: Double = 0.0,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double = 0.0,
+    @SerialName("completed_meals") val completedMeals: Int = 0,
+    @SerialName("planned_meals") val plannedMeals: Int = 0,
+)
+
+@Serializable
+data class ProgressSummaryDto(
+    @SerialName("current_weight_kg") val currentWeightKg: Double? = null,
+    @SerialName("start_weight_kg") val startWeightKg: Double? = null,
+    @SerialName("target_weight_kg") val targetWeightKg: Double? = null,
+    @SerialName("goal_type") val goalType: String? = null,
+    @SerialName("weight_delta_kg") val weightDeltaKg: Double? = null,
+    @SerialName("progress_percent") val progressPercent: Double? = null,
+    @SerialName("trend_7d_kg") val trend7dKg: Double? = null,
+    @SerialName("calorie_target_kcal") val calorieTargetKcal: Int? = null,
+    val today: DailyNutritionBalanceDto? = null,
+    @SerialName("recent_entries") val recentEntries: List<WeightEntryDto> = emptyList(),
+    val disclaimer: String = "",
+    val warnings: List<String> = emptyList(),
+)

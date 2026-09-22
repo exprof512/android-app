@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     image_max_retries: int = 3
     image_max_concurrent_jobs: int | None = None
 
+    deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_text_model: str = "deepseek-chat"
+    deepseek_text_timeout_seconds: int = 60
+
     s3_provider: str = "minio"
     s3_endpoint: str = "http://minio:9000"
     s3_region: str = "us-east-1"

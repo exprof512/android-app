@@ -66,3 +66,17 @@ interface ShoppingApi {
         @Query("completed") completed: Boolean = true,
     ): ShoppingListItemDto
 }
+
+interface ProgressApi {
+    @POST("weight-entries")
+    suspend fun createWeightEntry(@Body body: WeightEntryCreateRequest): WeightEntryDto
+
+    @GET("weight-entries")
+    suspend fun listWeightEntries(
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+    ): List<WeightEntryDto>
+
+    @GET("progress/summary")
+    suspend fun summary(@Query("date") date: String? = null): ProgressSummaryDto
+}

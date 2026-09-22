@@ -11,6 +11,7 @@ from app.profiles.models import (
     Goal,
     UserProfile,
 )
+from app.progress.models import WeightEntry
 from app.recipes.models import (
     Ingredient,
     Recipe,
@@ -38,4 +39,5 @@ __all__ = [
     "User",
     "UserProfile",
     "UserRecipeFavorite",
+    "WeightEntry",
 ]

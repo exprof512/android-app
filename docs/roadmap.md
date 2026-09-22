@@ -24,7 +24,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | 8 Image generation | **7** Image pipeline and storage | готово |
 | 9 Daily meal plan | **6** Meal planning (+ Android **10**) | готово |
 | 10 Weekly + shopping | **6**/**11** | shopping: Phase **11** готово |
-| 11 Progress | **12** | не начато |
+| 11 Progress | **12** | готово |
 | 12 AI chat | **13** | не начато |
 | 13 Monetization | **14** | не начато |
 | 14 Security | **15** Hardening | не начато |
@@ -47,7 +47,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | **9 — Android onboarding/profile** | Семь onboarding screens с product-copy из architecture, target preview, preferences/restrictions/pantry and first-plan loading handoff. | **готово**: debug APK, draft persistence, `PUT /profile` + `POST /meal-plans/generate`, disclaimer/preview. |
 | **10 — Android plan and recipe** | Home Today, Plan, recipe dish card, Coil thumbnail/full image states, replace/complete/favorite. | **готово**: debug APK; Today/Week; dish card; image pending/ready/failed. |
 | **11 — Shopping** | Генерация, merged ingredients, pantry exclusion, completion и Shopping navigation. | **готово**: backend shopping APIs + tests; Android Shopping tab; debug APK. |
-| **12 — Progress** | Weight entry, progress summary, daily nutrition balance and Progress screen. | Tests for timeline/ownership; debug APK flow; no medical/guaranteed claims. |
+| **12 — Progress** | Weight entry, progress summary, daily nutrition balance and Progress screen. | **готово**: weight-entries + summary APIs; Android Progress tab; disclaimer. |
 | **13 — Contextual chat** | Conversation/message API, bounded profile/plan context, safety handling, Chat UI entry from recipe. | Mocked AI tests; quota tests; debug APK chat/error states. |
 | **14 — Entitlements abstraction** | Free/Premium limits, `require_premium()`, usage UX and `PaymentProvider` interface only. | Permission/rate/usage tests; Android paywall states; no real payment provider required. |
 | **15 — Hardening and observability** | Structured logs, request IDs, security review, healthchecks, backups/restore drill, performance/cache checks. | Sensitive-log audit; all service healthchecks; tested Postgres/MinIO restore procedure. |

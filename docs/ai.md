@@ -122,18 +122,19 @@ NUTRITION_MIN_DAILY_CALORIES_MALE=1500
 
 ## Тестируемость
 
-`TextGenerationProvider` имеет production `OpenAIResponsesProvider` и test `MockTextProvider`. pytest не выполняет сетевых вызовов к OpenAI. Обязательные tests: JSON schema failure/retry, unknown ingredients, nutrition override attempt, allergy/exclusion violation, plan daily mismatch, context ownership, cache/idempotency, quota/rate limit и safe chat response. Параллельный image contract использует `MockImageProvider`, никогда реальный Image API.
+`TextGenerationProvider` имеет production `OpenAIResponsesProvider`, optional `DeepSeekChatProvider` и test `MockTextProvider`. pytest не выполняет сетевых вызовов к OpenAI/DeepSeek. Обязательные tests: JSON schema failure/retry, unknown ingredients, nutrition override attempt, allergy/exclusion violation, plan daily mismatch, context ownership, cache/idempotency, quota/rate limit и safe chat response. Параллельный image contract использует `MockImageProvider`, никогда реальный Image API.
 
 ## Phase 5 implementation notes
 
 Реализовано в коде:
 
-- `backend/app/integrations/openai/` — единственный SDK boundary (`client.py`, `text.py`, stub `images.py`);
-- `backend/app/ai/` — `TextAIService`, schemas, prompts, cache, `ai_text_usage`, `MockTextProvider`, draft converter;
+- `backend/app/integrations/openai/` — OpenAI SDK boundary (`client.py`, `text.py`, `images.py`);
+- `backend/app/integrations/deepseek/` — DeepSeek Chat Completions + JSON mode (тот же OpenAI SDK, `base_url`);
+- `backend/app/ai/` — `TextAIService`, schemas, prompts, cache, `ai_text_usage`, `MockTextProvider`, `FallbackTextProvider`, draft converter;
 - migration `0004_ai_text_usage`;
 - Redis cache key = operation + model + schema version + normalized payload fingerprint;
 - repair retry bounded by `OPENAI_TEXT_MAX_ATTEMPTS` (default 2);
-- без `OPENAI_API_KEY` runtime использует `MockTextProvider` (dev без ключа не бьёт в OpenAI).
+- runtime chain: OpenAI (если `OPENAI_API_KEY`) → DeepSeek (если `DEEPSEEK_API_KEY`) → meal-plan catalog fallback; без ключей — `MockTextProvider`.
 
 Meal-plan HTTP endpoints и Chat API появляются в следующих фазах и вызывают этот слой.
 

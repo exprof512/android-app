@@ -25,7 +25,8 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 9 — Android onboarding/profile | готово: 7 экранов, draft, calculate-target preview, first-plan loading, Profile tab |
 | 10 — Android plan and recipe | готово: Today/Plan, dish card, Coil image states, replace/complete/favorite |
 | 11 — Shopping | готово: generate/current/complete, pantry exclusion, Android Shopping tab |
-| 12–16 | не начаты |
+| 12 — Progress | готово: weight entries, summary, daily balance, Android Progress tab |
+| 13–16 | не начаты |
 
 Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 
