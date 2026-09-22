@@ -49,7 +49,11 @@ fun OnboardingRoute(
     }
     if (state.step == OnboardingStep.Loading) {
         LoadingPane(
-            if (generatePlan) OnboardingStep.Loading.title else "Сохраняем профиль…",
+            if (generatePlan || state.isSubmitting) {
+                "Создаём твой план питания…"
+            } else {
+                "Сохраняем профиль…"
+            },
         )
         return
     }

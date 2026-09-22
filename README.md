@@ -26,7 +26,8 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 | 10 — Android plan and recipe | готово: Today/Plan, dish card, Coil image states, replace/complete/favorite |
 | 11 — Shopping | готово: generate/current/complete, pantry exclusion, Android Shopping tab |
 | 12 — Progress | готово: weight entries, summary, daily balance, Android Progress tab |
-| 13–16 | не начаты |
+| 13 — Contextual chat | готово: conversations/messages, safety refusal, Ask AI from recipe |
+| 14–16 | не начаты |
 
 Маппинг master-prompt фаз → roadmap: [docs/roadmap.md](docs/roadmap.md).
 

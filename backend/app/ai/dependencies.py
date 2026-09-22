@@ -19,19 +19,8 @@ from app.integrations.openai.text import OpenAIResponsesProvider
 
 
 def build_text_provider(settings: Settings) -> TextGenerationProvider:
-    """OpenAI first (if keyed), then DeepSeek; mock when neither is configured."""
+    """DeepSeek first when keyed (OpenAI often quota-exhausted), then OpenAI; mock if none."""
     chain: list[tuple[str, TextGenerationProvider]] = []
-    if settings.openai_api_key.strip():
-        chain.append(
-            (
-                "openai",
-                OpenAIResponsesProvider(
-                    api_key=settings.openai_api_key,
-                    model=settings.openai_text_model or "gpt-4.1-mini",
-                    timeout_seconds=settings.openai_text_timeout_seconds,
-                ),
-            )
-        )
     if settings.deepseek_api_key.strip():
         chain.append(
             (
@@ -41,6 +30,17 @@ def build_text_provider(settings: Settings) -> TextGenerationProvider:
                     model=settings.deepseek_text_model or "deepseek-chat",
                     timeout_seconds=settings.deepseek_text_timeout_seconds,
                     base_url=settings.deepseek_base_url or "https://api.deepseek.com",
+                ),
+            )
+        )
+    if settings.openai_api_key.strip():
+        chain.append(
+            (
+                "openai",
+                OpenAIResponsesProvider(
+                    api_key=settings.openai_api_key,
+                    model=settings.openai_text_model or "gpt-4.1-mini",
+                    timeout_seconds=settings.openai_text_timeout_seconds,
                 ),
             )
         )

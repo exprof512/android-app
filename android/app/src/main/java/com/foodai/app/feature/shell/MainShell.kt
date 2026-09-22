@@ -37,6 +37,7 @@ import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.theme.FoodAiTokens
+import com.foodai.app.feature.chat.ChatRoute
 import com.foodai.app.feature.plan.TodayRoute
 import com.foodai.app.feature.plan.WeekRoute
 import com.foodai.app.feature.progress.ProgressRoute
@@ -90,7 +91,7 @@ fun MainShell(
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
-    val hideBottomBar = current?.startsWith("recipe/") == true
+    val hideBottomBar = current?.startsWith("recipe/") == true || current?.startsWith("chat/") == true
 
     Scaffold(
         bottomBar = {
@@ -160,7 +161,16 @@ fun MainShell(
                     },
                 ),
             ) {
-                RecipeRoute(onBack = { navController.popBackStack() })
+                RecipeRoute(
+                    onBack = { navController.popBackStack() },
+                    onAskAi = { recipeId -> navController.navigate("chat/$recipeId") },
+                )
+            }
+            composable(
+                route = "chat/{recipeId}",
+                arguments = listOf(navArgument("recipeId") { type = NavType.StringType }),
+            ) {
+                ChatRoute(onBack = { navController.popBackStack() })
             }
         }
     }

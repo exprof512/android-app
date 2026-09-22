@@ -6,6 +6,7 @@ import com.foodai.app.core.auth.TokenStore
 import com.foodai.app.core.network.AuthApi
 import com.foodai.app.core.network.AuthApiProvider
 import com.foodai.app.core.network.AuthInterceptor
+import com.foodai.app.core.network.ChatApi
 import com.foodai.app.core.network.MealPlanApi
 import com.foodai.app.core.network.ProfileApi
 import com.foodai.app.core.network.ProgressApi
@@ -128,6 +129,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideProgressApi(retrofit: Retrofit): ProgressApi = retrofit.create(ProgressApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideChatApi(retrofit: Retrofit): ChatApi = retrofit.create(ChatApi::class.java)
 
     private fun buildRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()

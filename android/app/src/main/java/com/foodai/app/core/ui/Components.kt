@@ -43,6 +43,9 @@ fun LoadingPane(
 fun ErrorPane(
     message: String,
     onRetry: (() -> Unit)? = null,
+    retryLabel: String = "Повторить",
+    onSecondary: (() -> Unit)? = null,
+    secondaryLabel: String = "Создать план",
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -61,9 +64,14 @@ fun ErrorPane(
                 color = MaterialTheme.colorScheme.error,
                 textAlign = TextAlign.Center,
             )
+            if (onSecondary != null) {
+                Button(onClick = onSecondary) {
+                    Text(secondaryLabel)
+                }
+            }
             if (onRetry != null) {
                 Button(onClick = onRetry) {
-                    Text("Повторить")
+                    Text(retryLabel)
                 }
             }
         }

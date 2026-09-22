@@ -80,3 +80,17 @@ interface ProgressApi {
     @GET("progress/summary")
     suspend fun summary(@Query("date") date: String? = null): ProgressSummaryDto
 }
+
+interface ChatApi {
+    @POST("ai/chat/conversations")
+    suspend fun createConversation(@Body body: ConversationCreateRequest): ConversationDto
+
+    @GET("ai/chat/conversations/{conversationId}")
+    suspend fun getConversation(@Path("conversationId") conversationId: String): ConversationDto
+
+    @POST("ai/chat/conversations/{conversationId}/messages")
+    suspend fun postMessage(
+        @Path("conversationId") conversationId: String,
+        @Body body: ChatMessageCreateRequest,
+    ): ChatMessageResponseDto
+}

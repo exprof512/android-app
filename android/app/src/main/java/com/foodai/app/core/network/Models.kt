@@ -408,3 +408,52 @@ data class ProgressSummaryDto(
     val disclaimer: String = "",
     val warnings: List<String> = emptyList(),
 )
+
+@Serializable
+data class ConversationCreateRequest(
+    val title: String? = null,
+    @SerialName("context_plan_id") val contextPlanId: String? = null,
+    @SerialName("context_recipe_id") val contextRecipeId: String? = null,
+)
+
+@Serializable
+data class ChatMessageCreateRequest(
+    val content: String,
+)
+
+@Serializable
+data class SuggestedActionDto(
+    val type: String,
+    val label: String,
+    val payload: kotlinx.serialization.json.JsonElement? = null,
+)
+
+@Serializable
+data class ChatMessageDto(
+    val id: String,
+    val role: String,
+    val content: String,
+    @SerialName("suggested_actions") val suggestedActions: List<SuggestedActionDto> = emptyList(),
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class ConversationDto(
+    val id: String,
+    val title: String? = null,
+    val status: String = "active",
+    @SerialName("context_plan_id") val contextPlanId: String? = null,
+    @SerialName("context_recipe_id") val contextRecipeId: String? = null,
+    val messages: List<ChatMessageDto> = emptyList(),
+    val warnings: List<String> = emptyList(),
+    val disclaimer: String = "",
+)
+
+@Serializable
+data class ChatMessageResponseDto(
+    @SerialName("conversation_id") val conversationId: String,
+    @SerialName("user_message") val userMessage: ChatMessageDto,
+    @SerialName("assistant_message") val assistantMessage: ChatMessageDto,
+    val warnings: List<String> = emptyList(),
+    val disclaimer: String = "",
+)

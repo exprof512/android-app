@@ -6,6 +6,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.recipes import router as recipes_router
 from app.api.v1.users import router as users_router
+from app.chat.api import router as chat_router
 from app.images.api import router as images_router
 from app.meal_plans.api import router as meal_plans_router
 from app.progress.api import router as progress_router
@@ -22,6 +23,7 @@ def create_api_router(prefix: str) -> APIRouter:
     router.include_router(images_router)
     router.include_router(shopping_router)
     router.include_router(progress_router)
+    router.include_router(chat_router)
     return router
 
 

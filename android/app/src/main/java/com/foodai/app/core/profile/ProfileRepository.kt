@@ -36,6 +36,19 @@ class ProfileRepository @Inject constructor(
             )
         }
 
+    /** Generate a plan when the user has none (e.g. after profile edit). */
+    suspend fun ensurePlan(days: Int = 7): MealPlanDto =
+        try {
+            wrap { mealPlanApi.today(LocalDate.now().toString()) }
+        } catch (error: Throwable) {
+            val parsed = ApiErrorParser.fromThrowable(error)
+            if (parsed.code == "meal_plan_not_found" || parsed.httpStatus == 404) {
+                generateFirstPlan(days)
+            } else {
+                throw parsed
+            }
+        }
+
     private suspend fun <T> wrap(block: suspend () -> T): T =
         try {
             block()

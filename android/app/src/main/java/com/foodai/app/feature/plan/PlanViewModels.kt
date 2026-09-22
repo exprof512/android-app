@@ -20,9 +20,11 @@ import javax.inject.Inject
 data class TodayUiState(
     val loading: Boolean = true,
     val refreshing: Boolean = false,
+    val generating: Boolean = false,
     val plan: MealPlanDto? = null,
     val profile: ProfileResponse? = null,
     val error: String? = null,
+    val missingPlan: Boolean = false,
     val actionError: String? = null,
 )
 
@@ -40,20 +42,42 @@ class TodayViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = _state.value.plan == null, error = null)
+            _state.value = _state.value.copy(loading = _state.value.plan == null, error = null, missingPlan = false)
             try {
                 val plan = mealPlans.today(LocalDate.now())
                 val profile = runCatching { profiles.getProfile() }.getOrNull()
                 _state.value = TodayUiState(loading = false, plan = plan, profile = profile)
             } catch (error: ApiException) {
+                val missing = error.code == "meal_plan_not_found" || error.httpStatus == 404
                 _state.value = _state.value.copy(
                     loading = false,
-                    error = error.toUiMessage(),
+                    error = if (missing) {
+                        "План питания ещё не создан."
+                    } else {
+                        error.toUiMessage()
+                    },
+                    missingPlan = missing,
                 )
             } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
                     error = error.message ?: "Не удалось загрузить план",
+                )
+            }
+        }
+    }
+
+    fun generatePlan() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(generating = true, error = null, actionError = null)
+            try {
+                profiles.generateFirstPlan(days = 7)
+                refresh()
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    generating = false,
+                    error = error.toUiMessage(),
+                    missingPlan = error.code == "meal_plan_not_found" || error.httpStatus == 404,
                 )
             }
         }
@@ -88,14 +112,17 @@ class TodayViewModel @Inject constructor(
 
 data class WeekUiState(
     val loading: Boolean = true,
+    val generating: Boolean = false,
     val plan: MealPlanDto? = null,
     val selectedDate: String = LocalDate.now().toString(),
     val error: String? = null,
+    val missingPlan: Boolean = false,
 )
 
 @HiltViewModel
 class WeekViewModel @Inject constructor(
     private val mealPlans: MealPlanRepository,
+    private val profiles: ProfileRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WeekUiState())
     val state: StateFlow<WeekUiState> = _state.asStateFlow()
@@ -106,7 +133,7 @@ class WeekViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, error = null)
+            _state.value = _state.value.copy(loading = true, error = null, missingPlan = false)
             try {
                 val plan = mealPlans.week(LocalDate.now())
                 _state.value = WeekUiState(
@@ -115,11 +142,32 @@ class WeekViewModel @Inject constructor(
                     selectedDate = _state.value.selectedDate.ifBlank { LocalDate.now().toString() },
                 )
             } catch (error: ApiException) {
-                _state.value = _state.value.copy(loading = false, error = error.toUiMessage())
+                val missing = error.code == "meal_plan_not_found" || error.httpStatus == 404
+                _state.value = _state.value.copy(
+                    loading = false,
+                    error = if (missing) "План питания ещё не создан." else error.toUiMessage(),
+                    missingPlan = missing,
+                )
             } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
                     error = error.message ?: "Не удалось загрузить неделю",
+                )
+            }
+        }
+    }
+
+    fun generatePlan() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(generating = true, error = null)
+            try {
+                profiles.generateFirstPlan(days = 7)
+                refresh()
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    generating = false,
+                    error = error.toUiMessage(),
+                    missingPlan = error.code == "meal_plan_not_found" || error.httpStatus == 404,
                 )
             }
         }

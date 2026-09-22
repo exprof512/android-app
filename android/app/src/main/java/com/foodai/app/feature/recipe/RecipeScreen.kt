@@ -154,6 +154,7 @@ class RecipeViewModel @Inject constructor(
 @Composable
 fun RecipeRoute(
     onBack: () -> Unit,
+    onAskAi: (recipeId: String) -> Unit = {},
     viewModel: RecipeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -192,6 +193,7 @@ fun RecipeRoute(
                 state = state,
                 onComplete = viewModel::complete,
                 onReplace = viewModel::replace,
+                onAskAi = { state.recipe?.id?.let(onAskAi) },
                 modifier = Modifier.padding(padding),
             )
         }
@@ -203,6 +205,7 @@ fun RecipeScreen(
     state: RecipeUiState,
     onComplete: () -> Unit,
     onReplace: () -> Unit,
+    onAskAi: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val recipe = state.recipe ?: return
@@ -241,6 +244,9 @@ fun RecipeScreen(
             Button(onClick = onComplete, modifier = Modifier.weight(1f)) {
                 Text("Cook")
             }
+        }
+        OutlinedButton(onClick = onAskAi, modifier = Modifier.fillMaxWidth()) {
+            Text("Ask AI")
         }
         Text("Ингредиенты", style = MaterialTheme.typography.titleLarge)
         recipe.ingredients.forEach { ing ->

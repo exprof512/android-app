@@ -36,10 +36,14 @@ fun TodayRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     when {
-        state.loading -> LoadingPane("Загружаем сегодня…")
+        state.loading || state.generating -> LoadingPane(
+            if (state.generating) "Создаём план питания…" else "Загружаем сегодня…",
+        )
         state.error != null && state.plan == null -> ErrorPane(
             message = state.error ?: "Ошибка",
             onRetry = viewModel::refresh,
+            onSecondary = if (state.missingPlan) viewModel::generatePlan else null,
+            secondaryLabel = "Создать план на неделю",
         )
         else -> TodayScreen(
             state = state,
@@ -117,10 +121,14 @@ fun WeekRoute(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     when {
-        state.loading -> LoadingPane("Загружаем неделю…")
+        state.loading || state.generating -> LoadingPane(
+            if (state.generating) "Создаём план питания…" else "Загружаем неделю…",
+        )
         state.error != null && state.plan == null -> ErrorPane(
             message = state.error ?: "Ошибка",
             onRetry = viewModel::refresh,
+            onSecondary = if (state.missingPlan) viewModel::generatePlan else null,
+            secondaryLabel = "Создать план на неделю",
         )
         else -> WeekScreen(
             state = state,

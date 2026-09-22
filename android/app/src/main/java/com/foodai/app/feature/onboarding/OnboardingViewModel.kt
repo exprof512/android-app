@@ -104,6 +104,9 @@ class OnboardingViewModel @Inject constructor(
                 profileRepository.updateProfile(body)
                 if (shouldGenerate) {
                     profileRepository.generateFirstPlan(days = 7)
+                } else {
+                    // Profile edits used to skip generation — ensure a plan exists.
+                    profileRepository.ensurePlan(days = 7)
                 }
                 draftStore.clear()
                 _state.update { it.copy(isSubmitting = false, finished = true) }

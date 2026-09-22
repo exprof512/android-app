@@ -2,6 +2,7 @@
 
 from app.ai.models import AiTextUsage
 from app.auth.models import RefreshToken, User
+from app.chat.models import AiConversation, AiMessage
 from app.images.models import AiImageUsage, RecipeImage
 from app.meal_plans.models import MealPlan, MealPlanItem
 from app.profiles.models import (
@@ -21,7 +22,9 @@ from app.recipes.models import (
 from app.shopping.models import ShoppingList, ShoppingListItem
 
 __all__ = [
+    "AiConversation",
     "AiImageUsage",
+    "AiMessage",
     "AiTextUsage",
     "AvailableProduct",
     "FoodPreference",
