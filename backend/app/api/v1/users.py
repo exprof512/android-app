@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Body, Depends, Header, Response, status
 from fastapi.responses import JSONResponse
 
 from app.auth.account_service import AccountService
@@ -101,16 +102,49 @@ async def export_my_data(
     account_service: AccountService = Depends(get_account_service),
 ) -> JSONResponse:
     payload = await account_service.export_user_data(current_user)
-    return JSONResponse(content=payload)
+    if not isinstance(payload, dict) or "exported_at" not in payload:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": {
+                    "code": "export_failed",
+                    "message": "Экспорт не сформирован.",
+                }
+            },
+        )
+    return JSONResponse(
+        content=payload,
+        headers={
+            "Content-Disposition": 'attachment; filename="foodai-export.json"',
+        },
+    )
 
 
-@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_my_account(
+@router.post("/me/delete", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_account_post(
     payload: DeleteAccountRequest,
     current_user: CurrentUser,
     account_service: AccountService = Depends(get_account_service),
 ) -> Response:
+    """Preferred delete path — JSON body is reliable across HTTP clients/proxies."""
     await account_service.delete_account(
         current_user, confirmation=payload.confirmation
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_account(
+    current_user: CurrentUser,
+    account_service: AccountService = Depends(get_account_service),
+    payload: Annotated[DeleteAccountRequest | None, Body()] = None,
+    x_confirm_delete: Annotated[str | None, Header(alias="X-Confirm-Delete")] = None,
+) -> Response:
+    """Legacy DELETE. Prefer POST /users/me/delete when clients drop DELETE bodies."""
+    confirmation = (
+        payload.confirmation
+        if payload is not None
+        else (x_confirm_delete or "")
+    )
+    await account_service.delete_account(current_user, confirmation=confirmation)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -42,7 +42,7 @@ _BMR_SEX_CONSTANT: dict[str, Decimal] = {
 }
 
 KCAL_PER_KG_BODY_MASS = Decimal("7700")
-DEFAULT_MAX_WEEKLY_WEIGHT_CHANGE_KG = Decimal("1.0")
+DEFAULT_MAX_WEEKLY_WEIGHT_CHANGE_KG = Decimal("2.0")
 MIN_SAFE_BMI = Decimal("18.5")
 
 PROTEIN_G_PER_KG = Decimal("1.6")

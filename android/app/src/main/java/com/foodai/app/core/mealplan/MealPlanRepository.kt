@@ -8,39 +8,144 @@ import com.foodai.app.core.network.MealPlanGenerateRequest
 import com.foodai.app.core.network.MealPlanItemDto
 import com.foodai.app.core.network.RecipeApi
 import com.foodai.app.core.network.RecipeImageDto
+import com.foodai.app.core.sync.AppStateBus
+import com.foodai.app.core.sync.DomainEvent
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.time.LocalDate
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class PlanSnapshot(
+    val plan: MealPlanDto? = null,
+    val loading: Boolean = false,
+    val generating: Boolean = false,
+    val error: String? = null,
+    val missing: Boolean = false,
+    val lastUpdatedEpochMs: Long = 0L,
+)
+
+/**
+ * Authoritative Android meal-plan store: backend → this repository → ViewModels.
+ * Today and Week both read [weekPlan] / fetch covering the selected date.
+ */
 @Singleton
 class MealPlanRepository @Inject constructor(
     private val mealPlanApi: MealPlanApi,
     private val recipeApi: RecipeApi,
+    private val bus: AppStateBus,
 ) {
-    suspend fun today(date: LocalDate = LocalDate.now()): MealPlanDto =
-        wrap { mealPlanApi.today(date.toString()) }
+    private val _weekPlan = MutableStateFlow(PlanSnapshot())
+    val weekPlan: StateFlow<PlanSnapshot> = _weekPlan.asStateFlow()
 
-    suspend fun week(start: LocalDate = LocalDate.now()): MealPlanDto =
-        wrap { mealPlanApi.week(start.toString()) }
+    private val _todayPlan = MutableStateFlow(PlanSnapshot())
+    val todayPlan: StateFlow<PlanSnapshot> = _todayPlan.asStateFlow()
 
-    suspend fun generate(days: Int = 7, force: Boolean = false): MealPlanDto =
-        wrap {
-            mealPlanApi.generate(
-                MealPlanGenerateRequest(
-                    startDate = LocalDate.now().toString(),
-                    days = days,
-                    force = force,
-                ),
+    suspend fun refreshToday(date: LocalDate = LocalDate.now()): MealPlanDto {
+        _todayPlan.value = _todayPlan.value.copy(loading = true, error = null, missing = false)
+        return try {
+            val plan = wrap { mealPlanApi.today(date.toString()) }
+            _todayPlan.value = PlanSnapshot(
+                plan = plan,
+                lastUpdatedEpochMs = System.currentTimeMillis(),
             )
+            plan
+        } catch (error: Throwable) {
+            val parsed = ApiErrorParser.fromThrowable(error)
+            val missing = parsed.code == "meal_plan_not_found" || parsed.httpStatus == 404
+            _todayPlan.value = PlanSnapshot(
+                plan = null,
+                missing = missing,
+                error = parsed.message,
+                lastUpdatedEpochMs = System.currentTimeMillis(),
+            )
+            throw parsed
         }
+    }
+
+    suspend fun refreshWeek(anchor: LocalDate = LocalDate.now()): MealPlanDto {
+        _weekPlan.value = _weekPlan.value.copy(loading = true, error = null, missing = false)
+        return try {
+            val plan = wrap { mealPlanApi.week(anchor.toString()) }
+            _weekPlan.value = PlanSnapshot(
+                plan = plan,
+                lastUpdatedEpochMs = System.currentTimeMillis(),
+            )
+            plan
+        } catch (error: Throwable) {
+            val parsed = ApiErrorParser.fromThrowable(error)
+            val missing = parsed.code == "meal_plan_not_found" || parsed.httpStatus == 404
+            _weekPlan.value = PlanSnapshot(
+                plan = null,
+                missing = missing,
+                error = parsed.message,
+                lastUpdatedEpochMs = System.currentTimeMillis(),
+            )
+            throw parsed
+        }
+    }
+
+    /** Load both today slice and full week from the same covering plan when possible. */
+    suspend fun refreshAll(anchor: LocalDate = LocalDate.now()) {
+        runCatching { refreshWeek(anchor) }
+        runCatching { refreshToday(anchor) }
+    }
+
+    suspend fun today(date: LocalDate = LocalDate.now()): MealPlanDto = refreshToday(date)
+
+    suspend fun week(start: LocalDate = LocalDate.now()): MealPlanDto = refreshWeek(start)
+
+    suspend fun generate(days: Int = 7, force: Boolean = false): MealPlanDto {
+        _todayPlan.value = _todayPlan.value.copy(generating = true, error = null)
+        _weekPlan.value = _weekPlan.value.copy(generating = true, error = null)
+        return try {
+            val plan = wrap {
+                mealPlanApi.generate(
+                    MealPlanGenerateRequest(
+                        startDate = LocalDate.now().toString(),
+                        days = days,
+                        force = force,
+                    ),
+                )
+            }
+            _weekPlan.value = PlanSnapshot(plan = plan, lastUpdatedEpochMs = System.currentTimeMillis())
+            runCatching { refreshToday(LocalDate.now()) }
+            bus.emit(DomainEvent.PlanChanged("generate"))
+            bus.emit(DomainEvent.ShoppingChanged(plan.id))
+            plan
+        } catch (error: Throwable) {
+            val parsed = ApiErrorParser.fromThrowable(error)
+            _todayPlan.value = _todayPlan.value.copy(generating = false, error = parsed.message)
+            _weekPlan.value = _weekPlan.value.copy(generating = false, error = parsed.message)
+            throw parsed
+        }
+    }
 
     suspend fun regenerate(days: Int = 7): MealPlanDto = generate(days = days, force = true)
 
-    suspend fun replaceItem(itemId: String): MealPlanDto =
-        wrap { mealPlanApi.replaceItem(itemId) }
+    suspend fun replaceItem(itemId: String): MealPlanDto {
+        val plan = wrap {
+            mealPlanApi.replaceItem(
+                itemId,
+                idempotencyKey = UUID.randomUUID().toString(),
+            )
+        }
+        _weekPlan.value = PlanSnapshot(plan = plan, lastUpdatedEpochMs = System.currentTimeMillis())
+        runCatching { refreshToday(LocalDate.now()) }
+        bus.emit(DomainEvent.PlanChanged("replace"))
+        bus.emit(DomainEvent.ShoppingChanged(plan.id))
+        return plan
+    }
 
-    suspend fun completeItem(itemId: String, completed: Boolean = true): MealPlanItemDto =
-        wrap { mealPlanApi.completeItem(itemId, completed) }
+    suspend fun completeItem(itemId: String, completed: Boolean = true): MealPlanItemDto {
+        val item = wrap { mealPlanApi.completeItem(itemId, completed) }
+        runCatching { refreshAll(LocalDate.now()) }
+        bus.emit(DomainEvent.PlanChanged("complete"))
+        bus.emit(DomainEvent.NutritionLogChanged())
+        return item
+    }
 
     suspend fun recipe(recipeId: String): DishCardDto =
         wrap { recipeApi.getRecipe(recipeId) }

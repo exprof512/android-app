@@ -4,7 +4,6 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
-import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -49,7 +48,8 @@ interface AuthApi {
     @GET("users/me/export")
     suspend fun exportData(): kotlinx.serialization.json.JsonObject
 
-    @HTTP(method = "DELETE", path = "users/me", hasBody = true)
+    /** Preferred: POST with confirmation body (DELETE bodies are unreliable on some stacks). */
+    @POST("users/me/delete")
     suspend fun deleteAccount(@Body body: DeleteAccountRequest): Response<Unit>
 }
 

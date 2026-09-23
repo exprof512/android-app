@@ -95,7 +95,17 @@ class AuthRepository @Inject constructor(
 
     suspend fun revokeAllSessions() = wrap { authedAuthApi.revokeAllSessions() }
 
-    suspend fun exportData() = wrap { authedAuthApi.exportData() }
+    suspend fun exportData(): kotlinx.serialization.json.JsonObject =
+        wrap {
+            val payload = authedAuthApi.exportData()
+            if (!payload.containsKey("exported_at")) {
+                throw com.foodai.app.core.network.ApiException.Unexpected(
+                    "Экспорт пуст или повреждён",
+                    httpStatus = 500,
+                )
+            }
+            payload
+        }
 
     suspend fun deleteAccount(): Boolean =
         wrap {

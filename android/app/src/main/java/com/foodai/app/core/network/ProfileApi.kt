@@ -3,6 +3,7 @@ package com.foodai.app.core.network
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -30,7 +31,10 @@ interface MealPlanApi {
     suspend fun week(@Query("start_date") startDate: String? = null): MealPlanDto
 
     @POST("meal-plan-items/{itemId}/replace")
-    suspend fun replaceItem(@Path("itemId") itemId: String): MealPlanDto
+    suspend fun replaceItem(
+        @Path("itemId") itemId: String,
+        @Header("Idempotency-Key") idempotencyKey: String? = null,
+    ): MealPlanDto
 
     @POST("meal-plan-items/{itemId}/complete")
     suspend fun completeItem(

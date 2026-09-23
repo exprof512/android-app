@@ -92,11 +92,14 @@ class AccountViewModel @Inject constructor(
         viewModelScope.launch {
             busy = true
             runCatching {
-                analytics.track("data_export_requested")
                 val json = auth.exportData().toString()
+                if (!json.contains("exported_at") || json.length < 32) {
+                    error("Экспорт пуст")
+                }
+                analytics.track("data_export_requested")
                 onDone(json)
-                message = "Экспорт готов (${json.length} символов)"
-            }.onFailure { message = it.message }
+                message = "Экспорт готов — выберите приложение для сохранения"
+            }.onFailure { message = it.message ?: "Экспорт не выполнен" }
             busy = false
         }
     }
@@ -105,8 +108,8 @@ class AccountViewModel @Inject constructor(
         viewModelScope.launch {
             busy = true
             runCatching {
-                analytics.track("account_deleted")
                 auth.deleteAccount()
+                analytics.track("account_deleted")
                 onSuccess()
             }.onFailure {
                 message = it.message ?: "Удаление не выполнено. Сессия сохранена."
@@ -133,7 +136,7 @@ fun AccountRoute(
     onDeleted: () -> Unit,
     viewModel: AccountViewModel = hiltViewModel(),
 ) {
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { viewModel.load() }
 
@@ -226,7 +229,14 @@ fun AccountRoute(
             FoodAIPrimaryButton(
                 label = if (viewModel.busy) "Экспорт…" else "Экспорт моих данных",
                 onClick = {
-                    viewModel.export { /* JSON kept in message; file share later */ }
+                    viewModel.export { json ->
+                        val share = Intent(Intent.ACTION_SEND).apply {
+                            type = "application/json"
+                            putExtra(Intent.EXTRA_SUBJECT, "FoodAI data export")
+                            putExtra(Intent.EXTRA_TEXT, json)
+                        }
+                        context.startActivity(Intent.createChooser(share, "Сохранить экспорт"))
+                    }
                 },
                 showArrow = false,
                 enabled = !viewModel.busy,

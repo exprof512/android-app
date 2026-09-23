@@ -442,8 +442,14 @@ private fun BudgetStep(
             colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = FoodAIColors.Primary),
         )
         Column {
-            Text("Учитывать акции и скидки", style = FoodAITypography.titleSmall)
-            Text("Подберём продукты с учётом текущих акций.", style = FoodAITypography.bodySmall)
+            Text(
+                "Учитывать ориентировочные цены",
+                style = FoodAITypography.titleSmall,
+            )
+            Text(
+                "Цены в каталоге приблизительные. Отдельных данных о магазинных акциях нет — переключатель влияет только на то, показывать ли стоимость в плане.",
+                style = FoodAITypography.bodySmall,
+            )
         }
     }
 }

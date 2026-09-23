@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,12 +26,25 @@ data class ProgressUiState(
 @HiltViewModel
 class ProgressViewModel @Inject constructor(
     private val progress: ProgressRepository,
+    private val bus: com.foodai.app.core.sync.AppStateBus,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProgressUiState())
     val state: StateFlow<ProgressUiState> = _state.asStateFlow()
 
     init {
         refresh()
+        viewModelScope.launch {
+            bus.events.collectLatest { event ->
+                when (event) {
+                    is com.foodai.app.core.sync.DomainEvent.WeightChanged,
+                    is com.foodai.app.core.sync.DomainEvent.ProfileChanged,
+                    is com.foodai.app.core.sync.DomainEvent.PlanChanged,
+                    is com.foodai.app.core.sync.DomainEvent.NutritionLogChanged,
+                    -> refresh()
+                    else -> Unit
+                }
+            }
+        }
     }
 
     fun refresh() {

@@ -66,7 +66,13 @@ fun SettingsRoute(
         context.getSharedPreferences("foodai_settings", android.content.Context.MODE_PRIVATE)
     }
     var tips by remember { mutableStateOf(prefs.getBoolean("tips_enabled", true)) }
-    var darkHint by remember { mutableStateOf(prefs.getBoolean("prefer_system_theme", true)) }
+    val themePrefs = remember {
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            com.foodai.app.core.ui.theme.ThemePreferencesEntryPoint::class.java,
+        ).themePreferences()
+    }
+    val themeMode by themePrefs.mode.collectAsStateWithLifecycle()
     var unitsMetric by remember { mutableStateOf(prefs.getBoolean("units_metric", true)) }
 
     Scaffold(
@@ -123,9 +129,11 @@ fun SettingsRoute(
                 }
             }
             FoodAICard {
+                Text("Единицы измерения", style = FoodAITypography.titleMedium)
+                Spacer(Modifier.height(FoodAIDimens.Space8))
                 SettingsToggleRow(
                     title = "Метрическая система",
-                    subtitle = "кг, см, мл (рекомендуется)",
+                    subtitle = if (unitsMetric) "кг, см, мл" else "lb, ft/in (хранение на сервере — кг)",
                     checked = unitsMetric,
                     onChange = {
                         unitsMetric = it
@@ -133,15 +141,23 @@ fun SettingsRoute(
                     },
                 )
                 Spacer(Modifier.height(FoodAIDimens.Space12))
-                SettingsToggleRow(
-                    title = "Системная тема",
-                    subtitle = "Следовать оформлению телефона",
-                    checked = darkHint,
-                    onChange = {
-                        darkHint = it
-                        prefs.edit().putBoolean("prefer_system_theme", it).apply()
-                    },
-                )
+                Text("Тема", style = FoodAITypography.titleMedium)
+                Spacer(Modifier.height(FoodAIDimens.Space8))
+                listOf(
+                    com.foodai.app.core.ui.theme.ThemeMode.SYSTEM to "Системная",
+                    com.foodai.app.core.ui.theme.ThemeMode.LIGHT to "Светлая",
+                    com.foodai.app.core.ui.theme.ThemeMode.DARK to "Тёмная",
+                ).forEach { (mode, label) ->
+                    TextButton(
+                        onClick = { themePrefs.setMode(mode) },
+                        enabled = themeMode != mode,
+                    ) {
+                        Text(
+                            if (themeMode == mode) "✓ $label" else label,
+                            color = FoodAIColors.Primary,
+                        )
+                    }
+                }
             }
             FoodAIPrimaryButton(
                 label = "Изменить анкету питания",

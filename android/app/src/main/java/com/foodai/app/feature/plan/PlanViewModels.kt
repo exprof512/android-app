@@ -10,8 +10,14 @@ import com.foodai.app.core.metrics.DailyMetricsStore
 import com.foodai.app.core.network.ApiException
 import com.foodai.app.core.network.MealPlanDto
 import com.foodai.app.core.network.MealPlanItemDto
+import com.foodai.app.core.network.NutritionApi
+import com.foodai.app.core.network.NutritionLogCreateRequest
+import com.foodai.app.core.network.NutritionLogDto
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.profile.ProfileRepository
+import com.foodai.app.core.sync.AppStateBus
+import com.foodai.app.core.sync.DomainEvent
+import com.foodai.app.core.sync.SelectedDateStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +35,9 @@ data class TodayUiState(
     val plan: MealPlanDto? = null,
     val profile: ProfileResponse? = null,
     val metrics: DailyMetrics = DailyMetrics(),
-    val nutritionLogs: List<com.foodai.app.core.network.NutritionLogDto> = emptyList(),
+    val nutritionLogs: List<NutritionLogDto> = emptyList(),
+    val selectedDate: String = LocalDate.now().toString(),
+    val lastUpdatedEpochMs: Long = 0L,
     val error: String? = null,
     val missingPlan: Boolean = false,
     val actionError: String? = null,
@@ -42,14 +50,33 @@ class TodayViewModel @Inject constructor(
     private val profiles: ProfileRepository,
     private val auth: AuthRepository,
     private val metricsStore: DailyMetricsStore,
-    private val nutritionApi: com.foodai.app.core.network.NutritionApi,
+    private val nutritionApi: NutritionApi,
+    private val bus: AppStateBus,
+    private val selectedDate: SelectedDateStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TodayUiState())
     val state: StateFlow<TodayUiState> = _state.asStateFlow()
     private var stepsJob: Job? = null
 
     init {
-        refresh()
+        viewModelScope.launch {
+            selectedDate.date.collectLatest { date ->
+                _state.value = _state.value.copy(selectedDate = date.toString())
+                refresh(date)
+            }
+        }
+        viewModelScope.launch {
+            bus.events.collectLatest { event ->
+                when (event) {
+                    is DomainEvent.PlanChanged,
+                    is DomainEvent.WeightChanged,
+                    is DomainEvent.ProfileChanged,
+                    is DomainEvent.NutritionLogChanged,
+                    -> refresh(selectedDate.date.value)
+                    else -> Unit
+                }
+            }
+        }
         observeSteps()
     }
 
@@ -59,14 +86,16 @@ class TodayViewModel @Inject constructor(
         stepsJob?.cancel()
         val uid = userId()
         val snapshot = metricsStore.metrics(uid)
-        _state.value = _state.value.copy(metrics = _state.value.metrics.copy(
-            steps = snapshot.steps,
-            stepsAvailable = snapshot.stepsAvailable,
-            stepsPermissionNeeded = snapshot.stepsPermissionNeeded,
-            waterMl = snapshot.waterMl,
-            waterGoalMl = snapshot.waterGoalMl,
-            stepsGoal = snapshot.stepsGoal,
-        ))
+        _state.value = _state.value.copy(
+            metrics = _state.value.metrics.copy(
+                steps = snapshot.steps,
+                stepsAvailable = snapshot.stepsAvailable,
+                stepsPermissionNeeded = snapshot.stepsPermissionNeeded,
+                waterMl = snapshot.waterMl,
+                waterGoalMl = snapshot.waterGoalMl,
+                stepsGoal = snapshot.stepsGoal,
+            ),
+        )
         if (!snapshot.stepsAvailable) return
         stepsJob = viewModelScope.launch {
             metricsStore.observeSteps(uid).collectLatest { steps ->
@@ -81,37 +110,46 @@ class TodayViewModel @Inject constructor(
         }
     }
 
-    /** Call after ACTIVITY_RECOGNITION dialog — sensor flow only starts when granted. */
     fun onStepsPermissionResult(granted: Boolean) {
         _state.value = _state.value.copy(metrics = metricsStore.metrics(userId()))
         if (granted) observeSteps()
     }
 
-    fun refresh() {
+    fun refresh(date: LocalDate = selectedDate.date.value) {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = _state.value.plan == null, error = null, missingPlan = false)
+            val keepData = _state.value.plan != null
+            _state.value = _state.value.copy(
+                loading = !keepData,
+                refreshing = keepData,
+                error = null,
+                missingPlan = false,
+            )
             try {
-                val plan = mealPlans.today(LocalDate.now())
-                val profile = runCatching { profiles.getProfile() }.getOrNull()
+                val plan = mealPlans.today(date)
+                val profile = runCatching { profiles.refreshProfile() }.getOrNull()
                 val metrics = metricsStore.metrics(userId())
                 val logs = runCatching {
-                    nutritionApi.listLogs(LocalDate.now().toString())
+                    nutritionApi.listLogs(date.toString())
                 }.getOrDefault(emptyList())
                 _state.value = TodayUiState(
                     loading = false,
+                    refreshing = false,
                     plan = plan,
                     profile = profile,
                     metrics = metrics,
                     nutritionLogs = logs,
+                    selectedDate = date.toString(),
+                    lastUpdatedEpochMs = System.currentTimeMillis(),
                 )
                 observeSteps()
             } catch (error: ApiException) {
                 val missing = error.code == "meal_plan_not_found" || error.httpStatus == 404
                 _state.value = _state.value.copy(
                     loading = false,
+                    refreshing = false,
                     metrics = metricsStore.metrics(userId()),
                     error = if (missing) {
-                        "План питания ещё не создан."
+                        "План на этот день отсутствует."
                     } else {
                         error.toUiMessage()
                     },
@@ -120,6 +158,7 @@ class TodayViewModel @Inject constructor(
             } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
+                    refreshing = false,
                     error = error.message ?: "Не удалось загрузить план",
                 )
             }
@@ -135,8 +174,8 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 nutritionApi.createLog(
-                    com.foodai.app.core.network.NutritionLogCreateRequest(
-                        loggedOn = LocalDate.now().toString(),
+                    NutritionLogCreateRequest(
+                        loggedOn = selectedDate.date.value.toString(),
                         mealType = "snack",
                         source = "manual",
                         description = description,
@@ -146,6 +185,7 @@ class TodayViewModel @Inject constructor(
                         carbohydrateG = 0.0,
                     ),
                 )
+                bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
                 refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(actionError = error.toUiMessage())
@@ -155,15 +195,16 @@ class TodayViewModel @Inject constructor(
 
     fun generatePlan() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(generating = true, error = null, actionError = null, infoMessage = null)
+            _state.value = _state.value.copy(generating = true, error = null, actionError = null)
             try {
-                profiles.generateFirstPlan(days = 7, force = true)
+                mealPlans.generate(days = 7, force = true)
                 refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     generating = false,
                     error = error.toUiMessage(),
-                    missingPlan = error.code == "meal_plan_not_found" || error.httpStatus == 404,
+                    missingPlan = error.code == "meal_plan_not_found" || error.httpStatus == 404 ||
+                        error.httpStatus == 429,
                 )
             }
         }
@@ -173,7 +214,7 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(generating = true, actionError = null, infoMessage = null)
             try {
-                profiles.regeneratePlan(days = 7)
+                mealPlans.regenerate(days = 7)
                 refresh()
                 _state.value = _state.value.copy(infoMessage = "План на неделю пересобран.")
             } catch (error: ApiException) {
@@ -189,7 +230,6 @@ class TodayViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 mealPlans.completeItem(item.id, completed = !item.isCompleted)
-                refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(actionError = error.toUiMessage())
             }
@@ -201,7 +241,6 @@ class TodayViewModel @Inject constructor(
             _state.value = _state.value.copy(refreshing = true, actionError = null)
             try {
                 mealPlans.replaceItem(item.id)
-                refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     refreshing = false,
@@ -215,10 +254,13 @@ class TodayViewModel @Inject constructor(
 data class WeekUiState(
     val loading: Boolean = true,
     val generating: Boolean = false,
+    val refreshing: Boolean = false,
     val plan: MealPlanDto? = null,
     val profile: ProfileResponse? = null,
     val selectedDate: String = LocalDate.now().toString(),
     val weekDates: List<String> = emptyList(),
+    val dayStatuses: Map<String, String> = emptyMap(),
+    val lastUpdatedEpochMs: Long = 0L,
     val error: String? = null,
     val missingPlan: Boolean = false,
     val actionError: String? = null,
@@ -229,43 +271,84 @@ data class WeekUiState(
 class WeekViewModel @Inject constructor(
     private val mealPlans: MealPlanRepository,
     private val profiles: ProfileRepository,
+    private val bus: AppStateBus,
+    private val selectedDate: SelectedDateStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WeekUiState())
     val state: StateFlow<WeekUiState> = _state.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            selectedDate.date.collectLatest { date ->
+                _state.value = _state.value.copy(selectedDate = date.toString())
+            }
+        }
         refresh()
+        viewModelScope.launch {
+            bus.events.collectLatest { event ->
+                when (event) {
+                    is DomainEvent.PlanChanged,
+                    is DomainEvent.ProfileChanged,
+                    -> refresh()
+                    is DomainEvent.SelectedDateChanged -> {
+                        _state.value = _state.value.copy(selectedDate = event.date.toString())
+                    }
+                    else -> Unit
+                }
+            }
+        }
     }
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, error = null, missingPlan = false)
+            val keep = _state.value.plan != null
+            _state.value = _state.value.copy(
+                loading = !keep,
+                refreshing = keep,
+                error = null,
+                missingPlan = false,
+            )
             try {
-                val plan = mealPlans.week(LocalDate.now())
-                val profile = runCatching { profiles.getProfile() }.getOrNull()
+                val plan = mealPlans.week(selectedDate.date.value)
+                val profile = runCatching { profiles.refreshProfile() }.getOrNull()
                 val dates = datesBetween(plan.startDate, plan.endDate)
+                val statuses = dates.associateWith { date ->
+                    val items = plan.items.filter { it.date == date }
+                    when {
+                        items.isEmpty() -> "missing"
+                        else -> "planned"
+                    }
+                }
                 val selected = when {
-                    dates.contains(_state.value.selectedDate) -> _state.value.selectedDate
+                    dates.contains(selectedDate.date.value.toString()) -> selectedDate.date.value.toString()
                     dates.contains(LocalDate.now().toString()) -> LocalDate.now().toString()
                     else -> dates.firstOrNull().orEmpty()
                 }
+                if (selected.isNotBlank()) {
+                    selectedDate.select(LocalDate.parse(selected))
+                }
                 _state.value = WeekUiState(
                     loading = false,
+                    refreshing = false,
                     plan = plan,
                     profile = profile,
                     selectedDate = selected,
                     weekDates = dates,
+                    dayStatuses = statuses,
+                    lastUpdatedEpochMs = System.currentTimeMillis(),
                 )
             } catch (error: ApiException) {
                 val missing = error.code == "meal_plan_not_found" || error.httpStatus == 404
                 _state.value = _state.value.copy(
                     loading = false,
-                    error = if (missing) "План питания ещё не создан." else error.toUiMessage(),
+                    refreshing = false,
+                    error = if (missing) "План на неделю отсутствует." else error.toUiMessage(),
                     missingPlan = missing,
                 )
             } catch (error: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
+                    refreshing = false,
                     error = error.message ?: "Не удалось загрузить неделю",
                 )
             }
@@ -276,13 +359,13 @@ class WeekViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(generating = true, error = null, actionError = null)
             try {
-                profiles.generateFirstPlan(days = 7, force = true)
+                mealPlans.generate(days = 7, force = true)
                 refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     generating = false,
                     error = error.toUiMessage(),
-                    missingPlan = error.code == "meal_plan_not_found" || error.httpStatus == 404,
+                    missingPlan = error.httpStatus == 404 || error.httpStatus == 429,
                 )
             }
         }
@@ -292,7 +375,7 @@ class WeekViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(generating = true, actionError = null, infoMessage = null)
             try {
-                profiles.regeneratePlan(days = 7)
+                mealPlans.regenerate(days = 7)
                 refresh()
                 _state.value = _state.value.copy(infoMessage = "План на неделю пересобран.")
             } catch (error: ApiException) {
@@ -305,6 +388,7 @@ class WeekViewModel @Inject constructor(
     }
 
     fun selectDate(date: String) {
+        runCatching { selectedDate.select(LocalDate.parse(date)) }
         _state.value = _state.value.copy(selectedDate = date)
     }
 
