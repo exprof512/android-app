@@ -72,12 +72,20 @@ class OpenAIResponsesProvider:
             ) from exc
         except OpenAIError as exc:
             code, message, retryable = classify_openai_error(exc)
+            payload = getattr(exc, "body", None)
+            err = payload.get("error") if isinstance(payload, dict) else None
             logger.warning(
                 "openai_text_provider_error",
                 extra={
                     "error_code": code,
                     "operation": request.operation,
                     "http_status": getattr(exc, "status_code", None),
+                    "openai_param": (
+                        err.get("param") if isinstance(err, dict) else None
+                    ),
+                    "openai_api_code": (
+                        err.get("code") if isinstance(err, dict) else None
+                    ),
                 },
             )
             raise TextAIProviderError(

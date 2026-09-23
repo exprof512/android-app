@@ -28,7 +28,15 @@ class ImageGenerationRequest:
     model: str
     size: str | None = None
     quality: str | None = None
-    output_format: str = "webp"
+    # Wire format for OpenAI Images API (png|jpeg|webp). None → provider default png.
+    provider_format: str | None = None
+    # Post-process / MinIO format (webp|jpeg).
+    storage_format: str = "webp"
+
+    @property
+    def output_format(self) -> str:
+        """Alias kept for older tests/call sites that mean storage format."""
+        return self.storage_format
 
 
 @dataclass(frozen=True)

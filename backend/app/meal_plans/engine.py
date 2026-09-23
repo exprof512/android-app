@@ -104,12 +104,7 @@ class MealPlanEngine:
             low = int(targets.calories_kcal * (1 - constants.DAILY_CALORIE_TOLERANCE))
             high = int(targets.calories_kcal * (1 + constants.DAILY_CALORIE_TOLERANCE))
             if day_slots and not (low <= day_calories <= high):
-                details.append(
-                    {
-                        "field": "daily_calories",
-                        "reason": f"out_of_range:{day_calories}",
-                    }
-                )
+                # Soft fail: keep the plan usable; surface a warning instead of 422.
                 warnings.append(
                     f"Калории за {cursor.isoformat()} ({day_calories}) вне допуска "
                     f"{low}–{high}."

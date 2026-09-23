@@ -1,5 +1,6 @@
 package com.foodai.app.feature.profile
 
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +27,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +35,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.foodai.app.core.analytics.AnalyticsTracker
 import com.foodai.app.core.auth.AuthRepository
+import com.foodai.app.core.export.DataExportWriter
+import com.foodai.app.core.export.ExportFileResult
 import com.foodai.app.core.network.CurrentUserDto
 import com.foodai.app.core.network.SessionDto
 import com.foodai.app.core.ui.components.FoodAICard
@@ -44,7 +46,9 @@ import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAITypography
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -88,7 +92,7 @@ class AccountViewModel @Inject constructor(
         }
     }
 
-    fun export(onDone: (String) -> Unit) {
+    fun export(context: android.content.Context, onDone: (ExportFileResult) -> Unit) {
         viewModelScope.launch {
             busy = true
             runCatching {
@@ -96,9 +100,12 @@ class AccountViewModel @Inject constructor(
                 if (!json.contains("exported_at") || json.length < 32) {
                     error("Экспорт пуст")
                 }
+                val file = withContext(Dispatchers.IO) {
+                    DataExportWriter.writeJson(context, json)
+                }
                 analytics.track("data_export_requested")
-                onDone(json)
-                message = "Экспорт готов — выберите приложение для сохранения"
+                onDone(file)
+                message = "Файл сохранён: ${file.absolutePathHint ?: file.displayName}"
             }.onFailure { message = it.message ?: "Экспорт не выполнен" }
             busy = false
         }
@@ -229,13 +236,21 @@ fun AccountRoute(
             FoodAIPrimaryButton(
                 label = if (viewModel.busy) "Экспорт…" else "Экспорт моих данных",
                 onClick = {
-                    viewModel.export { json ->
+                    viewModel.export(context) { file ->
                         val share = Intent(Intent.ACTION_SEND).apply {
                             type = "application/json"
-                            putExtra(Intent.EXTRA_SUBJECT, "FoodAI data export")
-                            putExtra(Intent.EXTRA_TEXT, json)
+                            putExtra(Intent.EXTRA_STREAM, file.uri)
+                            putExtra(Intent.EXTRA_SUBJECT, file.displayName)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            clipData = ClipData.newUri(
+                                context.contentResolver,
+                                file.displayName,
+                                file.uri,
+                            )
                         }
-                        context.startActivity(Intent.createChooser(share, "Сохранить экспорт"))
+                        context.startActivity(
+                            Intent.createChooser(share, "Файл экспорта: ${file.displayName}"),
+                        )
                     }
                 },
                 showArrow = false,

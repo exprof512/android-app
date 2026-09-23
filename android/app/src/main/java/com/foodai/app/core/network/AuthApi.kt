@@ -1,5 +1,6 @@
 package com.foodai.app.core.network
 
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -48,9 +49,12 @@ interface AuthApi {
     @GET("users/me/export")
     suspend fun exportData(): kotlinx.serialization.json.JsonObject
 
-    /** Preferred: POST with confirmation body (DELETE bodies are unreliable on some stacks). */
+    /**
+     * Preferred: POST with confirmation body (DELETE bodies are unreliable on some stacks).
+     * Returns [ResponseBody] so HTTP 204 empty responses are not parsed as JSON Unit.
+     */
     @POST("users/me/delete")
-    suspend fun deleteAccount(@Body body: DeleteAccountRequest): Response<Unit>
+    suspend fun deleteAccount(@Body body: DeleteAccountRequest): Response<ResponseBody>
 }
 
 interface AnalyticsApi {

@@ -1,5 +1,7 @@
 package com.foodai.app.di
 
+import android.content.Context
+import coil.ImageLoader
 import com.foodai.app.BuildConfig
 import com.foodai.app.core.auth.SecureTokenStore
 import com.foodai.app.core.auth.TokenStore
@@ -21,6 +23,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -84,6 +87,20 @@ object NetworkModule {
         .writeTimeout(60, TimeUnit.SECONDS)
         .addInterceptor(authInterceptor)
         .authenticator(tokenAuthenticator)
+        .build()
+
+    /**
+     * Coil must use the authed OkHttp client — `/media/...` requires Bearer,
+     * otherwise image metadata returns 200 while pixels fail with 401.
+     */
+    @Provides
+    @Singleton
+    fun provideImageLoader(
+        @ApplicationContext context: Context,
+        client: OkHttpClient,
+    ): ImageLoader = ImageLoader.Builder(context)
+        .okHttpClient(client)
+        .crossfade(true)
         .build()
 
     @Provides

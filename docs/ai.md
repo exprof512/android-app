@@ -138,7 +138,7 @@ NUTRITION_MIN_DAILY_CALORIES_MALE=1500
 - migration `0004_ai_text_usage`;
 - Redis cache key = operation + model + schema version + normalized payload fingerprint;
 - repair retry bounded by `OPENAI_TEXT_MAX_ATTEMPTS` (default 2);
-- runtime chain: DeepSeek (если `DEEPSEEK_API_KEY`) → OpenAI (если `OPENAI_API_KEY`) → meal-plan catalog fallback; без ключей — `MockTextProvider`.
+- runtime chain: OpenAI/ChatGPT (если `OPENAI_API_KEY`) → DeepSeek (если `DEEPSEEK_API_KEY`) → meal-plan catalog fallback; без ключей — `MockTextProvider`.
 
 Meal-plan HTTP endpoints и Chat API появляются в следующих фазах и вызывают этот слой.
 

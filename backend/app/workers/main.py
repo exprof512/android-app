@@ -32,7 +32,18 @@ def arq_redis_settings(redis_url: str) -> RedisSettings:
     )
 
 
+def _register_orm_models() -> None:
+    """Import mapped models so SQLAlchemy can resolve FKs during worker flush."""
+    # noqa: F401 — side-effect imports for metadata registration
+    import app.auth.models  # noqa: F401
+    import app.images.models  # noqa: F401
+    import app.meal_plans.models  # noqa: F401
+    import app.nutrition.models  # noqa: F401
+    import app.recipes.models  # noqa: F401
+
+
 async def startup(ctx: dict[str, object]) -> None:
+    _register_orm_models()
     database = Database(settings.database_url)
     storage = S3StorageProvider(
         endpoint_url=settings.s3_endpoint,
@@ -69,4 +80,4 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     health_check_interval = 10
-    max_jobs = 2
+    max_jobs = 1

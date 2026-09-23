@@ -1,6 +1,9 @@
 """Structured Outputs schemas for Text AI operations.
 
 AI may propose structure; NutritionEngine / RecipeEngine own final math.
+
+OpenAI Responses API with ``strict: true`` requires every property key to appear
+in ``required`` (optional fields use ``anyOf: [T, null]`` and stay required).
 """
 
 from __future__ import annotations
@@ -83,7 +86,8 @@ class ReplaceMealResponse(StrictModel):
 class ChatSuggestedAction(StrictModel):
     type: Literal["replace_meal_item", "open_shopping_list", "explain_balance", "none"]
     label: str = Field(min_length=1, max_length=120)
-    payload: dict[str, Any] | None = None
+    # Free-form dict is rejected by OpenAI strict schemas; keep optional JSON string.
+    payload: str | None = Field(default=None, max_length=2000)
 
 
 class ChatAnswerResponse(StrictModel):
@@ -103,8 +107,13 @@ OPERATION_SCHEMAS: dict[str, type[BaseModel]] = {
 def json_schema_for(operation: str) -> dict[str, Any]:
     model = OPERATION_SCHEMAS[operation]
     schema = model.model_json_schema()
-    # Responses API expects a root object schema without $defs references when possible.
-    return _inline_defs(schema)
+    return make_openai_strict_schema(schema)
+
+
+def make_openai_strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Flatten $defs and satisfy OpenAI strict Structured Outputs rules."""
+    inlined = _inline_defs(schema)
+    return _enforce_strict(inlined)
 
 
 def _inline_defs(schema: dict[str, Any]) -> dict[str, Any]:
@@ -122,3 +131,28 @@ def _inline_defs(schema: dict[str, Any]) -> dict[str, Any]:
         return node
 
     return resolve(schema)
+
+
+def _enforce_strict(node: Any) -> Any:
+    """Recursively: required=all properties; drop defaults; forbid extras."""
+    if isinstance(node, list):
+        return [_enforce_strict(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+
+    out: dict[str, Any] = {}
+    for key, value in node.items():
+        if key == "default":
+            # Defaults are incompatible with OpenAI strict required-all-keys.
+            continue
+        out[key] = _enforce_strict(value)
+
+    if out.get("type") == "object" or "properties" in out:
+        props = out.get("properties")
+        if isinstance(props, dict):
+            out["additionalProperties"] = False
+            out["required"] = list(props.keys())
+            out["properties"] = {
+                name: _enforce_strict(prop) for name, prop in props.items()
+            }
+    return out

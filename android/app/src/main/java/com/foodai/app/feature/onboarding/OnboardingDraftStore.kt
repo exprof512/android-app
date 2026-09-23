@@ -14,22 +14,34 @@ class OnboardingDraftStore @Inject constructor(
 ) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    fun load(): OnboardingDraft {
-        val raw = prefs.getString(KEY, null) ?: return OnboardingDraft()
+    fun load(userId: String?): OnboardingDraft {
+        if (userId.isNullOrBlank()) return OnboardingDraft()
+        val raw = prefs.getString(key(userId), null) ?: return OnboardingDraft()
         return runCatching { json.decodeFromString(OnboardingDraft.serializer(), raw) }
             .getOrDefault(OnboardingDraft())
     }
 
-    fun save(draft: OnboardingDraft) {
-        prefs.edit().putString(KEY, json.encodeToString(OnboardingDraft.serializer(), draft)).apply()
+    fun save(userId: String?, draft: OnboardingDraft) {
+        if (userId.isNullOrBlank()) return
+        prefs.edit()
+            .putString(key(userId), json.encodeToString(OnboardingDraft.serializer(), draft))
+            .commit()
     }
 
-    fun clear() {
-        prefs.edit().remove(KEY).apply()
+    fun clear(userId: String?) {
+        if (userId.isNullOrBlank()) return
+        prefs.edit().remove(key(userId)).commit()
     }
+
+    /** Drop every account's draft — used before login/register so UI state cannot leak. */
+    fun clearAll() {
+        // commit(): apply() can race with the next account's hydrate and leak the questionnaire.
+        prefs.edit().clear().commit()
+    }
+
+    private fun key(userId: String) = "draft_json:$userId"
 
     companion object {
         private const val PREFS = "foodai_onboarding_draft"
-        private const val KEY = "draft_json"
     }
 }

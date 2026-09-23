@@ -42,9 +42,15 @@ class OnboardingViewModel @Inject constructor(
 
     private fun hydrate() {
         viewModelScope.launch {
-            val local = draftStore.load()
+            val userId = authRepository.currentUser()?.id
+            val local = draftStore.load(userId)
             val profile = runCatching { profileRepository.getProfile() }.getOrNull()
+            // New accounts start with an empty draft (cleared on register). Do not pull a
+            // complete server profile into a pending onboarding — that skipped the questionnaire
+            // when a previous session left profile rows or draft prefs leaked across users.
             val draft = when {
+                authRepository.pendingOnboarding() ->
+                    if (local.hasMeaningfulInput()) local else OnboardingDraft()
                 profile != null && profile.isComplete() -> profile.toOnboardingDraft(stepIndex = 0)
                 local.hasMeaningfulInput() -> local
                 profile != null -> profile.toOnboardingDraft(local.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2))
@@ -52,7 +58,7 @@ class OnboardingViewModel @Inject constructor(
             }
             val step = OnboardingStep.formSteps
                 .getOrElse(draft.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2)) { OnboardingStep.Goal }
-            draftStore.save(draft)
+            draftStore.save(userId, draft)
             _state.value = OnboardingUiState(
                 draft = draft,
                 step = step,
@@ -71,7 +77,7 @@ class OnboardingViewModel @Inject constructor(
     fun updateDraft(transform: (OnboardingDraft) -> OnboardingDraft) {
         _state.update { current ->
             val next = transform(current.draft).copy(stepIndex = current.step.index)
-            draftStore.save(next)
+            draftStore.save(authRepository.currentUser()?.id, next)
             current.copy(draft = next, error = null)
         }
     }
@@ -125,6 +131,7 @@ class OnboardingViewModel @Inject constructor(
                 it.copy(step = OnboardingStep.Loading, isSubmitting = true, error = null)
             }
             try {
+                val userId = authRepository.currentUser()?.id
                 val body = _state.value.draft.toUpdateRequest()
                 profileRepository.updateProfile(body)
                 if (shouldGenerate) {
@@ -132,12 +139,15 @@ class OnboardingViewModel @Inject constructor(
                 }
                 // Edit-questionnaire path (generatePlan=false): persist profile only —
                 // plan rebuild is explicit via «Пересобрать» on Today/Week.
-                draftStore.clear()
-                // Keep a fresh snapshot so reopening the questionnaire is filled.
-                runCatching { profileRepository.getProfile() }
+                // Keep a per-user snapshot so reopening the questionnaire is filled.
+                val snapshot = runCatching { profileRepository.getProfile() }
                     .getOrNull()
                     ?.toOnboardingDraft()
-                    ?.let { draftStore.save(it) }
+                if (snapshot != null) {
+                    draftStore.save(userId, snapshot)
+                } else {
+                    draftStore.clear(userId)
+                }
                 authRepository.setPendingOnboarding(false)
                 _state.update { it.copy(isSubmitting = false, finished = true) }
             } catch (error: ApiException) {
@@ -170,7 +180,7 @@ class OnboardingViewModel @Inject constructor(
     private fun persistStep(step: OnboardingStep) {
         _state.update { current ->
             val draft = current.draft.copy(stepIndex = step.index)
-            draftStore.save(draft)
+            draftStore.save(authRepository.currentUser()?.id, draft)
             current.copy(step = step, draft = draft, error = null)
         }
     }

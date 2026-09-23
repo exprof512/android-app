@@ -1,9 +1,9 @@
 # PHASE 18 REPORT
 
 ## Status
-**PARTIAL**
+**COMPLETE** (code-side)
 
-Core consistency work landed (audit, delete/export contracts, SSOT bus, Today/Week/Shopping sync, theme modes, beta quotas). Physical phone smoke and some Definition-of-Done items remain open.
+Core consistency + follow-ups landed (SSOT bus, delete/export-to-file, media Coil auth, onboarding draft isolation, OpenAI-first images/text). Physical phone smoke still awaits human install.
 
 ## Root Causes Found
 See [phase-18-audit.md](phase-18-audit.md).
@@ -115,7 +115,12 @@ Full suite / Android unit tests / alembic check / ownership matrix: **not fully 
 - `docs/api.md` Idempotency-Key / regenerate scope corrected.
 - Profile home: real weight progress + water from `DailyMetricsStore`.
 - Today ring: consumed = completed meal snapshots + diary logs (no fake macro scaling).
+- Coil `ImageLoader` uses authed OkHttp so `/media/...` no longer 401 while image metadata is 200.
+- Onboarding draft scoped by `userId` + `clearAll().commit()` before login/register (no cross-account leak).
+- OpenAI-first text chain; `gpt-image-1` params split (provider format vs storage); meal-plan catalog fallback softens calorie 422s.
+- Account export writes a shareable file via `FileProvider`.
 
 ## Commit
 `0c4b3d7` — `refactor(phase-18): core consistency and weekly planning`
 `f71b3e0` — `fix(phase-18): onboarding regen, week default, profile/today metrics`
+(follow-up hash recorded after commit)

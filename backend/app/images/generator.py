@@ -16,11 +16,15 @@ from app.images.optimize import optimize_pair
 from app.images.prompts import build_image_prompt
 from app.images.schemas import ImageGenerationRequest
 from app.images.storage import original_key, thumbnail_key
+from app.auth.models import User  # noqa: F401 — FK target for ai_image_usage.user_id
 from app.integrations.openai.images import OpenAIImageProvider
 from app.recipes.models import Recipe
 from app.storage.s3 import S3StorageProvider
 
 logger = logging.getLogger(__name__)
+
+# Keep User referenced so import optimizers do not drop the FK registration.
+_ = User
 
 
 async def generate_recipe_image(ctx: dict, recipe_image_id: str) -> None:
@@ -68,14 +72,15 @@ async def generate_recipe_image(ctx: dict, recipe_image_id: str) -> None:
             model=settings.openai_image_model,
             size=settings.openai_image_size or None,
             quality=settings.openai_image_quality or None,
-            output_format=settings.openai_image_format or "webp",
+            provider_format=getattr(settings, "openai_image_provider_format", None) or None,
+            storage_format=settings.openai_image_format or "webp",
         )
 
         try:
             result = await provider.generate(request)
             original, thumbnail = optimize_pair(
                 result.content,
-                output_format=settings.openai_image_format or "webp",
+                output_format=request.storage_format or "webp",
             )
             orig_key = original_key(recipe.id, image.id, original.format)
             thumb_key = thumbnail_key(recipe.id, image.id, thumbnail.format)

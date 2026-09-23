@@ -23,17 +23,18 @@ class DefaultLocalSessionCleaner @Inject constructor(
     private val userProfileStore: UserProfileStore,
 ) : LocalSessionCleaner {
     override fun clearBeforeNewSession() {
-        draftStore.clear()
+        draftStore.clearAll()
         metricsStore.clearAll()
         userProfileStore.clearAll()
     }
 
     override fun clearOnLogout(userId: String?) {
-        draftStore.clear()
         if (userId != null) {
+            draftStore.clear(userId)
             metricsStore.clearUser(userId)
             userProfileStore.clearUser(userId)
         } else {
+            draftStore.clearAll()
             metricsStore.clearAll()
             userProfileStore.clearAll()
         }

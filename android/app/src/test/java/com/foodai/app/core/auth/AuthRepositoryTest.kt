@@ -16,6 +16,7 @@ import com.foodai.app.core.network.TokenPairResponse
 import com.foodai.app.core.network.UserSummaryDto
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Test
 import retrofit2.Response
@@ -25,6 +26,7 @@ private class FakeAuthApi(
 ) : AuthApi {
     var loginCalls = 0
     var logoutCalls = 0
+    var deleteCalls = 0
 
     override suspend fun register(body: RegisterRequest): TokenPairResponse = pair
     override suspend fun login(body: LoginRequest): TokenPairResponse {
@@ -52,9 +54,14 @@ private class FakeAuthApi(
     override suspend fun listSessions(): List<SessionDto> = emptyList()
     override suspend fun revokeSession(sessionId: String) = Unit
     override suspend fun revokeAllSessions() = Unit
-    override suspend fun exportData() = buildJsonObject { }
-    override suspend fun deleteAccount(body: DeleteAccountRequest): Response<Unit> =
-        Response.success(Unit)
+    override suspend fun exportData() = buildJsonObject {
+        put("exported_at", JsonPrimitive("2026-09-23T00:00:00Z"))
+    }
+    override suspend fun deleteAccount(body: DeleteAccountRequest): Response<okhttp3.ResponseBody> {
+        deleteCalls += 1
+        // Simulate HTTP 204 empty body (the real failure mode for Response<Unit>).
+        return Response.success(null)
+    }
 }
 
 class AuthRepositoryTest {

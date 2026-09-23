@@ -112,6 +112,8 @@ class AuthRepository @Inject constructor(
             val response = authedAuthApi.deleteAccount(
                 com.foodai.app.core.network.DeleteAccountRequest("DELETE"),
             )
+            // Drain/close body — 204 has no JSON payload.
+            response.body()?.close()
             if (!response.isSuccessful) {
                 throw com.foodai.app.core.network.ApiException.Unexpected(
                     "Не удалось удалить аккаунт",

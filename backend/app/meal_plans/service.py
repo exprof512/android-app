@@ -13,7 +13,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.drafts import recipe_candidate_to_draft
-from app.ai.errors import TextAIQuotaExhausted, TextAIUnavailable
+from app.ai.errors import TextAIQuotaExhausted, TextAIUnavailable, TextAIValidationFailed
 from app.ai.fallback_plans import build_catalog_meal_plan_proposal
 from app.ai.service import TextAIService
 from app.core.errors import OwnershipDenied
@@ -127,7 +127,7 @@ class MealPlanService:
             proposal = await self._text_ai.generate_meal_plan_proposal(
                 context=context, user_id=user_id, use_cache=not payload.force
             )
-        except (TextAIQuotaExhausted, TextAIUnavailable) as exc:
+        except (TextAIQuotaExhausted, TextAIUnavailable, TextAIValidationFailed) as exc:
             logger.warning(
                 "meal_plan_ai_fallback",
                 extra={"error_code": getattr(exc, "code", "ai_generation_unavailable")},
@@ -170,24 +170,6 @@ class MealPlanService:
             meals_per_day=meals_per_day,
         )
 
-        slots: list[PlannedSlot] = []
-        for index, slot in enumerate(proposal.slots):
-            if slot.recipe_index >= len(stored_recipes):
-                raise PlanConstraintsUnsatisfied(
-                    [{"field": "recipe_index", "reason": "out_of_range"}]
-                )
-            planned = date.fromisoformat(slot.planned_date)
-            recipe = stored_recipes[slot.recipe_index]
-            slots.append(
-                PlannedSlot(
-                    planned_date=planned,
-                    meal_type=slot.meal_type,
-                    sort_order=index,
-                    servings=Decimal(str(slot.servings)),
-                    recipe=recipe,
-                )
-            )
-
         targets = DayTargets(
             calories_kcal=snapshot.goal.calorie_target_kcal,
             protein_g=snapshot.goal.protein_target_g,
@@ -199,15 +181,52 @@ class MealPlanService:
             for item in snapshot.restrictions
             if item.restriction_type in {"allergy", "excluded"}
         ]
-        warnings = self._engine.validate_plan(
-            slots=slots,
-            targets=targets,
-            meals_per_day=snapshot.profile.meals_per_day,
-            max_cook_time_minutes=snapshot.profile.max_cook_time_minutes,
-            restricted_names=restricted,
-            start_date=payload.start_date,
-            end_date=end_date,
-        ) + warnings
+
+        try:
+            slots = self._slots_from_proposal(proposal, stored_recipes)
+            warnings = self._engine.validate_plan(
+                slots=slots,
+                targets=targets,
+                meals_per_day=snapshot.profile.meals_per_day,
+                max_cook_time_minutes=snapshot.profile.max_cook_time_minutes,
+                restricted_names=restricted,
+                start_date=payload.start_date,
+                end_date=end_date,
+            ) + warnings
+        except PlanConstraintsUnsatisfied as exc:
+            logger.warning(
+                "meal_plan_constraints_fallback",
+                extra={
+                    "error_code": "plan_constraints_unsatisfied",
+                    "detail_count": len(getattr(exc, "details", None) or []),
+                },
+            )
+            proposal = await build_catalog_meal_plan_proposal(
+                self._session,
+                start_date=payload.start_date,
+                end_date=end_date,
+                meals_per_day=meals_per_day,
+            )
+            warnings.append(
+                "План собран из каталога: AI-предложение не прошло проверку питания."
+            )
+            stored_recipes, proposal = await self._persist_proposal_recipes(
+                proposal=proposal,
+                warnings=warnings,
+                start_date=payload.start_date,
+                end_date=end_date,
+                meals_per_day=meals_per_day,
+            )
+            slots = self._slots_from_proposal(proposal, stored_recipes)
+            warnings = self._engine.validate_plan(
+                slots=slots,
+                targets=targets,
+                meals_per_day=snapshot.profile.meals_per_day,
+                max_cook_time_minutes=snapshot.profile.max_cook_time_minutes,
+                restricted_names=restricted,
+                start_date=payload.start_date,
+                end_date=end_date,
+            ) + warnings
 
         plan = MealPlan(
             user_id=user_id,
@@ -697,6 +716,27 @@ class MealPlanService:
             cursor = cursor + timedelta(days=1)
         if seen:
             await self._session.flush()
+
+    @staticmethod
+    def _slots_from_proposal(proposal, stored_recipes: list) -> list[PlannedSlot]:
+        slots: list[PlannedSlot] = []
+        for index, slot in enumerate(proposal.slots):
+            if slot.recipe_index >= len(stored_recipes):
+                raise PlanConstraintsUnsatisfied(
+                    [{"field": "recipe_index", "reason": "out_of_range"}]
+                )
+            planned = date.fromisoformat(slot.planned_date)
+            recipe = stored_recipes[slot.recipe_index]
+            slots.append(
+                PlannedSlot(
+                    planned_date=planned,
+                    meal_type=slot.meal_type,
+                    sort_order=index,
+                    servings=Decimal(str(slot.servings)),
+                    recipe=recipe,
+                )
+            )
+        return slots
 
     @staticmethod
     def _proposal_covers_range(

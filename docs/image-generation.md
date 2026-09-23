@@ -126,11 +126,14 @@ estimated_cost, duration_ms, error_code, retry_count, created_at, updated_at
 
 ```dotenv
 OPENAI_API_KEY=
-OPENAI_IMAGE_MODEL=gpt-image-2
-OPENAI_IMAGE_SIZE=
-OPENAI_IMAGE_QUALITY=
+OPENAI_IMAGE_MODEL=gpt-image-1
+OPENAI_IMAGE_SIZE=1024x1024
+OPENAI_IMAGE_QUALITY=low
+# Storage/mobile format after optimize (webp|jpeg). Not sent to OpenAI.
 OPENAI_IMAGE_FORMAT=webp
-OPENAI_IMAGE_TIMEOUT_SECONDS=60
+# Wire format for Images API (png|jpeg|webp). Prefer png for GPT Image.
+OPENAI_IMAGE_PROVIDER_FORMAT=png
+OPENAI_IMAGE_TIMEOUT_SECONDS=120
 IMAGE_MAX_RETRIES=3
 IMAGE_MAX_CONCURRENT_JOBS=
 IMAGE_ORIGINAL_MAX_EDGE=
@@ -138,7 +141,15 @@ IMAGE_THUMBNAIL_MAX_EDGE=
 IMAGE_WEBP_QUALITY=
 ```
 
-`OPENAI_IMAGE_MODEL` default ориентирован на `gpt-image-2` (GPT-Image-2), но не hardcoded: model swap — config-only. Допустимые примеры без смены архитектуры: `gpt-image-2`, `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst` или dated snapshot. `OpenAIImageProvider` хранит versioned capability map выбранной model и передаёт в Image Generation API только параметры, поддерживаемые этой model (`size`, `quality`, `output_format`, compression и т.д.). Пустые/unsupported значения не отправляются; GPT Image models возвращают `b64_json`, а worker при необходимости конвертирует PNG → WEBP/JPEG и всегда пишет свои object keys. Неподдерживаемая required configuration должна fail fast на startup/config validation, а не отправлять неизвестный параметр provider. OpenAI не используется как permanent store.
+Default production model: **`gpt-image-1`**. Supported swaps without architecture changes: `gpt-image-1-mini`, `gpt-image-1.5`, `gpt-image-2`.
+`OpenAIImageProvider` builds params via `integrations/openai/image_params.py`:
+
+- sends only GPT Image–safe fields: `model`, `prompt`, `size`, `quality`, `output_format` (provider);
+- **never** sends `response_format`, `style`, or DALL·E quality aliases (`standard`/`hd`) — those return HTTP 400;
+- invalid/empty size/quality fall back to `1024x1024` / `low`;
+- `OPENAI_IMAGE_FORMAT` is **storage only** (Pillow → WEBP/JPEG); provider bytes are always re-encoded.
+
+GPT Image responses are `b64_json`. Worker concurrency defaults to 1 job to reduce 429 rate limits.
 
 Не использовать OpenAI как permanent image store: результат скачивается/декодируется немедленно, сохраняется через `StorageProvider`, а provider URL/temporary asset не отдаётся Android.
 

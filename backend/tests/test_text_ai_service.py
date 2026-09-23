@@ -220,3 +220,13 @@ def test_json_schema_is_object_without_open_refs():
     assert "recipes" in schema["properties"]
     dumped = str(schema)
     assert "$ref" not in dumped
+
+
+def test_json_schema_openai_strict_requires_all_properties():
+    schema = json_schema_for("generate_meal_plan_proposal")
+    recipe = schema["properties"]["recipes"]["items"]
+    assert set(recipe["required"]) == set(recipe["properties"].keys())
+    assert "description" in recipe["required"]
+    assert "rationale" in recipe["required"]
+    assert "default" not in recipe["properties"]["description"]
+    assert recipe.get("additionalProperties") is False
