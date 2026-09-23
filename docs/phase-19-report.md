@@ -104,4 +104,4 @@ cd android && ./gradlew :app:testDebugUnitTest --tests 'com.foodai.app.core.netw
 - Imperial units still not applied on every screen (Phase 18 leftover).
 
 ## Commit
-(recorded after `feat(phase-19)` commit)
+`b8a54a8` — `feat(phase-19): beta UX and daily loop`
