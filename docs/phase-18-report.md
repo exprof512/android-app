@@ -118,4 +118,4 @@ Full suite / Android unit tests / alembic check / ownership matrix: **not fully 
 
 ## Commit
 `0c4b3d7` — `refactor(phase-18): core consistency and weekly planning`
-Follow-up commit hash filled after land.
+`f71b3e0` — `fix(phase-18): onboarding regen, week default, profile/today metrics`
