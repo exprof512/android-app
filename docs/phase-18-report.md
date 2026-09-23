@@ -110,4 +110,4 @@ Full suite / Android unit tests / alembic check / ownership matrix: **not fully 
 - Alembic historical reflection noise from Phase 17 may still appear on `alembic check`.
 
 ## Commit
-Pending at report write time — see git log for `refactor(phase-18): core consistency and weekly planning`.
+`0c4b3d7` — `refactor(phase-18): core consistency and weekly planning`
