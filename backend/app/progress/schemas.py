@@ -42,6 +42,14 @@ class DailyNutritionBalanceOut(BaseModel):
     planned_meals: int = 0
 
 
+class ProgressSeriesPointOut(BaseModel):
+    date: date
+    consumed_kcal: int
+    protein_g: DecimalOut
+    completed_meals: int
+    weight_kg: DecimalOut | None = None
+
+
 class ProgressSummaryOut(BaseModel):
     current_weight_kg: DecimalOut | None = None
     start_weight_kg: DecimalOut | None = None
@@ -53,6 +61,8 @@ class ProgressSummaryOut(BaseModel):
     calorie_target_kcal: int | None = None
     today: DailyNutritionBalanceOut | None = None
     recent_entries: list[WeightEntryOut] = Field(default_factory=list)
+    series: list[ProgressSeriesPointOut] = Field(default_factory=list)
+    period_days: int | None = None
     disclaimer: str = (
         "Расчёты приблизительны и не заменяют врача или диетолога. "
         "FoodAI не гарантирует результат по весу."

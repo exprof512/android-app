@@ -2,6 +2,7 @@ package com.foodai.app.feature.plan
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.foodai.app.core.analytics.AnalyticsTracker
 import com.foodai.app.core.auth.AuthRepository
 import com.foodai.app.core.auth.toUiMessage
 import com.foodai.app.core.mealplan.MealPlanRepository
@@ -14,10 +15,13 @@ import com.foodai.app.core.network.NutritionApi
 import com.foodai.app.core.network.NutritionLogCreateRequest
 import com.foodai.app.core.network.NutritionLogDto
 import com.foodai.app.core.network.ProfileResponse
+import com.foodai.app.core.network.WaterTodayDto
 import com.foodai.app.core.profile.ProfileRepository
+import com.foodai.app.core.progress.ProgressRepository
 import com.foodai.app.core.sync.AppStateBus
 import com.foodai.app.core.sync.DomainEvent
 import com.foodai.app.core.sync.SelectedDateStore
+import com.foodai.app.core.water.WaterRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,10 +39,12 @@ data class TodayUiState(
     val plan: MealPlanDto? = null,
     val profile: ProfileResponse? = null,
     val metrics: DailyMetrics = DailyMetrics(),
+    val water: WaterTodayDto? = null,
     val nutritionLogs: List<NutritionLogDto> = emptyList(),
     val selectedDate: String = LocalDate.now().toString(),
     val lastUpdatedEpochMs: Long = 0L,
     val error: String? = null,
+    val offlineCached: Boolean = false,
     val missingPlan: Boolean = false,
     val actionError: String? = null,
     val infoMessage: String? = null,
@@ -51,12 +57,16 @@ class TodayViewModel @Inject constructor(
     private val auth: AuthRepository,
     private val metricsStore: DailyMetricsStore,
     private val nutritionApi: NutritionApi,
+    private val waterRepo: WaterRepository,
+    private val progress: ProgressRepository,
+    private val analytics: AnalyticsTracker,
     private val bus: AppStateBus,
     private val selectedDate: SelectedDateStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TodayUiState())
     val state: StateFlow<TodayUiState> = _state.asStateFlow()
     private var stepsJob: Job? = null
+    private var openedTracked = false
 
     init {
         viewModelScope.launch {
@@ -72,12 +82,12 @@ class TodayViewModel @Inject constructor(
                     is DomainEvent.WeightChanged,
                     is DomainEvent.ProfileChanged,
                     is DomainEvent.NutritionLogChanged,
+                    is DomainEvent.WaterChanged,
                     -> refresh(selectedDate.date.value)
                     else -> Unit
                 }
             }
         }
-        observeSteps()
     }
 
     private fun userId(): String = auth.currentUser()?.id ?: "anon"
@@ -86,13 +96,15 @@ class TodayViewModel @Inject constructor(
         stepsJob?.cancel()
         val uid = userId()
         val snapshot = metricsStore.metrics(uid)
+        val waterMl = _state.value.water?.totalMl ?: snapshot.waterMl
+        val waterGoal = _state.value.water?.goalMl ?: snapshot.waterGoalMl
         _state.value = _state.value.copy(
             metrics = _state.value.metrics.copy(
                 steps = snapshot.steps,
                 stepsAvailable = snapshot.stepsAvailable,
                 stepsPermissionNeeded = snapshot.stepsPermissionNeeded,
-                waterMl = snapshot.waterMl,
-                waterGoalMl = snapshot.waterGoalMl,
+                waterMl = waterMl,
+                waterGoalMl = waterGoal,
                 stepsGoal = snapshot.stepsGoal,
             ),
         )
@@ -111,7 +123,14 @@ class TodayViewModel @Inject constructor(
     }
 
     fun onStepsPermissionResult(granted: Boolean) {
-        _state.value = _state.value.copy(metrics = metricsStore.metrics(userId()))
+        _state.value = _state.value.copy(
+            metrics = metricsStore.metrics(userId()).copy(
+                waterMl = _state.value.water?.totalMl
+                    ?: metricsStore.metrics(userId()).waterMl,
+                waterGoalMl = _state.value.water?.goalMl
+                    ?: metricsStore.metrics(userId()).waterGoalMl,
+            ),
+        )
         if (granted) observeSteps()
     }
 
@@ -122,12 +141,22 @@ class TodayViewModel @Inject constructor(
                 loading = !keepData,
                 refreshing = keepData,
                 error = null,
+                offlineCached = false,
                 missingPlan = false,
             )
             try {
                 val plan = mealPlans.today(date)
                 val profile = runCatching { profiles.refreshProfile() }.getOrNull()
-                val metrics = metricsStore.metrics(userId())
+                val water = runCatching { waterRepo.today(date) }.getOrNull()
+                if (water != null) {
+                    metricsStore.setWater(userId(), water.totalMl)
+                }
+                val metrics = metricsStore.metrics(userId()).let { m ->
+                    m.copy(
+                        waterMl = water?.totalMl ?: m.waterMl,
+                        waterGoalMl = water?.goalMl ?: m.waterGoalMl,
+                    )
+                }
                 val logs = runCatching {
                     nutritionApi.listLogs(date.toString())
                 }.getOrDefault(emptyList())
@@ -137,56 +166,150 @@ class TodayViewModel @Inject constructor(
                     plan = plan,
                     profile = profile,
                     metrics = metrics,
+                    water = water,
                     nutritionLogs = logs,
                     selectedDate = date.toString(),
                     lastUpdatedEpochMs = System.currentTimeMillis(),
                 )
                 observeSteps()
+                if (!openedTracked) {
+                    openedTracked = true
+                    analytics.track("today_opened")
+                }
             } catch (error: ApiException) {
                 val missing = error.code == "meal_plan_not_found" || error.httpStatus == 404
-                _state.value = _state.value.copy(
-                    loading = false,
-                    refreshing = false,
-                    metrics = metricsStore.metrics(userId()),
-                    error = if (missing) {
-                        "План на этот день отсутствует."
-                    } else {
-                        error.toUiMessage()
-                    },
-                    missingPlan = missing,
-                )
+                val cached = mealPlans.todayPlan.value.plan ?: _state.value.plan
+                val isNetwork = error is ApiException.Network ||
+                    error.httpStatus == null && !missing
+                if (cached != null && !missing) {
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        refreshing = false,
+                        plan = cached,
+                        offlineCached = true,
+                        error = "Нет соединения",
+                        metrics = metricsStore.metrics(userId()),
+                        missingPlan = false,
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        refreshing = false,
+                        metrics = metricsStore.metrics(userId()),
+                        error = if (missing) {
+                            "План на этот день отсутствует."
+                        } else {
+                            error.toUiMessage()
+                        },
+                        missingPlan = missing,
+                        offlineCached = false,
+                    )
+                }
             } catch (error: Exception) {
-                _state.value = _state.value.copy(
-                    loading = false,
-                    refreshing = false,
-                    error = error.message ?: "Не удалось загрузить план",
-                )
+                val cached = mealPlans.todayPlan.value.plan ?: _state.value.plan
+                if (cached != null) {
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        refreshing = false,
+                        plan = cached,
+                        offlineCached = true,
+                        error = "Нет соединения",
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        refreshing = false,
+                        error = error.message ?: "Не удалось загрузить план",
+                    )
+                }
             }
         }
     }
 
     fun addWater(deltaMl: Int = 250) {
-        val metrics = metricsStore.addWater(userId(), deltaMl)
-        _state.value = _state.value.copy(metrics = metrics)
+        viewModelScope.launch {
+            try {
+                waterRepo.add(deltaMl, userId(), selectedDate.date.value)
+                val water = waterRepo.today(selectedDate.date.value)
+                metricsStore.setWater(userId(), water.totalMl)
+                _state.value = _state.value.copy(
+                    water = water,
+                    metrics = _state.value.metrics.copy(
+                        waterMl = water.totalMl,
+                        waterGoalMl = water.goalMl,
+                    ),
+                    actionError = null,
+                )
+                analytics.track("water_added", mapOf("amount_ml" to deltaMl.toString()))
+            } catch (error: ApiException) {
+                // Optimistic offline mirror fallback.
+                val metrics = metricsStore.addWater(userId(), deltaMl)
+                _state.value = _state.value.copy(
+                    metrics = metrics,
+                    actionError = error.toUiMessage(),
+                )
+            }
+        }
     }
 
-    fun addManualSnack(description: String, calories: Int) {
+    fun undoWater() {
+        viewModelScope.launch {
+            try {
+                waterRepo.undoLast(userId(), selectedDate.date.value)
+                val water = runCatching { waterRepo.today(selectedDate.date.value) }.getOrNull()
+                if (water != null) {
+                    metricsStore.setWater(userId(), water.totalMl)
+                    _state.value = _state.value.copy(
+                        water = water,
+                        metrics = _state.value.metrics.copy(
+                            waterMl = water.totalMl,
+                            waterGoalMl = water.goalMl,
+                        ),
+                    )
+                }
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(actionError = error.toUiMessage())
+            }
+        }
+    }
+
+    fun addFood(
+        description: String,
+        calories: Int,
+        proteinG: Double = 0.0,
+        fatG: Double = 0.0,
+        carbsG: Double = 0.0,
+        mealType: String = "snack",
+    ) {
         viewModelScope.launch {
             try {
                 nutritionApi.createLog(
                     NutritionLogCreateRequest(
                         loggedOn = selectedDate.date.value.toString(),
-                        mealType = "snack",
+                        mealType = mealType,
                         source = "manual",
                         description = description,
                         caloriesKcal = calories,
-                        proteinG = 0.0,
-                        fatG = 0.0,
-                        carbohydrateG = 0.0,
+                        proteinG = proteinG,
+                        fatG = fatG,
+                        carbohydrateG = carbsG,
                     ),
                 )
+                analytics.track("food_added")
                 bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
                 refresh()
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(actionError = error.toUiMessage())
+            }
+        }
+    }
+
+    fun addWeight(weightKg: Double) {
+        viewModelScope.launch {
+            try {
+                progress.addWeight(weightKg)
+                analytics.track("weight_added")
+                _state.value = _state.value.copy(infoMessage = "Вес сохранён")
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(actionError = error.toUiMessage())
             }
@@ -229,25 +352,50 @@ class TodayViewModel @Inject constructor(
     fun complete(item: MealPlanItemDto) {
         viewModelScope.launch {
             try {
-                mealPlans.completeItem(item.id, completed = !item.isCompleted)
+                val completing = item.status != "completed" && !item.isCompleted
+                mealPlans.completeItem(item.id, completed = completing)
+                if (completing) {
+                    analytics.track("meal_completed", mapOf("meal_type" to item.mealType))
+                }
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(actionError = error.toUiMessage())
             }
         }
     }
 
-    fun replace(item: MealPlanItemDto) {
+    fun skip(item: MealPlanItemDto) {
+        viewModelScope.launch {
+            try {
+                val skipping = item.status != "skipped"
+                mealPlans.skipItem(item.id, skipped = skipping)
+                if (skipping) {
+                    analytics.track("meal_skipped", mapOf("meal_type" to item.mealType))
+                }
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(actionError = error.toUiMessage())
+            }
+        }
+    }
+
+    fun replace(item: MealPlanItemDto, reason: String = "user_requested") {
         viewModelScope.launch {
             _state.value = _state.value.copy(refreshing = true, actionError = null)
             try {
-                mealPlans.replaceItem(item.id)
+                analytics.track("replacement_started", mapOf("reason" to reason))
+                mealPlans.replaceItem(item.id, reason = reason)
+                analytics.track("replacement_completed", mapOf("reason" to reason))
             } catch (error: ApiException) {
+                analytics.track("replacement_failed", mapOf("reason" to reason))
                 _state.value = _state.value.copy(
                     refreshing = false,
                     actionError = error.toUiMessage(),
                 )
             }
         }
+    }
+
+    fun clearMessages() {
+        _state.value = _state.value.copy(actionError = null, infoMessage = null)
     }
 }
 
@@ -311,12 +459,21 @@ class WeekViewModel @Inject constructor(
             try {
                 val plan = mealPlans.week(selectedDate.date.value)
                 val profile = runCatching { profiles.refreshProfile() }.getOrNull()
-                val dates = datesBetween(plan.startDate, plan.endDate)
-                val statuses = dates.associateWith { date ->
-                    val items = plan.items.filter { it.date == date }
-                    when {
-                        items.isEmpty() -> "missing"
-                        else -> "planned"
+                val summaryDays = plan.weekSummary?.days.orEmpty()
+                val dates = if (summaryDays.isNotEmpty()) {
+                    summaryDays.map { it.date }
+                } else {
+                    datesBetween(plan.startDate, plan.endDate)
+                }
+                val statuses = if (summaryDays.isNotEmpty()) {
+                    summaryDays.associate { it.date to it.status }
+                } else {
+                    dates.associateWith { date ->
+                        val items = plan.items.filter { it.date == date }
+                        when {
+                            items.isEmpty() -> "missing"
+                            else -> "planned"
+                        }
                     }
                 }
                 val selected = when {

@@ -237,7 +237,7 @@ Before production: `APP_ENV=production`, non-placeholder `JWT_SECRET`, real `TER
 | Backups | `scripts/backup.sh` + restore drill | encrypted dump/PITR + object replication |
 | Observability | JSON logs + request ids | ship logs to aggregator; alert on `/health` 503 |
 
-Release gate document: [release-checklist.md](release-checklist.md). Smoke: `scripts/release_check.sh`.
+Release gate document: [release-checklist.md](release-checklist.md). Smoke: `scripts/release_check.sh`. Phase reports: [phase-18-report.md](phase-18-report.md), [phase-19-report.md](phase-19-report.md).
 
 ## Phase gate и git workflow
 

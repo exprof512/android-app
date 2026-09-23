@@ -1,4 +1,4 @@
-# State management (Phase 18)
+# State management (Phase 18–19)
 
 PostgreSQL is the authoritative source. Android repositories hold in-memory snapshots and emit typed `DomainEvent`s via `AppStateBus` so screens stay consistent without ad-hoc `refresh()` coupling.
 
@@ -9,11 +9,12 @@ PostgreSQL is the authoritative source. Android repositories hold in-memory snap
 | Auth session | JWT + `refresh_tokens` | `AuthRepository` / `TokenStore` | Encrypted prefs | logout/delete | Boot, shell |
 | Profile + goal | `GET/PUT /profile` | `ProfileRepository` (`StateFlow`) | memory | `ProfileChanged`, `WeightChanged` | Today, Week, Progress, Profile |
 | Weight | `POST /weight-entries`, mirrored on profile | `ProgressRepository` | none local | emits `WeightChanged` | Progress, Profile, Today |
-| Plan (week) | `GET /meal-plans/week` | `MealPlanRepository.weekPlan` | memory | `PlanChanged` | Week, Shopping |
-| Plan (today) | `GET /meal-plans/today` | `MealPlanRepository.todayPlan` | memory | `PlanChanged` | Today |
+| Plan (week) | `GET /meal-plans/week` (+ `week_summary`) | `MealPlanRepository.weekPlan` | memory (+ last-success) | `PlanChanged` | Week, Shopping |
+| Plan (today) | `GET /meal-plans/today` (+ `day_progress`) | `MealPlanRepository.todayPlan` | memory (+ last-success) | `PlanChanged` | Today |
 | Selected date | — | `SelectedDateStore` | memory | `SelectedDateChanged` | Today, Week |
-| Nutrition logs | `/nutrition/logs` | NutritionApi via Today VM | none | `NutritionLogChanged` | Today, Progress |
-| Shopping | shopping APIs | `ShoppingRepository` + VM | memory | `ShoppingChanged`, `PlanChanged` | Shopping |
+| Nutrition logs | `/nutrition/logs` (also upserted on complete) | NutritionApi via Today VM | none | `NutritionLogChanged` | Today, Progress |
+| Water | `/water` | `WaterRepository` | memory + prefs mirror | `WaterChanged` | Today |
+| Shopping | shopping APIs (+ stale/cost/category) | `ShoppingRepository` + VM | memory | `ShoppingChanged`, `PlanChanged` | Shopping |
 | Theme / units | — | `ThemePreferences`, `UnitPreferences` | SharedPreferences | immediate | whole app |
 | Entitlements | `/entitlements/me` | badge fetch | none | — | Profile/Premium |
 
@@ -26,16 +27,17 @@ ProfileChanged → Today/Week refresh
 NutritionLogChanged → Today (and Progress if open)
 ShoppingChanged → Shopping refresh
 SelectedDateChanged → Today loads that day; Week highlights day
+WaterChanged → Today water section refresh
 ```
 
 ## Targets vs consumption
 
-- **USER TARGET** — active `goals.*` from profile.
+- **USER TARGET** — active `goals.*` from profile / plan `daily_targets`.
 - **PLAN SNAPSHOT** — `meal_plans.*_target_*` frozen at generation.
-- **ACTUAL CONSUMPTION** — completed `meal_plan_items` ∪ `nutrition_logs` for the day.
+- **ACTUAL CONSUMPTION** — completed `meal_plan_items` ∪ `nutrition_logs` for the day (server `day_progress`).
 
-UI must not silently mix these without labeling.
+Android must prefer `day_progress.remaining_*` from the backend; do not recompute when present.
 
 ## Mutations
 
-Generate / replace / complete / rebuild shopping / add weight / edit profile all go through repositories that emit events. ViewModels subscribe to `AppStateBus` instead of calling sibling ViewModels.
+Generate / replace / complete / skip / rebuild shopping / add water / add weight / edit profile / add food all go through repositories that emit events. ViewModels subscribe to `AppStateBus` instead of calling sibling ViewModels.

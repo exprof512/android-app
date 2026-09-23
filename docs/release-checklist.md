@@ -7,7 +7,7 @@
 - [x] `docker compose ps` — все сервисы `healthy` (postgres, redis, minio, backend, worker, nginx)
 - [x] `GET /health` → `{"status":"ok"}` и `X-Request-ID`
 - [x] `GET /health/deps` → postgres/redis/storage без секретов
-- [x] Alembic head применён (`0013_nutrition_diary_policy`)
+- [x] Alembic head применён (`0014_phase19_daily_loop`)
 - [x] Full backend pytest suite green (incl. `test_phase17_productization`)
 - [x] Postgres restore drill (isolated DB) passed
 - [x] Structured logs не содержат password/JWT/API keys (audit + redaction tests)

@@ -15,6 +15,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,6 +27,13 @@ class NutritionLog(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "nutrition_logs"
     __table_args__ = (
         Index("ix_nutrition_logs_user_logged_on", "user_id", "logged_on"),
+        Index(
+            "uq_nutrition_logs_meal_plan_item",
+            "meal_plan_item_id",
+            unique=True,
+            postgresql_where=text("meal_plan_item_id IS NOT NULL"),
+            sqlite_where=text("meal_plan_item_id IS NOT NULL"),
+        ),
         CheckConstraint(
             "meal_type IN ('breakfast', 'lunch', 'dinner', 'snack')",
             name="ck_nutrition_logs_meal_type",

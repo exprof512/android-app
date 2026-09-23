@@ -196,6 +196,76 @@ class NutritionDiaryService:
             "entries": len(logs),
         }
 
+    async def get_by_meal_plan_item(
+        self, user_id: UUID, meal_plan_item_id: UUID
+    ) -> NutritionLog | None:
+        statement = select(NutritionLog).where(
+            NutritionLog.user_id == user_id,
+            NutritionLog.meal_plan_item_id == meal_plan_item_id,
+            NutritionLog.source == "meal_plan_item",
+        )
+        return (await self._session.execute(statement)).scalar_one_or_none()
+
+    async def upsert_from_meal_plan_item(
+        self, user_id: UUID, item: MealPlanItem, *, commit: bool = True
+    ) -> NutritionLog:
+        """Create or update the nutrition_log tied to a completed meal_plan_item."""
+        recipe = await self._session.get(Recipe, item.recipe_id)
+        description = (recipe.name if recipe else item.meal_type)[:255]
+        existing = await self.get_by_meal_plan_item(user_id, item.id)
+        if existing is not None:
+            existing.logged_on = item.planned_date
+            existing.meal_type = item.meal_type
+            existing.recipe_id = item.recipe_id
+            existing.description = description
+            existing.calories_kcal = item.calories_kcal
+            existing.protein_g = item.protein_g
+            existing.fat_g = item.fat_g
+            existing.carbohydrate_g = item.carbohydrate_g
+            existing.servings = item.servings
+            existing.source = "meal_plan_item"
+            if commit:
+                await self._session.commit()
+                await self._session.refresh(existing)
+            else:
+                await self._session.flush()
+            return existing
+
+        row = NutritionLog(
+            user_id=user_id,
+            logged_on=item.planned_date,
+            meal_type=item.meal_type,
+            recipe_id=item.recipe_id,
+            meal_plan_item_id=item.id,
+            description=description,
+            calories_kcal=item.calories_kcal,
+            protein_g=item.protein_g,
+            fat_g=item.fat_g,
+            carbohydrate_g=item.carbohydrate_g,
+            servings=item.servings,
+            source="meal_plan_item",
+        )
+        self._session.add(row)
+        if commit:
+            await self._session.commit()
+            await self._session.refresh(row)
+        else:
+            await self._session.flush()
+        return row
+
+    async def delete_by_meal_plan_item(
+        self, user_id: UUID, meal_plan_item_id: UUID, *, commit: bool = True
+    ) -> bool:
+        row = await self.get_by_meal_plan_item(user_id, meal_plan_item_id)
+        if row is None:
+            return False
+        await self._session.delete(row)
+        if commit:
+            await self._session.commit()
+        else:
+            await self._session.flush()
+        return True
+
     @staticmethod
     def _validate_ranges(
         calories: int,

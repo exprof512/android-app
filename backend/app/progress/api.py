@@ -41,6 +41,11 @@ async def list_weight_entries(
 async def progress_summary(
     user: CurrentUser,
     date_: date | None = Query(default=None, alias="date"),
+    period: int | None = Query(default=None, ge=7, le=90),
     service: ProgressService = Depends(get_progress_service),
 ) -> ProgressSummaryOut:
-    return await service.summary(user.id, on_date=date_)
+    if period is not None and period not in {7, 30, 90}:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=422, detail="period must be 7, 30, or 90")
+    return await service.summary(user.id, on_date=date_, period=period)

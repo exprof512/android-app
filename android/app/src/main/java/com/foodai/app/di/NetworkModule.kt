@@ -17,6 +17,7 @@ import com.foodai.app.core.network.ProgressApi
 import com.foodai.app.core.network.RecipeApi
 import com.foodai.app.core.network.ShoppingApi
 import com.foodai.app.core.network.TokenAuthenticator
+import com.foodai.app.core.network.WaterApi
 import com.foodai.app.core.analytics.AnalyticsTracker
 import com.foodai.app.core.analytics.BackendAnalyticsTracker
 import dagger.Binds
@@ -168,6 +169,11 @@ object NetworkModule {
     @Singleton
     fun provideNutritionApi(retrofit: Retrofit): NutritionApi =
         retrofit.create(NutritionApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideWaterApi(retrofit: Retrofit): WaterApi =
+        retrofit.create(WaterApi::class.java)
 
     private fun buildRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()

@@ -15,6 +15,7 @@ from app.meal_plans.api import router as meal_plans_router
 from app.nutrition.api import router as nutrition_router
 from app.progress.api import router as progress_router
 from app.shopping.api import router as shopping_router
+from app.water.api import router as water_router
 
 
 def create_api_router(prefix: str) -> APIRouter:
@@ -32,6 +33,7 @@ def create_api_router(prefix: str) -> APIRouter:
     router.include_router(nutrition_router)
     router.include_router(analytics_router)
     router.include_router(admin_ai_router)
+    router.include_router(water_router)
     return router
 
 

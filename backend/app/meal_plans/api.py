@@ -98,3 +98,18 @@ async def complete_meal_plan_item(
     from uuid import UUID
 
     return await service.complete_item(user.id, UUID(item_id), completed=completed)
+
+
+@router.post(
+    "/meal-plan-items/{item_id}/skip",
+    response_model=MealPlanItemOut,
+)
+async def skip_meal_plan_item(
+    item_id: str,
+    user: CurrentUser,
+    service: MealPlanService = Depends(get_meal_plan_service),
+    skipped: bool = True,
+) -> MealPlanItemOut:
+    from uuid import UUID
+
+    return await service.skip_item(user.id, UUID(item_id), skipped=skipped)

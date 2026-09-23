@@ -60,3 +60,15 @@ async def complete_shopping_item(
     service: ShoppingService = Depends(get_shopping_service),
 ) -> ShoppingListItemOut:
     return await service.complete_item(user.id, UUID(item_id), completed=completed)
+
+
+@router.post(
+    "/shopping-list-items/clear-completed",
+    response_model=ShoppingListOut,
+)
+async def clear_completed_shopping_items(
+    user: CurrentUser,
+    list_id: UUID | None = Query(default=None),
+    service: ShoppingService = Depends(get_shopping_service),
+) -> ShoppingListOut:
+    return await service.clear_completed(user.id, list_id=list_id)

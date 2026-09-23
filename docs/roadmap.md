@@ -54,7 +54,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | **16 — MVP release candidate** | End-to-end regression, accessibility/localization review, production config review, APK build/install evidence. | **готово (RC)**: full pytest green; release checklist; version `0.1.0-rc1`; debug APK path; phone smoke items ожидают human confirmation. |
 | **17 — Productization & beta foundation** | Soft email verify/reset, sessions list/revoke, delete/export, consent versions + legal URLs, product analytics, admin AI usage aggregates, nutrition diary CRUD + Today union, replace idempotency/`replace_reason`, `NUTRITION_POLICY_VERSION` snapshot, ingredient `source_version`, Android account/settings/diary/analytics. | **готово**: migrations `0011`–`0013`; pytest `test_phase17_productization`; Android Account + diary + AnalyticsTracker; debug APK; phone smoke checklist для human. |
 | **18 — Core consistency & weekly planning** | SSOT + DomainEvent invalidation; delete/export fixes; Today↔Week↔Shopping sync; week summary; theme System/Light/Dark; units presentation; beta quotas; honest promotions copy; media auth + draft isolation. | **COMPLETE** (code-side); phone smoke human. See `phase-18-report.md`. |
-| **19 — Beta UX & daily loop** | Today hub, authoritative nutrition, skip/complete+log, water, week dashboard, shopping stale/cost, local notifications, favorites list, search. | In progress. |
+| **19 — Beta UX & daily loop** | Today hub, authoritative nutrition, skip/complete+log, water, week dashboard, shopping stale/cost, local notifications, favorites list, search. | **PARTIAL**: code + tests green; phone smoke human. See `phase-19-report.md`. |
 
 ## MVP на Phase 16
 

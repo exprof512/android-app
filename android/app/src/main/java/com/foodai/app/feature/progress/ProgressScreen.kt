@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -32,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.foodai.app.core.network.ProgressSeriesPointDto
 import com.foodai.app.core.network.WeightEntryDto
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
@@ -55,6 +58,7 @@ fun ProgressRoute(
             onWeightInput = viewModel::onWeightInput,
             onSave = viewModel::saveWeight,
             onRefresh = viewModel::refresh,
+            onPeriod = viewModel::setPeriod,
         )
     }
 }
@@ -65,9 +69,11 @@ fun ProgressScreen(
     onWeightInput: (String) -> Unit,
     onSave: () -> Unit,
     onRefresh: () -> Unit,
+    onPeriod: (Int) -> Unit,
 ) {
     val summary = state.summary
     val entries = summary?.recentEntries.orEmpty().sortedBy { it.measuredAt }
+    val series = summary?.series.orEmpty()
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -99,6 +105,20 @@ fun ProgressScreen(
             }
         }
         item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(7, 30, 90).forEach { days ->
+                    FilterChip(
+                        selected = state.period == days,
+                        onClick = { onPeriod(days) },
+                        label = { Text("$days дн.") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = FoodAIColors.PrimarySoft,
+                        ),
+                    )
+                }
+            }
+        }
+        item {
             Text(
                 "Текущий вес: ${summary?.currentWeightKg?.let { "$it кг" } ?: "—"}",
                 style = FoodAITypography.titleLarge,
@@ -123,17 +143,22 @@ fun ProgressScreen(
             }
         }
         item {
-            Text("Динамика веса", style = FoodAITypography.titleLarge)
-            if (entries.size >= 2) {
-                WeightChart(
+            Text("Динамика за ${state.period} дн.", style = FoodAITypography.titleLarge)
+            when {
+                series.size >= 2 -> SeriesChart(
+                    points = series,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                )
+                entries.size >= 2 -> WeightChart(
                     entries = entries,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(180.dp),
                 )
-            } else {
-                Text(
-                    "Добавьте минимум две записи веса — появится график.",
+                else -> Text(
+                    "Добавьте минимум две записи — появится график.",
                     color = FoodAIColors.TextSecondary,
                     style = FoodAITypography.bodyMedium,
                 )
@@ -200,6 +225,43 @@ fun ProgressScreen(
                     WeightRow(entry)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SeriesChart(
+    points: List<ProgressSeriesPointDto>,
+    modifier: Modifier = Modifier,
+) {
+    val lineColor = FoodAIColors.Primary
+    val gridColor = FoodAIColors.Divider
+    val pointColor = FoodAIColors.Gold
+    Canvas(modifier = modifier) {
+        val values = points.map { (it.weightKg ?: it.consumedKcal.toDouble()).toFloat() }
+        val minW = (values.minOrNull() ?: 0f) - 1f
+        val maxW = (values.maxOrNull() ?: 1f) + 1f
+        val range = (maxW - minW).coerceAtLeast(1f)
+        val padX = 24f
+        val padY = 20f
+        val chartW = size.width - padX * 2
+        val chartH = size.height - padY * 2
+        for (i in 0..3) {
+            val y = padY + chartH * i / 3f
+            drawLine(gridColor, Offset(padX, y), Offset(padX + chartW, y), strokeWidth = 2f)
+        }
+        val path = Path()
+        values.forEachIndexed { index, value ->
+            val x = padX + if (values.size == 1) chartW / 2f else chartW * index / (values.size - 1)
+            val y = padY + chartH * (1f - (value - minW) / range)
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path, color = lineColor, style = Stroke(width = 5f, cap = StrokeCap.Round))
+        values.forEachIndexed { index, value ->
+            val x = padX + if (values.size == 1) chartW / 2f else chartW * index / (values.size - 1)
+            val y = padY + chartH * (1f - (value - minW) / range)
+            drawCircle(pointColor, radius = 7f, center = Offset(x, y))
+            drawCircle(lineColor, radius = 3.5f, center = Offset(x, y))
         }
     }
 }

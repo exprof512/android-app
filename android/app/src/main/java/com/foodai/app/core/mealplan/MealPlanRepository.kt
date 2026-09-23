@@ -6,6 +6,7 @@ import com.foodai.app.core.network.MealPlanApi
 import com.foodai.app.core.network.MealPlanDto
 import com.foodai.app.core.network.MealPlanGenerateRequest
 import com.foodai.app.core.network.MealPlanItemDto
+import com.foodai.app.core.network.MealPlanReplaceRequest
 import com.foodai.app.core.network.RecipeApi
 import com.foodai.app.core.network.RecipeImageDto
 import com.foodai.app.core.sync.AppStateBus
@@ -55,8 +56,10 @@ class MealPlanRepository @Inject constructor(
         } catch (error: Throwable) {
             val parsed = ApiErrorParser.fromThrowable(error)
             val missing = parsed.code == "meal_plan_not_found" || parsed.httpStatus == 404
+            // Keep cached plan on network failure for offline UX.
+            val cached = _todayPlan.value.plan
             _todayPlan.value = PlanSnapshot(
-                plan = null,
+                plan = if (!missing) cached else null,
                 missing = missing,
                 error = parsed.message,
                 lastUpdatedEpochMs = System.currentTimeMillis(),
@@ -77,8 +80,9 @@ class MealPlanRepository @Inject constructor(
         } catch (error: Throwable) {
             val parsed = ApiErrorParser.fromThrowable(error)
             val missing = parsed.code == "meal_plan_not_found" || parsed.httpStatus == 404
+            val cached = _weekPlan.value.plan
             _weekPlan.value = PlanSnapshot(
-                plan = null,
+                plan = if (!missing) cached else null,
                 missing = missing,
                 error = parsed.message,
                 lastUpdatedEpochMs = System.currentTimeMillis(),
@@ -125,10 +129,11 @@ class MealPlanRepository @Inject constructor(
 
     suspend fun regenerate(days: Int = 7): MealPlanDto = generate(days = days, force = true)
 
-    suspend fun replaceItem(itemId: String): MealPlanDto {
+    suspend fun replaceItem(itemId: String, reason: String = "user_requested"): MealPlanDto {
         val plan = wrap {
             mealPlanApi.replaceItem(
-                itemId,
+                itemId = itemId,
+                body = MealPlanReplaceRequest(replaceReason = reason),
                 idempotencyKey = UUID.randomUUID().toString(),
             )
         }
@@ -147,6 +152,13 @@ class MealPlanRepository @Inject constructor(
         return item
     }
 
+    suspend fun skipItem(itemId: String, skipped: Boolean = true): MealPlanItemDto {
+        val item = wrap { mealPlanApi.skipItem(itemId, skipped) }
+        runCatching { refreshAll(LocalDate.now()) }
+        bus.emit(DomainEvent.PlanChanged("skip"))
+        return item
+    }
+
     suspend fun recipe(recipeId: String): DishCardDto =
         wrap { recipeApi.getRecipe(recipeId) }
 
@@ -158,6 +170,12 @@ class MealPlanRepository @Inject constructor(
             if (favorite) recipeApi.addFavorite(recipeId) else recipeApi.removeFavorite(recipeId)
         }
     }
+
+    suspend fun listFavorites(): List<DishCardDto> =
+        wrap { recipeApi.listFavorites() }
+
+    suspend fun searchRecipes(query: String): List<DishCardDto> =
+        wrap { recipeApi.search(query = query.ifBlank { null }) }
 
     private suspend fun <T> wrap(block: suspend () -> T): T =
         try {

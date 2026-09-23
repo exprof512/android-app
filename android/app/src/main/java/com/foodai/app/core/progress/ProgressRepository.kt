@@ -18,8 +18,8 @@ class ProgressRepository @Inject constructor(
     private val profiles: ProfileRepository,
     private val bus: AppStateBus,
 ) {
-    suspend fun summary(date: String? = null): ProgressSummaryDto =
-        wrap { progressApi.summary(date) }
+    suspend fun summary(date: String? = null, period: Int? = null): ProgressSummaryDto =
+        wrap { progressApi.summary(date = date, period = period) }
 
     suspend fun listEntries(): List<WeightEntryDto> =
         wrap { progressApi.listWeightEntries() }

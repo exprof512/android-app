@@ -22,10 +22,12 @@ import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.TrackChanges
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,6 +75,27 @@ fun OnboardingRoute(
     }
     LaunchedEffect(state.finished) {
         if (state.finished) onFinished()
+    }
+    if (state.askRebuildPlan) {
+        AlertDialog(
+            onDismissRequest = viewModel::skipRebuildPlan,
+            title = { Text("Обновить мой план?") },
+            text = {
+                Text(
+                    "Важные параметры профиля изменились. Можно пересобрать план питания сейчас или позже.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmRebuildPlan) {
+                    Text("Обновить", color = FoodAIColors.Primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::skipRebuildPlan) {
+                    Text("Позже")
+                }
+            },
+        )
     }
     if (state.hydrating) {
         FoodAILoading("Загружаем анкету…")

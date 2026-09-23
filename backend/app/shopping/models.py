@@ -45,6 +45,12 @@ class ShoppingList(UuidPrimaryKeyMixin, TimestampMixin, Base):
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
+    stale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    plan_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    estimated_total_amount: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RUB")
 
     items: Mapped[list[ShoppingListItem]] = relationship(
         back_populates="shopping_list",

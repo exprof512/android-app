@@ -41,6 +41,17 @@ ALLOWED_EVENTS = frozenset(
         "premium_screen_opened",
         "account_deleted",
         "data_export_requested",
+        # Phase 19 daily loop
+        "today_opened",
+        "meal_completed",
+        "meal_skipped",
+        "food_added",
+        "replacement_started",
+        "replacement_completed",
+        "replacement_failed",
+        "water_added",
+        "notification_enabled",
+        "notification_disabled",
     }
 )
 

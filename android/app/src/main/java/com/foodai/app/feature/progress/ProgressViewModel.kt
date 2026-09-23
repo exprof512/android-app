@@ -18,6 +18,7 @@ data class ProgressUiState(
     val loading: Boolean = true,
     val saving: Boolean = false,
     val summary: ProgressSummaryDto? = null,
+    val period: Int = 7,
     val weightInput: String = "",
     val error: String? = null,
     val actionError: String? = null,
@@ -47,14 +48,22 @@ class ProgressViewModel @Inject constructor(
         }
     }
 
+    fun setPeriod(period: Int) {
+        if (period !in setOf(7, 30, 90)) return
+        _state.value = _state.value.copy(period = period)
+        refresh()
+    }
+
     fun refresh() {
         viewModelScope.launch {
+            val period = _state.value.period
             _state.value = _state.value.copy(loading = true, error = null, actionError = null)
             try {
-                val summary = progress.summary()
+                val summary = progress.summary(period = period)
                 _state.value = ProgressUiState(
                     loading = false,
                     summary = summary,
+                    period = period,
                     weightInput = summary.currentWeightKg?.toString().orEmpty(),
                 )
             } catch (error: ApiException) {

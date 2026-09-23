@@ -25,6 +25,8 @@ data class OnboardingUiState(
     val hydrating: Boolean = true,
     val error: String? = null,
     val finished: Boolean = false,
+    /** Shown after profile edit when important fields changed (no auto-generate). */
+    val askRebuildPlan: Boolean = false,
 )
 
 @HiltViewModel
@@ -35,6 +37,7 @@ class OnboardingViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(OnboardingUiState())
     val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
+    private var baselineFingerprint: String? = null
 
     init {
         hydrate()
@@ -45,9 +48,6 @@ class OnboardingViewModel @Inject constructor(
             val userId = authRepository.currentUser()?.id
             val local = draftStore.load(userId)
             val profile = runCatching { profileRepository.getProfile() }.getOrNull()
-            // New accounts start with an empty draft (cleared on register). Do not pull a
-            // complete server profile into a pending onboarding — that skipped the questionnaire
-            // when a previous session left profile rows or draft prefs leaked across users.
             val draft = when {
                 authRepository.pendingOnboarding() ->
                     if (local.hasMeaningfulInput()) local else OnboardingDraft()
@@ -56,6 +56,7 @@ class OnboardingViewModel @Inject constructor(
                 profile != null -> profile.toOnboardingDraft(local.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2))
                 else -> local
             }
+            baselineFingerprint = importantFingerprint(draft)
             val step = OnboardingStep.formSteps
                 .getOrElse(draft.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2)) { OnboardingStep.Goal }
             draftStore.save(userId, draft)
@@ -124,9 +125,43 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
+    fun confirmRebuildPlan() {
+        viewModelScope.launch {
+            _state.update {
+                it.copy(askRebuildPlan = false, isSubmitting = true, step = OnboardingStep.Loading)
+            }
+            try {
+                profileRepository.regeneratePlan(days = 7)
+                finishSuccessfully()
+            } catch (error: ApiException) {
+                _state.update {
+                    it.copy(
+                        isSubmitting = false,
+                        step = OnboardingStep.Pantry,
+                        error = friendlyApiMessage(error),
+                        finished = true,
+                    )
+                }
+            } catch (error: Exception) {
+                _state.update {
+                    it.copy(
+                        isSubmitting = false,
+                        finished = true,
+                        error = error.message,
+                    )
+                }
+            }
+        }
+    }
+
+    fun skipRebuildPlan() {
+        _state.update { it.copy(askRebuildPlan = false, finished = true) }
+    }
+
     private fun submit() {
         viewModelScope.launch {
             val shouldGenerate = _state.value.generatePlan
+            val importantChanged = importantFingerprint(_state.value.draft) != baselineFingerprint
             _state.update {
                 it.copy(step = OnboardingStep.Loading, isSubmitting = true, error = null)
             }
@@ -136,20 +171,28 @@ class OnboardingViewModel @Inject constructor(
                 profileRepository.updateProfile(body)
                 if (shouldGenerate) {
                     profileRepository.generateFirstPlan(days = 7, force = true)
-                }
-                // Edit-questionnaire path (generatePlan=false): persist profile only —
-                // plan rebuild is explicit via «Пересобрать» on Today/Week.
-                // Keep a per-user snapshot so reopening the questionnaire is filled.
-                val snapshot = runCatching { profileRepository.getProfile() }
-                    .getOrNull()
-                    ?.toOnboardingDraft()
-                if (snapshot != null) {
-                    draftStore.save(userId, snapshot)
+                    finishSuccessfully()
+                } else if (importantChanged) {
+                    // Edit path: ask before regenerate — never auto-generate.
+                    val snapshot = runCatching { profileRepository.getProfile() }
+                        .getOrNull()
+                        ?.toOnboardingDraft()
+                    if (snapshot != null) {
+                        draftStore.save(userId, snapshot)
+                    } else {
+                        draftStore.clear(userId)
+                    }
+                    authRepository.setPendingOnboarding(false)
+                    _state.update {
+                        it.copy(
+                            isSubmitting = false,
+                            step = OnboardingStep.Pantry,
+                            askRebuildPlan = true,
+                        )
+                    }
                 } else {
-                    draftStore.clear(userId)
+                    finishSuccessfully()
                 }
-                authRepository.setPendingOnboarding(false)
-                _state.update { it.copy(isSubmitting = false, finished = true) }
             } catch (error: ApiException) {
                 _state.update {
                     it.copy(
@@ -169,6 +212,40 @@ class OnboardingViewModel @Inject constructor(
             }
         }
     }
+
+    private suspend fun finishSuccessfully() {
+        val userId = authRepository.currentUser()?.id
+        val snapshot = runCatching { profileRepository.getProfile() }
+            .getOrNull()
+            ?.toOnboardingDraft()
+        if (snapshot != null) {
+            draftStore.save(userId, snapshot)
+        } else {
+            draftStore.clear(userId)
+        }
+        authRepository.setPendingOnboarding(false)
+        _state.update { it.copy(isSubmitting = false, finished = true, askRebuildPlan = false) }
+    }
+
+    private fun importantFingerprint(draft: OnboardingDraft): String =
+        listOf(
+            draft.goalType,
+            draft.targetWeightKg,
+            draft.desiredWeeklyChangeKg,
+            draft.sex,
+            draft.ageYears,
+            draft.heightCm,
+            draft.currentWeightKg,
+            draft.activityLevel,
+            draft.mealsPerDay,
+            draft.dailyCalorieMode,
+            draft.dailyCalorieValue,
+            draft.excludedFoods,
+            draft.allergies,
+            draft.groceryBudgetWeekly,
+            draft.maxCookTimeMinutes,
+            draft.householdSize,
+        ).joinToString("|")
 
     private fun friendlyApiMessage(error: ApiException): String {
         val fromDetails = error.details.firstNotNullOfOrNull { detail ->

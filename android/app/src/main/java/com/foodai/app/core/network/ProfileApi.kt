@@ -1,5 +1,7 @@
 package com.foodai.app.core.network
 
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -33,6 +35,7 @@ interface MealPlanApi {
     @POST("meal-plan-items/{itemId}/replace")
     suspend fun replaceItem(
         @Path("itemId") itemId: String,
+        @Body body: MealPlanReplaceRequest = MealPlanReplaceRequest(),
         @Header("Idempotency-Key") idempotencyKey: String? = null,
     ): MealPlanDto
 
@@ -41,9 +44,27 @@ interface MealPlanApi {
         @Path("itemId") itemId: String,
         @Query("completed") completed: Boolean = true,
     ): MealPlanItemDto
+
+    @POST("meal-plan-items/{itemId}/skip")
+    suspend fun skipItem(
+        @Path("itemId") itemId: String,
+        @Query("skipped") skipped: Boolean = true,
+    ): MealPlanItemDto
 }
 
 interface RecipeApi {
+    @GET("recipes/favorites")
+    suspend fun listFavorites(): List<DishCardDto>
+
+    @GET("recipes/search")
+    suspend fun search(
+        @Query("q") query: String? = null,
+        @Query("max_kcal") maxKcal: Int? = null,
+        @Query("min_protein_g") minProteinG: Double? = null,
+        @Query("max_cook_time") maxCookTime: Int? = null,
+        @Query("max_cost") maxCost: Double? = null,
+    ): List<DishCardDto>
+
     @GET("recipes/{recipeId}")
     suspend fun getRecipe(@Path("recipeId") recipeId: String): DishCardDto
 
@@ -69,6 +90,9 @@ interface ShoppingApi {
         @Path("itemId") itemId: String,
         @Query("completed") completed: Boolean = true,
     ): ShoppingListItemDto
+
+    @POST("shopping-list-items/clear-completed")
+    suspend fun clearCompleted(@Query("list_id") listId: String? = null): ShoppingListDto
 }
 
 interface ProgressApi {
@@ -82,7 +106,21 @@ interface ProgressApi {
     ): List<WeightEntryDto>
 
     @GET("progress/summary")
-    suspend fun summary(@Query("date") date: String? = null): ProgressSummaryDto
+    suspend fun summary(
+        @Query("date") date: String? = null,
+        @Query("period") period: Int? = null,
+    ): ProgressSummaryDto
+}
+
+interface WaterApi {
+    @GET("water/today")
+    suspend fun today(@Query("date") date: String? = null): WaterTodayDto
+
+    @POST("water")
+    suspend fun add(@Body body: WaterEntryCreateRequest): WaterEntryDto
+
+    @DELETE("water/last")
+    suspend fun deleteLast(): Response<ResponseBody>
 }
 
 interface ChatApi {

@@ -191,11 +191,16 @@ Phase 3 фиксирует контракт этих endpoints. Обязател
 | Method / path | Назначение |
 |---|---|
 | `POST /meal-plans/generate` | создать персональный plan и рецепты; image jobs только ставятся в очередь |
-| `GET /meal-plans/today?date=YYYY-MM-DD` | active plan на дату |
-| `GET /meal-plans/week?start_date=YYYY-MM-DD` | семь дней active plan |
+| `GET /meal-plans/today?date=YYYY-MM-DD` | active plan на дату (+ `day_progress`) |
+| `GET /meal-plans/week?start_date=YYYY-MM-DD` | окно covering plan (+ `week_summary.days`) |
 | `POST /meal-plans/{meal_plan_id}/regenerate` | заменить scope плана после entitlement/quota check |
 | `POST /meal-plan-items/{item_id}/replace` | подобрать допустимую замену одному meal slot |
-| `POST /meal-plan-items/{item_id}/complete` | отметить приготовление/съедение |
+| `POST /meal-plan-items/{item_id}/complete?completed=` | complete → upsert nutrition_log; uncomplete → delete log |
+| `POST /meal-plan-items/{item_id}/skip?skipped=` | skip (без nutrition log) / restore planned |
+
+`replace_reason`: `dislike`, `too_expensive`, `too_long`, `unavailable_ingredients`, `nutrition_balance`, `user_requested`, `more_protein`, `less_calories`, `other`.
+
+`GET /meal-plans/today` добавляет `day_progress` (consumed/target/remaining kcal и макросы, next meal, suggestions). `GET /meal-plans/week` добавляет `week_summary.days[]` со статусом `planned|missing|generating`.
 
 `POST /meal-plans/generate`:
 
@@ -236,6 +241,8 @@ Phase 3 фиксирует контракт этих endpoints. Обязател
 
 | Method / path | Назначение |
 |---|---|
+| `GET /recipes/favorites` | список favorite dish cards |
+| `GET /recipes/search?q=&max_kcal=&min_protein_g=&max_cook_time=&max_cost=` | ILIKE search по ready recipes |
 | `GET /recipes/{recipe_id}` | полная dish card, доступная текущему user по plan/ownership |
 | `POST /recipes/{recipe_id}/favorite` | добавить favorite |
 | `DELETE /recipes/{recipe_id}/favorite` | убрать favorite |
@@ -301,8 +308,18 @@ URL всегда принадлежит FoodAI CDN/Nginx/backend; raw MinIO endp
 | `GET /shopping-lists/current?meal_plan_id=` | current list пользователя |
 | `GET /shopping-lists/{list_id}` | список с items |
 | `POST /shopping-list-items/{item_id}/complete` | отметить куплено/не куплено |
+| `POST /shopping-list-items/clear-completed?list_id=` | удалить completed items из current (или указанного) списка |
 
-`POST /shopping-lists/generate` принимает `meal_plan_id`, optional `from_date`/`to_date`, `exclude_available_products=true`. Server агрегирует одинаковые normalized ingredients и единицы; не вызывает AI.
+`ShoppingListOut` включает `estimated_total_amount`, `currency` (RUB), `stale`, `plan_fingerprint`. Items имеют `category` (`vegetables|meat|dairy|grains|other`). Replace/regenerate meal plan помечает список `stale=true`; generate сбрасывает stale и пересчитывает fingerprint.
+
+## Water
+
+| Method / path | Назначение |
+|---|---|
+| `GET /water/today?date=` | `total_ml`, `goal_ml` (2000), `entries` |
+| `POST /water` | `{amount_ml, recorded_on?}` |
+| `DELETE /water/last` | undo последней записи |
+| `DELETE /water/{id}` | удалить конкретную запись |
 
 ## Progress
 
@@ -310,9 +327,11 @@ URL всегда принадлежит FoodAI CDN/Nginx/backend; raw MinIO endp
 |---|---|
 | `POST /weight-entries` | сохранить факт веса |
 | `GET /weight-entries?from=&to=` | timeline weight |
-| `GET /progress/summary` | goal progress, balance и trend без medical claim |
+| `GET /progress/summary?period=7\|30\|90` | goal progress + optional `series` daily points |
 | `POST /nutrition-logs` | записать подтверждённый nutrition факт, если feature доступен |
 | `GET /nutrition-logs?date=` | дневной nutrition log |
+
+`series[]`: `date`, `consumed_kcal`, `protein_g`, `completed_meals`, `weight_kg` (null если нет). Дни без активности не дополняются нулями.
 
 `POST /weight-entries`:
 

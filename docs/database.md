@@ -15,6 +15,7 @@ erDiagram
     users ||--o{ available_products : has
     users ||--o{ meal_plans : owns
     users ||--o{ weight_entries : records
+    users ||--o{ water_entries : records
     users ||--o{ ai_conversations : owns
     users ||--o{ subscriptions : has
     users ||--o{ refresh_tokens : has
@@ -78,8 +79,9 @@ Phase 2 создаёт первую migration `0001_auth_and_session` c `users` 
 |---|---|---|
 | `meal_plans` | `id uuid PK`; `user_id uuid NOT NULL`; `goal_id uuid NOT NULL`; `start_date date`; `end_date date`; `status varchar(16)`; `calorie_target_kcal integer`; `protein_target_g numeric(8,2)`; `fat_target_g numeric(8,2)`; `carbohydrate_target_g numeric(8,2)`; `nutrition_policy_version varchar(32) NOT NULL default 'v1'`; `generation_request_hash char(64) NULL`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; `goal_id → goals` `RESTRICT`; indexes `(user_id, start_date DESC)`, `(user_id, status, start_date)` and unique `(user_id, generation_request_hash)` where non-null |
 | `meal_plan_items` | `id uuid PK`; `meal_plan_id uuid NOT NULL`; `recipe_id uuid NOT NULL`; `planned_date date`; `meal_type varchar(16)`; `servings numeric(5,2)`; `sort_order smallint`; `status varchar(16)`; `is_completed boolean`; `completed_at timestamptz NULL`; `calories_kcal integer`; `protein_g numeric(8,2)`; `fat_g numeric(8,2)`; `carbohydrate_g numeric(8,2)`; `estimated_cost_amount numeric(12,2)`; `created_at`; `updated_at` | `meal_plan_id → meal_plans` `CASCADE`; `recipe_id → recipes` `RESTRICT`; unique `(meal_plan_id, planned_date, meal_type, sort_order)`; indexes `(meal_plan_id, planned_date)`, `(recipe_id)` |
-| `shopping_lists` | `id uuid PK`; `user_id uuid NOT NULL`; `meal_plan_id uuid NOT NULL`; `from_date date`; `to_date date`; `status varchar(16)`; `generated_at timestamptz`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; `meal_plan_id → meal_plans` `CASCADE`; index `(user_id, updated_at DESC)` |
+| `shopping_lists` | `id uuid PK`; `user_id uuid NOT NULL`; `meal_plan_id uuid NOT NULL`; `from_date date`; `to_date date`; `status varchar(16)`; `stale boolean NOT NULL default false`; `plan_fingerprint varchar(64) NULL`; `generated_at timestamptz`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; `meal_plan_id → meal_plans` `CASCADE`; index `(user_id, updated_at DESC)` |
 | `shopping_list_items` | `id uuid PK`; `shopping_list_id uuid NOT NULL`; `ingredient_id uuid NULL`; `normalized_name varchar(255)`; `display_name varchar(255)`; `quantity_value numeric(10,2)`; `unit varchar(16)`; `is_completed boolean`; `completed_at timestamptz NULL`; `source_recipe_count integer`; `created_at`; `updated_at` | `shopping_list_id → shopping_lists` `CASCADE`; `ingredient_id → ingredients` `SET NULL`; unique `(shopping_list_id, normalized_name, unit)` |
+| `water_entries` | `id uuid PK`; `user_id uuid NOT NULL`; `recorded_on date NOT NULL`; `amount_ml integer NOT NULL`; `created_at`; `updated_at` | `user_id → users` `CASCADE`; index `(user_id, recorded_on DESC)`; check `amount_ml > 0` |
 
 Nutrition fields в `meal_plan_items` — immutable snapshot именно выбранного рецепта/порции на дату. Это делает historical plan воспроизводимым, даже если обновится справочник ingredient prices.
 

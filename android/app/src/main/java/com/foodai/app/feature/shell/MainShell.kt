@@ -21,11 +21,13 @@ import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material.icons.outlined.WaterDrop
@@ -124,7 +126,9 @@ fun MainShell(
         current == "settings" ||
         current == "notifications" ||
         current == "profile-details" ||
-        current == "account"
+        current == "account" ||
+        current == "favorites" ||
+        current == "recipe-search"
 
     Scaffold(
         containerColor = FoodAIColors.Background,
@@ -172,6 +176,15 @@ fun MainShell(
                             restoreState = true
                         }
                     },
+                    onOpenPlan = {
+                        navController.navigate(Routes.Plan) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
                 )
             }
             composable(Routes.Plan) {
@@ -197,6 +210,8 @@ fun MainShell(
                     onOpenSettings = { navController.navigate("settings") },
                     onOpenAccount = { navController.navigate("account") },
                     onOpenNotifications = { navController.navigate("notifications") },
+                    onOpenFavorites = { navController.navigate("favorites") },
+                    onOpenSearch = { navController.navigate("recipe-search") },
                     onEditQuestionnaire = onEditQuestionnaire,
                     onPremium = { navController.navigate("premium") },
                     onLogout = onLogout,
@@ -218,6 +233,22 @@ fun MainShell(
             composable("notifications") {
                 com.foodai.app.feature.profile.NotificationsRoute(
                     onBack = { navController.popBackStack() },
+                )
+            }
+            composable("favorites") {
+                com.foodai.app.feature.recipe.FavoritesRoute(
+                    onBack = { navController.popBackStack() },
+                    onOpenRecipe = { recipeId ->
+                        navController.navigate("recipe/$recipeId")
+                    },
+                )
+            }
+            composable("recipe-search") {
+                com.foodai.app.feature.recipe.RecipeSearchRoute(
+                    onBack = { navController.popBackStack() },
+                    onOpenRecipe = { recipeId ->
+                        navController.navigate("recipe/$recipeId")
+                    },
                 )
             }
             composable("profile-details") {
@@ -290,6 +321,8 @@ private fun ProfileHomeRoute(
     onOpenSettings: () -> Unit,
     onOpenAccount: () -> Unit = {},
     onOpenNotifications: () -> Unit,
+    onOpenFavorites: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
     onEditQuestionnaire: () -> Unit,
     onPremium: () -> Unit,
     onLogout: () -> Unit,
@@ -486,6 +519,18 @@ private fun ProfileHomeRoute(
             "Напоминания, советы, мотивация",
             Icons.Outlined.Notifications,
             onOpenNotifications,
+        )
+        ProfileMenuItem(
+            "Избранное",
+            "Сохранённые рецепты",
+            Icons.Outlined.Favorite,
+            onOpenFavorites,
+        )
+        ProfileMenuItem(
+            "Поиск рецептов",
+            "Найти блюдо по названию",
+            Icons.Outlined.Search,
+            onOpenSearch,
         )
         ProfileMenuItem(
             "Выйти из аккаунта",

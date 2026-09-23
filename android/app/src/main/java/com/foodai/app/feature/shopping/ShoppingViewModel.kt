@@ -119,6 +119,18 @@ class ShoppingViewModel @Inject constructor(
         }
     }
 
+    fun clearCompleted() {
+        val listId = _state.value.list?.id ?: return
+        viewModelScope.launch {
+            try {
+                val list = shopping.clearCompleted(listId)
+                _state.value = _state.value.copy(list = list, actionError = null)
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(actionError = error.toUiMessage())
+            }
+        }
+    }
+
     fun toggleItem(item: ShoppingListItemDto) {
         viewModelScope.launch {
             try {

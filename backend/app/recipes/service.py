@@ -106,6 +106,37 @@ class RecipeService:
         await self._repository.remove_favorite(user_id, recipe_id)
         await self._session.commit()
 
+    async def list_favorites(self, user_id: UUID) -> list[tuple[Recipe, bool]]:
+        recipes = await self._repository.list_favorites(user_id)
+        return [(recipe, True) for recipe in recipes]
+
+    async def search(
+        self,
+        user_id: UUID,
+        *,
+        q: str | None = None,
+        max_kcal: int | None = None,
+        min_protein_g: float | None = None,
+        max_cook_time: int | None = None,
+        max_cost: float | None = None,
+        limit: int = 50,
+    ) -> list[tuple[Recipe, bool]]:
+        recipes = await self._repository.search_ready(
+            q=q,
+            max_kcal=max_kcal,
+            min_protein_g=min_protein_g,
+            max_cook_time=max_cook_time,
+            max_cost=max_cost,
+            limit=limit,
+        )
+        result: list[tuple[Recipe, bool]] = []
+        for recipe in recipes:
+            # Prefer recipes the user can open (favorite or in plan); also allow
+            # catalog search hits so discovery works for ready recipes.
+            is_favorite = await self._repository.is_favorite(user_id, recipe.id)
+            result.append((recipe, is_favorite))
+        return result
+
     async def _readable_recipe(self, recipe_id: UUID) -> Recipe:
         recipe = await self._repository.get_recipe(recipe_id)
         if recipe is None or recipe.status != "ready":

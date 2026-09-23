@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from app.core.schemas import DecimalOut
+
+ShoppingCategory = Literal["vegetables", "meat", "dairy", "grains", "other"]
 
 
 class ShoppingGenerateRequest(BaseModel):
@@ -25,6 +28,8 @@ class ShoppingListItemOut(BaseModel):
     is_completed: bool
     source_recipe_count: int
     ingredient_id: UUID | None = None
+    category: ShoppingCategory = "other"
+    estimated_cost_amount: DecimalOut | None = None
 
 
 class ShoppingListOut(BaseModel):
@@ -35,3 +40,7 @@ class ShoppingListOut(BaseModel):
     status: str
     items: list[ShoppingListItemOut] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    estimated_total_amount: DecimalOut | None = None
+    currency: str = "RUB"
+    stale: bool = False
+    plan_fingerprint: str | None = None

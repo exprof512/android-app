@@ -31,6 +31,9 @@ class ShoppingRepository @Inject constructor(
     suspend fun completeItem(itemId: String, completed: Boolean = true): ShoppingListItemDto =
         wrap { shoppingApi.completeItem(itemId, completed) }
 
+    suspend fun clearCompleted(listId: String? = null): ShoppingListDto =
+        wrap { shoppingApi.clearCompleted(listId) }
+
     private suspend fun <T> wrap(block: suspend () -> T): T =
         try {
             block()

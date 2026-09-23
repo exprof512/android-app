@@ -31,12 +31,17 @@ from app.meal_plans.models import MealPlan, MealPlanItem
 from app.meal_plans.repository import MealPlanRepository
 from app.meal_plans.schemas import (
     DailyTargetsOut,
+    DayProgressOut,
+    MacroProgressOut,
     MealPlanGenerateRequest,
     MealPlanItemOut,
     MealPlanOut,
     MealPlanRecipeSummary,
     MealPlanRegenerateRequest,
+    WeekDayOut,
+    WeekSummaryOut,
 )
+from app.nutrition.diary import NutritionDiaryService
 from app.profiles.service import ProfileService
 from app.entitlements import constants as entitlement_constants
 from app.entitlements.service import EntitlementsService
@@ -47,6 +52,13 @@ from app.recipes.service import RecipeService
 from app.recipes.repository import RecipeRepository
 
 logger = logging.getLogger(__name__)
+
+_MEAL_TYPE_RU = {
+    "breakfast": "завтрак",
+    "lunch": "обед",
+    "dinner": "ужин",
+    "snack": "перекус",
+}
 
 
 def _scale(value: Decimal | int | float, servings: Decimal) -> Decimal:
@@ -271,7 +283,13 @@ class MealPlanService:
         items = await self._repository.list_items_for_dates(
             plan.id, from_date=on_date, to_date=on_date
         )
-        return await self._to_out(plan, warnings=[], items_override=items)
+        return await self._to_out(
+            plan,
+            warnings=[],
+            items_override=items,
+            day_progress_date=on_date,
+            include_week_summary=False,
+        )
 
     async def week(self, user_id: UUID, start_date: date) -> MealPlanOut:
         plan = await self._repository.find_covering(user_id, on_date=start_date)
@@ -283,7 +301,12 @@ class MealPlanService:
         items = await self._repository.list_items_for_dates(
             plan.id, from_date=plan.start_date, to_date=plan.end_date
         )
-        return await self._to_out(plan, warnings=[], items_override=items)
+        return await self._to_out(
+            plan,
+            warnings=[],
+            items_override=items,
+            include_week_summary=True,
+        )
 
     async def regenerate(
         self, user_id: UUID, plan_id: UUID, payload: MealPlanRegenerateRequest
@@ -304,6 +327,7 @@ class MealPlanService:
             days = 1
         else:
             start = plan.start_date
+        await self._mark_shopping_stale(plan.id)
         plan.status = "archived"
         plan.generation_request_hash = None
         await self._session.flush()
@@ -488,6 +512,7 @@ class MealPlanService:
         item.fat_g = _scale(recipe.fat_g, item.servings)
         item.carbohydrate_g = _scale(recipe.carbohydrate_g, item.servings)
         item.estimated_cost_amount = _scale(recipe.estimated_cost_amount, item.servings)
+        await self._mark_shopping_stale(plan.id)
         await self._session.commit()
         await self._session.refresh(item)
         if self._images is not None:
@@ -571,14 +596,67 @@ class MealPlanService:
             raise MealPlanNotFound()
         if plan.user_id != user_id:
             raise OwnershipDenied()
-        item.is_completed = completed
-        item.completed_at = utcnow() if completed else None
-        item.status = "completed" if completed else "planned"
+        diary = NutritionDiaryService(self._session)
+        if completed:
+            item.is_completed = True
+            item.completed_at = utcnow()
+            item.status = "completed"
+            await diary.upsert_from_meal_plan_item(user_id, item, commit=False)
+        else:
+            item.is_completed = False
+            item.completed_at = None
+            item.status = "planned"
+            await diary.delete_by_meal_plan_item(user_id, item.id, commit=False)
         await self._session.commit()
         await self._session.refresh(item)
         recipe = item.recipe or await self._session.get(Recipe, item.recipe_id)
         assert recipe is not None
         return self._item_out(item, recipe)
+
+    async def skip_item(
+        self, user_id: UUID, item_id: UUID, *, skipped: bool = True
+    ) -> MealPlanItemOut:
+        item = await self._repository.get_item(item_id)
+        if item is None:
+            raise MealPlanItemNotFound()
+        plan = await self._repository.get_plan(item.meal_plan_id)
+        if plan is None:
+            raise MealPlanNotFound()
+        if plan.user_id != user_id:
+            raise OwnershipDenied()
+        diary = NutritionDiaryService(self._session)
+        if skipped:
+            item.is_completed = False
+            item.completed_at = None
+            item.status = "skipped"
+            await diary.delete_by_meal_plan_item(user_id, item.id, commit=False)
+        else:
+            item.is_completed = False
+            item.completed_at = None
+            item.status = "planned"
+        await self._session.commit()
+        await self._session.refresh(item)
+        recipe = item.recipe or await self._session.get(Recipe, item.recipe_id)
+        assert recipe is not None
+        return self._item_out(item, recipe)
+
+    async def _mark_shopping_stale(self, meal_plan_id: UUID) -> None:
+        from sqlalchemy import select
+
+        from app.shopping.models import ShoppingList
+
+        rows = list(
+            (
+                await self._session.execute(
+                    select(ShoppingList).where(
+                        ShoppingList.meal_plan_id == meal_plan_id,
+                        ShoppingList.status == "ready",
+                    )
+                )
+            ).scalars()
+        )
+        for row in rows:
+            row.stale = True
 
     def _build_item(self, slot: PlannedSlot) -> MealPlanItem:
         return MealPlanItem(
@@ -790,6 +868,8 @@ class MealPlanService:
         warnings: list[str],
         reused: bool = False,
         items_override: list[MealPlanItem] | None = None,
+        day_progress_date: date | None = None,
+        include_week_summary: bool = False,
     ) -> MealPlanOut:
         items = items_override if items_override is not None else list(plan.items)
         out_items: list[MealPlanItemOut] = []
@@ -816,6 +896,26 @@ class MealPlanService:
                         "retry_allowed": peeked.retry_allowed,
                     }
             out_items.append(self._item_out(item, recipe, image_payload))
+
+        day_progress: DayProgressOut | None = None
+        if day_progress_date is not None:
+            day_progress = await self._build_day_progress(
+                plan, items, on_date=day_progress_date
+            )
+
+        week_summary: WeekSummaryOut | None = None
+        if include_week_summary:
+            all_items = items_override if items_override is not None else list(plan.items)
+            if items_override is not None and (
+                not all_items
+                or min(i.planned_date for i in all_items) > plan.start_date
+                or max(i.planned_date for i in all_items) < plan.end_date
+            ):
+                all_items = await self._repository.list_items_for_dates(
+                    plan.id, from_date=plan.start_date, to_date=plan.end_date
+                )
+            week_summary = self._build_week_summary(plan, all_items)
+
         return MealPlanOut(
             id=plan.id,
             start_date=plan.start_date,
@@ -830,7 +930,183 @@ class MealPlanService:
             items=out_items,
             warnings=warnings,
             reused=reused,
+            day_progress=day_progress,
+            week_summary=week_summary,
         )
+
+    async def _build_day_progress(
+        self,
+        plan: MealPlan,
+        items: list[MealPlanItem],
+        *,
+        on_date: date,
+    ) -> DayProgressOut:
+        day_items = [i for i in items if i.planned_date == on_date]
+        completed = [i for i in day_items if i.status == "completed" or i.is_completed]
+        skipped = [i for i in day_items if i.status == "skipped"]
+        planned_meals = len(day_items)
+
+        consumed_kcal = sum(i.calories_kcal for i in completed)
+        consumed_protein = sum((i.protein_g for i in completed), Decimal("0"))
+        consumed_fat = sum((i.fat_g for i in completed), Decimal("0"))
+        consumed_carbs = sum((i.carbohydrate_g for i in completed), Decimal("0"))
+
+        completed_ids = {i.id for i in completed}
+        from app.nutrition.models import NutritionLog
+        from sqlalchemy import select
+
+        logs = list(
+            (
+                await self._session.execute(
+                    select(NutritionLog).where(
+                        NutritionLog.user_id == plan.user_id,
+                        NutritionLog.logged_on == on_date,
+                    )
+                )
+            ).scalars()
+        )
+        for log in logs:
+            if (
+                log.meal_plan_item_id is not None
+                and log.meal_plan_item_id in completed_ids
+            ):
+                continue
+            consumed_kcal += log.calories_kcal
+            consumed_protein += log.protein_g
+            consumed_fat += log.fat_g
+            consumed_carbs += log.carbohydrate_g
+
+        target_kcal = plan.calorie_target_kcal
+        target_protein = Decimal(str(plan.protein_target_g))
+        target_fat = Decimal(str(plan.fat_target_g))
+        target_carbs = Decimal(str(plan.carbohydrate_target_g))
+
+        remaining_kcal = max(0, target_kcal - int(consumed_kcal))
+        remaining_protein = max(Decimal("0"), target_protein - consumed_protein)
+        remaining_fat = max(Decimal("0"), target_fat - consumed_fat)
+        remaining_carbs = max(Decimal("0"), target_carbs - consumed_carbs)
+
+        next_item = next(
+            (
+                i
+                for i in sorted(day_items, key=lambda x: x.sort_order)
+                if i.status not in {"completed", "skipped"} and not i.is_completed
+            ),
+            None,
+        )
+
+        daily_cost = sum(
+            (i.estimated_cost_amount for i in day_items), Decimal("0")
+        ).quantize(Decimal("0.01"))
+
+        suggestions = self._build_suggestions(
+            day_items=day_items,
+            next_item=next_item,
+            remaining_protein=remaining_protein,
+            target_protein=target_protein,
+        )
+
+        return DayProgressOut(
+            consumed_kcal=int(consumed_kcal),
+            target_kcal=target_kcal,
+            remaining_kcal=remaining_kcal,
+            protein=MacroProgressOut(
+                consumed_g=consumed_protein.quantize(Decimal("0.01")),
+                target_g=target_protein.quantize(Decimal("0.01")),
+                remaining_g=remaining_protein.quantize(Decimal("0.01")),
+            ),
+            fat=MacroProgressOut(
+                consumed_g=consumed_fat.quantize(Decimal("0.01")),
+                target_g=target_fat.quantize(Decimal("0.01")),
+                remaining_g=remaining_fat.quantize(Decimal("0.01")),
+            ),
+            carbs=MacroProgressOut(
+                consumed_g=consumed_carbs.quantize(Decimal("0.01")),
+                target_g=target_carbs.quantize(Decimal("0.01")),
+                remaining_g=remaining_carbs.quantize(Decimal("0.01")),
+            ),
+            completed_meals=len(completed),
+            planned_meals=planned_meals,
+            skipped_meals=len(skipped),
+            next_meal_item_id=next_item.id if next_item else None,
+            next_meal_type=next_item.meal_type if next_item else None,
+            suggestions=suggestions,
+            daily_estimated_cost_amount=daily_cost if day_items else None,
+        )
+
+    @staticmethod
+    def _build_suggestions(
+        *,
+        day_items: list[MealPlanItem],
+        next_item: MealPlanItem | None,
+        remaining_protein: Decimal,
+        target_protein: Decimal,
+    ) -> list[str]:
+        suggestions: list[str] = []
+        if not day_items:
+            suggestions.append("На сегодня блюд в плане нет")
+            return suggestions
+
+        completed_or_skipped = all(
+            i.status in {"completed", "skipped"} or i.is_completed for i in day_items
+        )
+        if completed_or_skipped and next_item is None:
+            suggestions.append("Все блюда на сегодня выполнены")
+            return suggestions
+
+        if next_item is not None:
+            label = _MEAL_TYPE_RU.get(next_item.meal_type, next_item.meal_type)
+            suggestions.append(f"Следующий приём — {label}")
+
+        # Remaining protein still high relative to target → nudge.
+        if target_protein > 0 and remaining_protein >= target_protein * Decimal("0.25"):
+            suggestions.append(
+                f"До цели по белку осталось {remaining_protein.quantize(Decimal('1'))} г"
+            )
+        elif remaining_protein <= Decimal("10") and remaining_protein > 0:
+            suggestions.append("Белок почти по цели")
+
+        return suggestions
+
+    @staticmethod
+    def _build_week_summary(
+        plan: MealPlan, items: list[MealPlanItem]
+    ) -> WeekSummaryOut:
+        by_date: dict[date, list[MealPlanItem]] = {}
+        for item in items:
+            by_date.setdefault(item.planned_date, []).append(item)
+
+        days: list[WeekDayOut] = []
+        cursor = plan.start_date
+        while cursor <= plan.end_date:
+            day_items = by_date.get(cursor, [])
+            if plan.status == "draft":
+                status: str = "generating"
+            elif not day_items:
+                status = "missing"
+            else:
+                status = "planned"
+            completed = sum(
+                1 for i in day_items if i.status == "completed" or i.is_completed
+            )
+            calories = sum(i.calories_kcal for i in day_items)
+            protein = sum((i.protein_g for i in day_items), Decimal("0"))
+            cost = sum((i.estimated_cost_amount for i in day_items), Decimal("0"))
+            days.append(
+                WeekDayOut(
+                    date=cursor,
+                    status=status,  # type: ignore[arg-type]
+                    calories_kcal=calories,
+                    protein_g=protein.quantize(Decimal("0.01")),
+                    completed_meals=completed,
+                    planned_meals=len(day_items),
+                    estimated_cost_amount=cost.quantize(Decimal("0.01"))
+                    if day_items
+                    else None,
+                )
+            )
+            cursor = cursor + timedelta(days=1)
+        return WeekSummaryOut(days=days)
 
     @staticmethod
     def _item_out(

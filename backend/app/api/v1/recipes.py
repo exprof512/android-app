@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.auth.dependencies import CurrentUser
 from app.recipes.dependencies import get_recipe_service
@@ -51,6 +51,36 @@ def _dish_card(recipe: Recipe, *, is_favorite: bool) -> DishCardResponse:
         steps=list(recipe.steps),
         is_favorite=is_favorite,
     )
+
+
+@router.get("/favorites", response_model=list[DishCardResponse])
+async def list_favorite_recipes(
+    current_user: CurrentUser,
+    recipe_service: RecipeService = Depends(get_recipe_service),
+) -> list[DishCardResponse]:
+    rows = await recipe_service.list_favorites(current_user.id)
+    return [_dish_card(recipe, is_favorite=fav) for recipe, fav in rows]
+
+
+@router.get("/search", response_model=list[DishCardResponse])
+async def search_recipes(
+    current_user: CurrentUser,
+    q: str | None = Query(default=None),
+    max_kcal: int | None = Query(default=None, ge=1),
+    min_protein_g: float | None = Query(default=None, ge=0),
+    max_cook_time: int | None = Query(default=None, ge=1),
+    max_cost: float | None = Query(default=None, ge=0),
+    recipe_service: RecipeService = Depends(get_recipe_service),
+) -> list[DishCardResponse]:
+    rows = await recipe_service.search(
+        current_user.id,
+        q=q,
+        max_kcal=max_kcal,
+        min_protein_g=min_protein_g,
+        max_cook_time=max_cook_time,
+        max_cost=max_cost,
+    )
+    return [_dish_card(recipe, is_favorite=fav) for recipe, fav in rows]
 
 
 @router.get("/{recipe_id}", response_model=DishCardResponse)

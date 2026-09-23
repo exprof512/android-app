@@ -29,6 +29,7 @@ from app.recipes.models import (
     UserRecipeFavorite,
 )
 from app.shopping.models import ShoppingList, ShoppingListItem
+from app.water.models import WaterEntry
 
 __all__ = [
     "AiConversation",
@@ -58,5 +59,6 @@ __all__ = [
     "User",
     "UserProfile",
     "UserRecipeFavorite",
+    "WaterEntry",
     "WeightEntry",
 ]

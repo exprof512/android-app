@@ -78,6 +78,45 @@ class RecipeRepository:
         )
         await self._session.flush()
 
+    async def list_favorites(self, user_id: UUID) -> list[Recipe]:
+        statement = (
+            select(Recipe)
+            .join(
+                UserRecipeFavorite,
+                UserRecipeFavorite.recipe_id == Recipe.id,
+            )
+            .where(
+                UserRecipeFavorite.user_id == user_id,
+                Recipe.status == "ready",
+            )
+            .order_by(UserRecipeFavorite.created_at.desc())
+        )
+        return list((await self._session.execute(statement)).scalars())
+
+    async def search_ready(
+        self,
+        *,
+        q: str | None = None,
+        max_kcal: int | None = None,
+        min_protein_g: float | None = None,
+        max_cook_time: int | None = None,
+        max_cost: float | None = None,
+        limit: int = 50,
+    ) -> list[Recipe]:
+        statement = select(Recipe).where(Recipe.status == "ready")
+        if q:
+            statement = statement.where(Recipe.name.ilike(f"%{q.strip()}%"))
+        if max_kcal is not None:
+            statement = statement.where(Recipe.calories_kcal <= max_kcal)
+        if min_protein_g is not None:
+            statement = statement.where(Recipe.protein_g >= min_protein_g)
+        if max_cook_time is not None:
+            statement = statement.where(Recipe.cook_time_minutes <= max_cook_time)
+        if max_cost is not None:
+            statement = statement.where(Recipe.estimated_cost_amount <= max_cost)
+        statement = statement.order_by(Recipe.name.asc()).limit(limit)
+        return list((await self._session.execute(statement)).scalars())
+
     async def user_has_recipe_in_plans(self, user_id: UUID, recipe_id: UUID) -> bool:
         from app.meal_plans.models import MealPlan, MealPlanItem
 

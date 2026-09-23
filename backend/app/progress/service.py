@@ -16,6 +16,7 @@ from app.progress.models import WeightEntry
 from app.progress.repository import ProgressRepository
 from app.progress.schemas import (
     DailyNutritionBalanceOut,
+    ProgressSeriesPointOut,
     ProgressSummaryOut,
     WeightEntryCreate,
     WeightEntryOut,
@@ -64,7 +65,11 @@ class ProgressService:
         return [self._entry_out(row) for row in rows]
 
     async def summary(
-        self, user_id: UUID, *, on_date: date | None = None
+        self,
+        user_id: UUID,
+        *,
+        on_date: date | None = None,
+        period: int | None = None,
     ) -> ProgressSummaryOut:
         today = on_date or date.today()
         warnings: list[str] = []
@@ -114,6 +119,13 @@ class ProgressService:
         if latest is None and current is None:
             warnings.append("Добавьте первую запись веса, чтобы увидеть динамику.")
 
+        series: list[ProgressSeriesPointOut] = []
+        period_days = period if period in {7, 30, 90} else None
+        if period_days is not None:
+            series = await self._build_series(
+                user_id, end_date=today, days=period_days, goal=goal
+            )
+
         return ProgressSummaryOut(
             current_weight_kg=current,
             start_weight_kg=start,
@@ -125,8 +137,49 @@ class ProgressService:
             calorie_target_kcal=goal.calorie_target_kcal if goal else None,
             today=today_balance,
             recent_entries=[self._entry_out(row) for row in recent],
+            series=series,
+            period_days=period_days,
             warnings=warnings,
         )
+
+    async def _build_series(
+        self,
+        user_id: UUID,
+        *,
+        end_date: date,
+        days: int,
+        goal: Goal | None,
+    ) -> list[ProgressSeriesPointOut]:
+        start_date = end_date - timedelta(days=days - 1)
+        entries = await self._repository.list_entries(user_id, limit=500)
+        weight_by_day: dict[date, Decimal] = {}
+        for entry in entries:
+            measured = as_utc(entry.measured_at).date()
+            if start_date <= measured <= end_date and measured not in weight_by_day:
+                weight_by_day[measured] = Decimal(str(entry.weight_kg))
+
+        points: list[ProgressSeriesPointOut] = []
+        cursor = start_date
+        while cursor <= end_date:
+            balance = await self._daily_balance(user_id, cursor, goal)
+            weight = weight_by_day.get(cursor)
+            has_activity = (
+                balance.consumed_calories_kcal > 0 or balance.completed_meals > 0
+            )
+            if not has_activity and weight is None:
+                cursor = cursor + timedelta(days=1)
+                continue
+            points.append(
+                ProgressSeriesPointOut(
+                    date=cursor,
+                    consumed_kcal=balance.consumed_calories_kcal,
+                    protein_g=balance.protein_g,
+                    completed_meals=balance.completed_meals,
+                    weight_kg=weight,
+                )
+            )
+            cursor = cursor + timedelta(days=1)
+        return points
 
     async def _daily_balance(
         self, user_id: UUID, on_date: date, goal: Goal | None

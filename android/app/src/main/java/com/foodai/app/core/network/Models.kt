@@ -389,6 +389,46 @@ data class MealPlanItemDto(
 )
 
 @Serializable
+data class MacroProgressDto(
+    @SerialName("consumed_g") val consumedG: Double = 0.0,
+    @SerialName("target_g") val targetG: Double = 0.0,
+    @SerialName("remaining_g") val remainingG: Double = 0.0,
+)
+
+@Serializable
+data class DayProgressDto(
+    @SerialName("consumed_kcal") val consumedKcal: Int = 0,
+    @SerialName("target_kcal") val targetKcal: Int = 0,
+    @SerialName("remaining_kcal") val remainingKcal: Int = 0,
+    val protein: MacroProgressDto = MacroProgressDto(),
+    val fat: MacroProgressDto = MacroProgressDto(),
+    val carbs: MacroProgressDto = MacroProgressDto(),
+    @SerialName("completed_meals") val completedMeals: Int = 0,
+    @SerialName("planned_meals") val plannedMeals: Int = 0,
+    @SerialName("skipped_meals") val skippedMeals: Int = 0,
+    @SerialName("next_meal_item_id") val nextMealItemId: String? = null,
+    @SerialName("next_meal_type") val nextMealType: String? = null,
+    val suggestions: List<String> = emptyList(),
+    @SerialName("daily_estimated_cost_amount") val dailyEstimatedCostAmount: Double? = null,
+)
+
+@Serializable
+data class WeekDayDto(
+    val date: String,
+    val status: String = "missing",
+    @SerialName("calories_kcal") val caloriesKcal: Int = 0,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("completed_meals") val completedMeals: Int = 0,
+    @SerialName("planned_meals") val plannedMeals: Int = 0,
+    @SerialName("estimated_cost_amount") val estimatedCostAmount: Double? = null,
+)
+
+@Serializable
+data class WeekSummaryDto(
+    val days: List<WeekDayDto> = emptyList(),
+)
+
+@Serializable
 data class MealPlanDto(
     val id: String,
     @SerialName("start_date") val startDate: String,
@@ -398,6 +438,13 @@ data class MealPlanDto(
     val items: List<MealPlanItemDto> = emptyList(),
     val warnings: List<String> = emptyList(),
     val reused: Boolean = false,
+    @SerialName("day_progress") val dayProgress: DayProgressDto? = null,
+    @SerialName("week_summary") val weekSummary: WeekSummaryDto? = null,
+)
+
+@Serializable
+data class MealPlanReplaceRequest(
+    @SerialName("replace_reason") val replaceReason: String = "user_requested",
 )
 
 /** @deprecated alias kept for generateFirstPlan return type clarity */
@@ -458,6 +505,9 @@ data class ShoppingListItemDto(
     val unit: String,
     @SerialName("is_completed") val isCompleted: Boolean = false,
     @SerialName("source_recipe_count") val sourceRecipeCount: Int = 1,
+    @SerialName("ingredient_id") val ingredientId: String? = null,
+    val category: String = "other",
+    @SerialName("estimated_cost_amount") val estimatedCostAmount: Double? = null,
 )
 
 @Serializable
@@ -469,6 +519,10 @@ data class ShoppingListDto(
     val status: String,
     val items: List<ShoppingListItemDto> = emptyList(),
     val warnings: List<String> = emptyList(),
+    @SerialName("estimated_total_amount") val estimatedTotalAmount: Double? = null,
+    val currency: String = "RUB",
+    val stale: Boolean = false,
+    @SerialName("plan_fingerprint") val planFingerprint: String? = null,
 )
 
 @Serializable
@@ -500,6 +554,15 @@ data class DailyNutritionBalanceDto(
 )
 
 @Serializable
+data class ProgressSeriesPointDto(
+    val date: String,
+    @SerialName("consumed_kcal") val consumedKcal: Int = 0,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("completed_meals") val completedMeals: Int = 0,
+    @SerialName("weight_kg") val weightKg: Double? = null,
+)
+
+@Serializable
 data class ProgressSummaryDto(
     @SerialName("current_weight_kg") val currentWeightKg: Double? = null,
     @SerialName("start_weight_kg") val startWeightKg: Double? = null,
@@ -511,8 +574,32 @@ data class ProgressSummaryDto(
     @SerialName("calorie_target_kcal") val calorieTargetKcal: Int? = null,
     val today: DailyNutritionBalanceDto? = null,
     @SerialName("recent_entries") val recentEntries: List<WeightEntryDto> = emptyList(),
+    val series: List<ProgressSeriesPointDto> = emptyList(),
+    @SerialName("period_days") val periodDays: Int? = null,
     val disclaimer: String = "",
     val warnings: List<String> = emptyList(),
+)
+
+@Serializable
+data class WaterEntryCreateRequest(
+    @SerialName("amount_ml") val amountMl: Int,
+    @SerialName("recorded_on") val recordedOn: String? = null,
+)
+
+@Serializable
+data class WaterEntryDto(
+    val id: String,
+    @SerialName("recorded_on") val recordedOn: String,
+    @SerialName("amount_ml") val amountMl: Int,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class WaterTodayDto(
+    val date: String,
+    @SerialName("total_ml") val totalMl: Int = 0,
+    @SerialName("goal_ml") val goalMl: Int = 2000,
+    val entries: List<WaterEntryDto> = emptyList(),
 )
 
 @Serializable

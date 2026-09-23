@@ -199,12 +199,47 @@ private fun SettingsToggleRow(
 @Composable
 fun NotificationsRoute(onBack: () -> Unit) {
     val context = LocalContext.current
-    val prefs = remember {
-        context.getSharedPreferences("foodai_notifications", android.content.Context.MODE_PRIVATE)
+    val analytics = remember {
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            AnalyticsEntryPoint::class.java,
+        ).analyticsTracker()
     }
-    var meals by remember { mutableStateOf(prefs.getBoolean("meals", true)) }
-    var water by remember { mutableStateOf(prefs.getBoolean("water", true)) }
-    var tips by remember { mutableStateOf(prefs.getBoolean("tips", false)) }
+    val scheduler = remember {
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            NotificationEntryPoint::class.java,
+        ).notificationScheduler()
+    }
+    val prefsStore = remember {
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            NotificationEntryPoint::class.java,
+        ).notificationPreferences()
+    }
+    var prefs by remember { mutableStateOf(prefsStore.load()) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            prefs = prefs.copy(masterEnabled = true)
+            prefsStore.save(prefs)
+            scheduler.reschedule()
+            analytics.track("notification_enabled")
+        }
+    }
+
+    fun apply(next: com.foodai.app.core.notifications.NotificationPrefs) {
+        val was = prefs.masterEnabled
+        prefs = next
+        prefsStore.save(next)
+        scheduler.reschedule()
+        if (next.masterEnabled && !was) {
+            analytics.track("notification_enabled")
+        } else if (!next.masterEnabled && was) {
+            analytics.track("notification_disabled")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -226,21 +261,47 @@ fun NotificationsRoute(onBack: () -> Unit) {
                 .padding(FoodAIDimens.ScreenPadding),
             verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12),
         ) {
-            NotifToggle("Приёмы пищи", "Напоминания о завтраке, обеде и ужине", meals) {
-                meals = it
-                prefs.edit().putBoolean("meals", it).apply()
+            NotifToggle(
+                "Все напоминания",
+                "Локальные уведомления о еде, воде и весе",
+                prefs.masterEnabled,
+            ) { enabled ->
+                if (enabled && android.os.Build.VERSION.SDK_INT >= 33) {
+                    permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    apply(prefs.copy(masterEnabled = enabled))
+                }
             }
-            NotifToggle("Вода", "Напоминания выпить воды", water) {
-                water = it
-                prefs.edit().putBoolean("water", it).apply()
+            NotifToggle("Приёмы пищи", "Завтрак, обед и ужин", prefs.meals) {
+                apply(prefs.copy(meals = it))
             }
-            NotifToggle("Мотивация", "Советы и прогресс за день", tips) {
-                tips = it
-                prefs.edit().putBoolean("tips", it).apply()
+            NotifToggle("Вода", "Напоминания выпить воды", prefs.water) {
+                apply(prefs.copy(water = it))
             }
-            FoodAIInfoCard(text = "Пуши появятся в следующем релизе. Сейчас настройки сохраняются локально.")
+            NotifToggle("Вес", "Утренний check-in веса", prefs.weight) {
+                apply(prefs.copy(weight = it))
+            }
+            NotifToggle("Недельный итог", "Воскресенье — итоги недели", prefs.weekly) {
+                apply(prefs.copy(weekly = it))
+            }
+            FoodAIInfoCard(
+                text = "Напоминания работают локально на устройстве. Их можно отключить в любой момент.",
+            )
         }
     }
+}
+
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface NotificationEntryPoint {
+    fun notificationScheduler(): com.foodai.app.core.notifications.NotificationScheduler
+    fun notificationPreferences(): com.foodai.app.core.notifications.NotificationPreferences
+}
+
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface AnalyticsEntryPoint {
+    fun analyticsTracker(): com.foodai.app.core.analytics.AnalyticsTracker
 }
 
 @Composable

@@ -60,6 +60,7 @@ fun ShoppingRoute(
             state = state,
             onRefresh = viewModel::refresh,
             onRegenerate = viewModel::regenerate,
+            onClearCompleted = viewModel::clearCompleted,
             onToggleExclude = viewModel::setExcludePantry,
             onToggleItem = viewModel::toggleItem,
             onBack = onBack,
@@ -72,12 +73,15 @@ fun ShoppingScreen(
     state: ShoppingUiState,
     onRefresh: () -> Unit,
     onRegenerate: () -> Unit,
+    onClearCompleted: () -> Unit,
     onToggleExclude: (Boolean) -> Unit,
     onToggleItem: (ShoppingListItemDto) -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
     val list = state.list
-    val grouped = list?.items.orEmpty().groupBy { categoryFor(it.displayName) }
+    val grouped = list?.items.orEmpty()
+        .groupBy { categoryLabel(it.category, it.displayName) }
+        .toSortedMap()
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -111,6 +115,37 @@ fun ShoppingScreen(
                     "${list.fromDate} — ${list.toDate}",
                     style = FoodAITypography.bodySmall,
                 )
+                list.estimatedTotalAmount?.let { total ->
+                    Text(
+                        "Ориентировочно: ${"%.0f".format(total)} ${currencySymbol(list.currency)}",
+                        style = FoodAITypography.titleMedium,
+                    )
+                }
+            }
+            if (list?.stale == true) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(FoodAIShapes.Card)
+                        .background(FoodAIColors.Warning.copy(alpha = 0.15f))
+                        .padding(FoodAIDimens.Space12),
+                ) {
+                    Text(
+                        "Список покупок изменился",
+                        style = FoodAITypography.titleSmall,
+                        color = FoodAIColors.Warning,
+                    )
+                    Text(
+                        "План обновился — пересоберите список, чтобы синхронизировать ингредиенты.",
+                        style = FoodAITypography.bodySmall,
+                    )
+                    TextButton(onClick = onRegenerate, enabled = !state.regenerating) {
+                        Text(
+                            if (state.regenerating) "Собираем…" else "Пересобрать",
+                            color = FoodAIColors.Primary,
+                        )
+                    }
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -141,6 +176,12 @@ fun ShoppingScreen(
                         if (state.regenerating) "Собираем…" else "Пересобрать список",
                         color = FoodAIColors.Primary,
                     )
+                }
+                TextButton(
+                    onClick = onClearCompleted,
+                    enabled = list?.items?.any { it.isCompleted } == true,
+                ) {
+                    Text("Очистить купленное", color = FoodAIColors.TextSecondary)
                 }
                 IconButton(onClick = onRefresh) {
                     Icon(
@@ -227,7 +268,26 @@ private fun ShoppingRow(
 private fun formatQty(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
 
-private fun categoryFor(name: String): String {
+private fun currencySymbol(code: String): String = when (code.uppercase()) {
+    "RUB", "RUR" -> "₽"
+    "USD" -> "$"
+    "EUR" -> "€"
+    else -> code
+}
+
+private fun categoryLabel(apiCategory: String?, displayName: String): String {
+    return when (apiCategory?.lowercase()) {
+        "vegetables" -> "Овощи и фрукты"
+        "meat" -> "Мясо и рыба"
+        "dairy" -> "Молочные продукты"
+        "grains" -> "Крупы"
+        "other" -> heuristicCategory(displayName)
+        null, "" -> heuristicCategory(displayName)
+        else -> heuristicCategory(displayName)
+    }
+}
+
+private fun heuristicCategory(name: String): String {
     val n = name.lowercase()
     return when {
         listOf("помидор", "огурец", "перец", "лук", "чеснок", "морков", "яблок", "банан", "ягод", "салат", "броккол", "капуст", "авокад", "фрукт", "овощ").any { n.contains(it) } ->
