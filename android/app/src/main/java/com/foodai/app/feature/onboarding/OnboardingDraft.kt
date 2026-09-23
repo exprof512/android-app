@@ -25,8 +25,9 @@ enum class OnboardingStep(val index: Int, val title: String, val subtitle: Strin
     }
 }
 
-/** Matches NutritionEngine DEFAULT_MAX_WEEKLY_WEIGHT_CHANGE_KG. */
-const val MAX_SAFE_WEEKLY_CHANGE_KG = 1.0
+/** Matches NutritionEngine / DB weekly change ceiling. */
+const val MAX_SAFE_WEEKLY_CHANGE_KG = 2.0
+const val MIN_WEEKLY_CHANGE_KG = 0.2
 
 @Serializable
 data class OnboardingDraft(

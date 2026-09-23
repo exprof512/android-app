@@ -169,7 +169,10 @@ fun TodayScreen(
 ) {
     val plan = state.plan
     val progress = plan?.dayProgress
-    val todayItems = plan?.items.orEmpty().sortedBy { it.sortOrder }
+    val selectedDay = state.selectedDate.take(10)
+    val todayItems = plan?.items.orEmpty()
+        .filter { it.date.take(10) == selectedDay }
+        .sortedBy { it.sortOrder }
     val nextMeal = progress?.nextMealItemId?.let { id -> todayItems.firstOrNull { it.id == id } }
         ?: todayItems.firstOrNull { it.status == "planned" && !it.isCompleted }
     val metrics = state.metrics
@@ -863,9 +866,12 @@ fun WeekScreen(
             plan?.items.orEmpty().map { it.date }.distinct().sorted()
         }
     }
-    val dayByDate = summaryDays.associateBy { it.date }
-    val dayItems = plan?.items.orEmpty().filter { it.date == state.selectedDate }
-    val selectedSummary = dayByDate[state.selectedDate]
+    val selectedDay = state.selectedDate.take(10)
+    val dayByDate = summaryDays.associateBy { it.date.take(10) }
+    val dayItems = plan?.items.orEmpty()
+        .filter { it.date.take(10) == selectedDay }
+        .sortedBy { it.sortOrder }
+    val selectedSummary = dayByDate[selectedDay]
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -912,20 +918,21 @@ fun WeekScreen(
         }
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
-                items(dates) { date ->
-                    val selected = date == state.selectedDate
-                    val day = dayByDate[date]
+                items(dates, key = { it }) { date ->
+                    val dayKey = date.take(10)
+                    val selected = dayKey == selectedDay
+                    val day = dayByDate[dayKey]
                     val dayLabel = runCatching {
-                        val d = LocalDate.parse(date)
+                        val d = LocalDate.parse(dayKey)
                         val dow = d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale("ru"))
                         "$dow ${d.dayOfMonth}.${d.monthValue.toString().padStart(2, '0')}"
-                    }.getOrDefault(date.takeLast(5))
-                    val status = day?.status ?: state.dayStatuses[date] ?: "missing"
+                    }.getOrDefault(dayKey.takeLast(5))
+                    val status = day?.status ?: state.dayStatuses[date] ?: state.dayStatuses[dayKey] ?: "missing"
                     Box(
                         modifier = Modifier
                             .clip(FoodAIShapes.Pill)
                             .background(if (selected) FoodAIColors.Primary else FoodAIColors.SurfaceMuted)
-                            .clickable { onSelectDate(date) }
+                            .clickable { onSelectDate(dayKey) }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {

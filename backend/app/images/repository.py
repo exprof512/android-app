@@ -50,6 +50,30 @@ class ImageRepository:
         )
         return (await self._session.execute(statement)).scalar_one_or_none()
 
+    async def find_ready_by_normalized_name(self, normalized_name: str) -> RecipeImage | None:
+        """Reuse photos for the same dish even when grams/fingerprint differ slightly."""
+        if not normalized_name:
+            return None
+        statement = (
+            select(RecipeImage)
+            .join(Recipe, Recipe.id == RecipeImage.recipe_id)
+            .where(
+                RecipeImage.generation_status == "ready",
+                RecipeImage.is_primary.is_(True),
+                RecipeImage.storage_key.is_not(None),
+            )
+            .order_by(RecipeImage.created_at.desc())
+            .limit(50)
+        )
+        candidates = list((await self._session.execute(statement)).scalars())
+        from app.recipes.normalization import canonical_key
+
+        for image in candidates:
+            recipe = await self._session.get(Recipe, image.recipe_id)
+            if recipe is not None and canonical_key(recipe.name) == normalized_name:
+                return image
+        return None
+
     async def has_active_job(self, recipe_id: UUID) -> bool:
         statement = select(RecipeImage.id).where(
             RecipeImage.recipe_id == recipe_id,

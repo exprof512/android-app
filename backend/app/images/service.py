@@ -73,10 +73,25 @@ class ImageGenerationService:
                 return self._to_out(active)
             raise ImageGenerationInProgress()
 
-        # Dedup across recipes with the same fingerprint.
+        # Dedup: exact fingerprint first, then same dish name (AI often varies grams).
+        from app.recipes.normalization import canonical_key
+
         existing = await self._repository.find_ready_by_fingerprint(
             recipe.recipe_fingerprint
         )
+        if existing is None:
+            existing = await self._repository.find_ready_by_normalized_name(
+                canonical_key(recipe.name)
+            )
+            if existing is not None:
+                logger.info(
+                    "image_reuse_by_name",
+                    extra={
+                        "recipe_id": str(recipe_id),
+                        "source_image_id": str(existing.id),
+                        "recipe_name": recipe.name,
+                    },
+                )
         hash_value = prompt_hash(
             recipe_fingerprint=recipe.recipe_fingerprint,
             model=self._settings.openai_image_model,

@@ -59,6 +59,7 @@ import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import java.util.Locale
 
 private const val DISCLAIMER =
     "Расчёты приблизительны и не заменяют врача или диетолога."
@@ -339,19 +340,36 @@ private fun GoalDetailsStep(
                 }
             },
         )
-        Text("Скорость изменений", style = FoodAITypography.titleMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
-            listOf(0.3, 0.4, 0.5).forEach { rate ->
-                FoodAISelectableOption(
-                    label = "$rate кг/нед",
-                    selected = kotlin.math.abs(weekly - rate) < 0.05,
-                    onClick = {
-                        onDraftChange { it.copy(desiredWeeklyChangeKg = rate.toString()) }
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        FoodAIStepper(
+            label = "Скорость изменений",
+            value = String.format(Locale.getDefault(), "%.1f", weekly.coerceIn(MIN_WEEKLY_CHANGE_KG, MAX_SAFE_WEEKLY_CHANGE_KG)),
+            unit = "кг/нед",
+            onDecrement = {
+                val next = ((weekly * 10).roundToInt() - 1) / 10.0
+                onDraftChange {
+                    it.copy(
+                        desiredWeeklyChangeKg = next
+                            .coerceIn(MIN_WEEKLY_CHANGE_KG, MAX_SAFE_WEEKLY_CHANGE_KG)
+                            .toString(),
+                    )
+                }
+            },
+            onIncrement = {
+                val next = ((weekly * 10).roundToInt() + 1) / 10.0
+                onDraftChange {
+                    it.copy(
+                        desiredWeeklyChangeKg = next
+                            .coerceIn(MIN_WEEKLY_CHANGE_KG, MAX_SAFE_WEEKLY_CHANGE_KG)
+                            .toString(),
+                    )
+                }
+            },
+        )
+        Text(
+            "От $MIN_WEEKLY_CHANGE_KG до $MAX_SAFE_WEEKLY_CHANGE_KG кг в неделю",
+            style = FoodAITypography.bodySmall,
+            color = FoodAIColors.TextSecondary,
+        )
         LaunchedEffect(draft.targetWeightKg, draft.goalType) {
             if (draft.targetWeightKg.isBlank()) {
                 onDraftChange { it.copy(targetWeightKg = target.roundToInt().toString()) }
