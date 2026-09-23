@@ -55,13 +55,34 @@ class TodayViewModel @Inject constructor(
 
     private fun observeSteps() {
         stepsJob?.cancel()
+        val uid = userId()
+        val snapshot = metricsStore.metrics(uid)
+        _state.value = _state.value.copy(metrics = _state.value.metrics.copy(
+            steps = snapshot.steps,
+            stepsAvailable = snapshot.stepsAvailable,
+            stepsPermissionNeeded = snapshot.stepsPermissionNeeded,
+            waterMl = snapshot.waterMl,
+            waterGoalMl = snapshot.waterGoalMl,
+            stepsGoal = snapshot.stepsGoal,
+        ))
+        if (!snapshot.stepsAvailable) return
         stepsJob = viewModelScope.launch {
-            metricsStore.observeSteps(userId()).collectLatest { steps ->
+            metricsStore.observeSteps(uid).collectLatest { steps ->
                 _state.value = _state.value.copy(
-                    metrics = _state.value.metrics.copy(steps = steps, stepsAvailable = true),
+                    metrics = _state.value.metrics.copy(
+                        steps = steps,
+                        stepsAvailable = true,
+                        stepsPermissionNeeded = false,
+                    ),
                 )
             }
         }
+    }
+
+    /** Call after ACTIVITY_RECOGNITION dialog — sensor flow only starts when granted. */
+    fun onStepsPermissionResult(granted: Boolean) {
+        _state.value = _state.value.copy(metrics = metricsStore.metrics(userId()))
+        if (granted) observeSteps()
     }
 
     fun refresh() {

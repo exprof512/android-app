@@ -3,12 +3,15 @@ package com.foodai.app.feature.shopping
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -27,12 +30,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.network.ShoppingListItemDto
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
+import com.foodai.app.core.ui.foodEmojiFor
 import com.foodai.app.core.ui.components.FoodAIEmptyState
+import com.foodai.app.core.ui.components.FoodAITipBanner
 import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAIShapes
@@ -94,6 +100,11 @@ fun ShoppingScreen(
                 "Все ингредиенты для твоего плана. Отмечай купленное — и ничего не забудешь!",
                 style = FoodAITypography.bodyMedium,
                 color = FoodAIColors.TextSecondary,
+            )
+            Spacer(Modifier.size(FoodAIDimens.Space8))
+            FoodAITipBanner(
+                tipId = "shopping_check",
+                text = "Отмечай купленное галочкой. Включи «Уже есть дома», чтобы скрыть продукты из кладовой.",
             )
             if (list != null) {
                 Text(
@@ -183,11 +194,16 @@ private fun ShoppingRow(
             .padding(horizontal = FoodAIDimens.Space12, vertical = FoodAIDimens.Space8),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(
-            checked = item.isCompleted,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(checkedColor = FoodAIColors.Primary),
-        )
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(FoodAIShapes.Tile)
+                .background(FoodAIColors.PrimarySoft),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(foodEmojiFor(item.displayName), fontSize = 22.sp)
+        }
+        Spacer(Modifier.size(FoodAIDimens.Space12))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 item.displayName,
@@ -200,6 +216,11 @@ private fun ShoppingRow(
                 style = FoodAITypography.bodySmall,
             )
         }
+        Checkbox(
+            checked = item.isCompleted,
+            onCheckedChange = { onToggle() },
+            colors = CheckboxDefaults.colors(checkedColor = FoodAIColors.Primary),
+        )
     }
 }
 

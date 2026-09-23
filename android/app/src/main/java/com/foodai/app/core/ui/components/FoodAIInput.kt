@@ -280,18 +280,31 @@ fun FoodAIChip(
 fun FoodAIAvatar(
     initials: String,
     modifier: Modifier = Modifier,
+    imagePath: String? = null,
+    size: androidx.compose.ui.unit.Dp = 56.dp,
 ) {
     Box(
         modifier = modifier
-            .size(56.dp)
+            .size(size)
             .clip(CircleShape)
             .background(FoodAIColors.PrimaryLight),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = initials.take(2).uppercase(),
-            style = FoodAITypography.titleMedium,
-            color = FoodAIColors.PrimaryDark,
-        )
+        if (!imagePath.isNullOrBlank()) {
+            coil.compose.AsyncImage(
+                model = java.io.File(imagePath),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier
+                    .size(size)
+                    .clip(CircleShape),
+            )
+        } else {
+            Text(
+                text = initials.take(2).uppercase(),
+                style = if (size >= 72.dp) FoodAITypography.headlineSmall else FoodAITypography.titleMedium,
+                color = FoodAIColors.PrimaryDark,
+            )
+        }
     }
 }

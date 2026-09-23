@@ -39,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,6 +55,7 @@ import com.foodai.app.core.ui.components.FoodAIEmptyState
 import com.foodai.app.core.ui.components.FoodAIMacroBar
 import com.foodai.app.core.ui.components.FoodAIOutlinedButton
 import com.foodai.app.core.ui.components.FoodAIStatusDot
+import com.foodai.app.core.ui.components.FoodAITipBanner
 import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAIShapes
@@ -72,10 +72,12 @@ fun TodayRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { /* steps update via sensor flow when granted */ }
+    ) { granted -> viewModel.onStepsPermissionResult(granted) }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        } else {
+            viewModel.onStepsPermissionResult(true)
         }
     }
     when {
@@ -95,6 +97,13 @@ fun TodayRoute(
             onComplete = viewModel::complete,
             onReplace = viewModel::replace,
             onAddWater = viewModel::addWater,
+            onRequestStepsPermission = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+                } else {
+                    viewModel.onStepsPermissionResult(true)
+                }
+            },
             onOpenRecipe = onOpenRecipe,
             onOpenShopping = onOpenShopping,
             onOpenProgress = onOpenProgress,
@@ -110,6 +119,7 @@ fun TodayScreen(
     onComplete: (MealPlanItemDto) -> Unit,
     onReplace: (MealPlanItemDto) -> Unit,
     onAddWater: () -> Unit,
+    onRequestStepsPermission: () -> Unit = {},
     onOpenRecipe: (recipeId: String, itemId: String) -> Unit,
     onOpenShopping: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
@@ -158,6 +168,12 @@ fun TodayScreen(
                     )
                 }
             }
+        }
+        item {
+            FoodAITipBanner(
+                tipId = "today_meals",
+                text = "Отмечай съеденное — калории и прогресс обновятся автоматически. Нажми на блюдо, чтобы открыть рецепт.",
+            )
         }
         item {
             Column(
@@ -251,14 +267,14 @@ fun TodayScreen(
                 )
                 TodayMetric(
                     title = "Шаги",
-                    value = if (metrics.stepsAvailable || metrics.steps > 0) {
-                        "%,d".format(metrics.steps)
-                    } else {
-                        "Нет датчика"
+                    value = when {
+                        metrics.stepsPermissionNeeded -> "Разрешить"
+                        metrics.stepsAvailable || metrics.steps > 0 -> "%,d".format(metrics.steps)
+                        else -> "Нет датчика"
                     },
                     icon = Icons.AutoMirrored.Outlined.DirectionsWalk,
                     modifier = Modifier.weight(1f),
-                    onClick = null,
+                    onClick = if (metrics.stepsPermissionNeeded) onRequestStepsPermission else null,
                 )
                 TodayMetric(
                     title = "Вес",

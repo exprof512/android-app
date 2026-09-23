@@ -1,0 +1,47 @@
+package com.foodai.app.core.ui
+
+/** Emoji icons aligned with onboarding food tiles. */
+fun foodEmojiFor(name: String): String {
+    val n = name.lowercase()
+    return when {
+        n.contains("курин") || n.contains("куриц") -> "🍗"
+        n.contains("говяд") || n.contains("мяс") -> "🥩"
+        n.contains("свинин") || n.contains("бекон") -> "🥓"
+        n.contains("индейк") -> "🦃"
+        n.contains("рыб") || n.contains("лосос") || n.contains("тунец") -> "🐟"
+        n.contains("яйц") -> "🥚"
+        n.contains("молок") -> "🥛"
+        n.contains("сыр") -> "🧀"
+        n.contains("йогурт") || n.contains("творог") || n.contains("кефир") -> "🫙"
+        n.contains("рис") -> "🍚"
+        n.contains("гречк") -> "🥣"
+        n.contains("овсян") || n.contains("каш") -> "🥣"
+        n.contains("макарон") || n.contains("паст") -> "🍝"
+        n.contains("хлеб") -> "🍞"
+        n.contains("картоф") -> "🥔"
+        n.contains("помидор") || n.contains("томат") -> "🍅"
+        n.contains("огурец") -> "🥒"
+        n.contains("перец") -> "🫑"
+        n.contains("лук") -> "🧅"
+        n.contains("чеснок") -> "🧄"
+        n.contains("морков") -> "🥕"
+        n.contains("броккол") || n.contains("капуст") -> "🥦"
+        n.contains("салат") || n.contains("зелен") -> "🥬"
+        n.contains("авокад") -> "🥑"
+        n.contains("яблок") -> "🍎"
+        n.contains("банан") -> "🍌"
+        n.contains("ягод") || n.contains("клубник") || n.contains("малин") -> "🫐"
+        n.contains("апельсин") || n.contains("цитрус") -> "🍊"
+        n.contains("лимон") -> "🍋"
+        n.contains("виноград") -> "🍇"
+        n.contains("орех") || n.contains("миндал") -> "🥜"
+        n.contains("масл") -> "🧈"
+        n.contains("сахар") || n.contains("мёд") || n.contains("мед") -> "🍯"
+        n.contains("соль") || n.contains("спец") -> "🧂"
+        n.contains("мук") -> "🌾"
+        n.contains("киноа") || n.contains("круп") -> "🌾"
+        n.contains("гриб") -> "🍄"
+        n.contains("фасол") || n.contains("нут") || n.contains("чечев") -> "🫘"
+        else -> "🛒"
+    }
+}

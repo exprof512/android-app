@@ -182,7 +182,7 @@ fun MainShell(
                 ProgressRoute()
             }
             composable(Routes.Profile) {
-                ProfilePane(
+                ProfileHomeRoute(
                     email = email,
                     tier = tier,
                     profile = profile,
@@ -267,7 +267,7 @@ fun MainShell(
 }
 
 @Composable
-private fun ProfilePane(
+private fun ProfileHomeRoute(
     email: String,
     tier: String,
     profile: ProfileResponse?,
@@ -277,8 +277,10 @@ private fun ProfilePane(
     onEditQuestionnaire: () -> Unit,
     onPremium: () -> Unit,
     onLogout: () -> Unit,
+    viewModel: com.foodai.app.feature.profile.ProfileViewModel = hiltViewModel(),
 ) {
-    val name = email.substringBefore("@").replaceFirstChar { it.uppercase() }
+    val local by viewModel.localProfile.collectAsStateWithLifecycle()
+    val name = viewModel.displayNameOrFallback(email)
     val p = profile?.profile
     val goal = profile?.goal
     Column(
@@ -315,14 +317,23 @@ private fun ProfilePane(
             }
         }
 
+        com.foodai.app.core.ui.components.FoodAITipBanner(
+            tipId = "profile_home",
+            text = "Нажми на карточку профиля, чтобы изменить имя и добавить фото.",
+        )
+
         FoodAICard(onClick = onOpenDetails) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                FoodAIAvatar(initials = name.take(2))
+                FoodAIAvatar(
+                    initials = name.take(2),
+                    imagePath = local.avatarPath,
+                    size = 64.dp,
+                )
                 Spacer(Modifier.size(FoodAIDimens.Space12))
                 Column(Modifier.weight(1f)) {
                     Text(name, style = FoodAITypography.titleLarge)
                     Text(
-                        "Стремлюсь к здоровью, энергии и большим целям",
+                        local.bio.ifBlank { "Стремлюсь к здоровью, энергии и большим целям" },
                         style = FoodAITypography.bodySmall,
                     )
                     if (p != null) {
@@ -337,6 +348,12 @@ private fun ProfilePane(
                             color = FoodAIColors.TextSecondary,
                         )
                     }
+                    Spacer(Modifier.height(FoodAIDimens.Space4))
+                    Text(
+                        "Изменить имя и фото →",
+                        style = FoodAITypography.labelMedium,
+                        color = FoodAIColors.Primary,
+                    )
                 }
                 Icon(Icons.Outlined.ChevronRight, null, tint = FoodAIColors.TextMuted)
             }

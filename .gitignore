@@ -36,3 +36,6 @@ android/**/.cxx/
 *.iml
 .DS_Store
 captures/
+
+# Kotlin incremental caches
+android/.kotlin/

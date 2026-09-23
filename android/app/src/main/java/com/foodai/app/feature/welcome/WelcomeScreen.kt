@@ -97,24 +97,23 @@ fun WelcomeScreen(
             FeatureTile("Здоровые\nпривычки", Icons.Outlined.Spa, Modifier.weight(1f))
         }
         Spacer(Modifier.height(FoodAIDimens.Space24))
-        Box(contentAlignment = Alignment.TopEnd) {
-            Image(
-                painter = painterResource(R.drawable.img_hero_bowl),
-                contentDescription = "Здоровое блюдо",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(220.dp)
-                    .clip(CircleShape),
-            )
-            Text(
-                text = "Вкусно. Полезно.\nПросто. ♡",
-                color = FoodAIColors.PrimaryDark,
-                style = FoodAITypography.bodySmall,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.End,
-                modifier = Modifier.padding(top = 8.dp, end = 4.dp),
-            )
-        }
+        Image(
+            painter = painterResource(R.drawable.img_hero_bowl),
+            contentDescription = "Здоровое блюдо",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(220.dp)
+                .clip(CircleShape),
+        )
+        Spacer(Modifier.height(FoodAIDimens.Space16))
+        Text(
+            text = "Вкусно. Полезно. Просто.",
+            color = FoodAIColors.PrimaryDark,
+            style = FoodAITypography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.height(FoodAIDimens.Space32))
         FoodAIPrimaryButton(label = "Начать", onClick = onStart, showArrow = true)
         Spacer(Modifier.height(FoodAIDimens.Space8))
