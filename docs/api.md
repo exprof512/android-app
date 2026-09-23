@@ -25,7 +25,7 @@ Authorization: Bearer <access_jwt>
 
 Коды: `400` malformed request, `401` invalid/expired token, `403` ownership or entitlement denied, `404` absent resource, `409` conflicting/in-progress action, `422` domain/schema validation, `429` quota/rate limit, `503` temporarily unavailable dependency. Не возвращать provider-specific или secret details.
 
-Все принадлежащие пользователю UUID проверяются по `user_id` до чтения/изменения. Для создающих AI endpoints поддерживается `Idempotency-Key`; повтор с тем же key возвращает исходный результат, а не расходует новую quota.
+Все принадлежащие пользователю UUID проверяются по `user_id` до чтения/изменения. Для `POST /meal-plan-items/{id}/replace` поддерживается header `Idempotency-Key` (повтор с тем же key возвращает исходный результат без повторного spend quota). Генерация плана идемпотентна через `generation_request_hash` (+ `force` для явного пересоздания), а не через Idempotency-Key.
 
 ## Auth и current user
 
@@ -203,10 +203,12 @@ Phase 3 фиксирует контракт этих endpoints. Обязател
 {
   "start_date": "2026-09-21",
   "days": 7,
-  "regenerate_scope": "all",
+  "force": false,
   "notes": "Быстрые ужины в будни"
 }
 ```
+
+`days` по умолчанию **7** (диапазон 1–7). `force: true` архивирует пересекающиеся ready-планы и обходит hash-reuse. Scope regenerate (`all`/`day`) — на `POST /meal-plans/{id}/regenerate`, не в generate body.
 
 `201` возвращает сохранённый `MealPlan`; HTTP request не ждёт изображения:
 
@@ -223,11 +225,12 @@ Phase 3 фиксирует контракт этих endpoints. Обязател
     "meal_type": "breakfast",
     "recipe": {"id": "a86cebd6-e8c3-463d-92ea-a6fced7b9dcb", "name": "Овсянка с ягодами", "calories_kcal": 412, "image": {"status": "pending", "thumbnail_url": null}}
   }],
-  "warnings": []
+  "warnings": [],
+  "reused": false
 }
 ```
 
-`regenerate_scope` — `all`, `day` или `item`; запрос с `day` содержит `date`, с `item` используется endpoint replace. Все результаты после replacement снова проходят `NutritionEngine`.
+`GET /meal-plans/week` возвращает **окно сохранённого covering plan** (`start_date`…`end_date`), не обязательно ровно 7 дней от query date. Все результаты after replacement снова проходят `NutritionEngine`.
 
 ## Recipes и изображения
 

@@ -196,3 +196,20 @@ Payments, social, camera, wearables, real SMTP, K8s, visual redesign, microservi
 Phase 17 productization APIs largely exist, but the **client state model is fragmented**. User-facing failures (delete 422, “export did nothing”, Today/Week disagreement, fake settings, 429 on regen) are primarily **contract + SSOT + invalidation + honest settings** problems, not missing week persistence on the server.
 
 **Next step:** implement in the order above; do not patch individual screens with ad-hoc `refresh()` without shared repository events.
+
+---
+
+## 15. Follow-up from parallel audits (post-implementation)
+
+Findings from Android and Backend parallel audits folded in after Phase 18 PARTIAL land:
+
+| Finding | Action |
+|---|---|
+| Edit onboarding `generatePlan=false` still called `regeneratePlan(force=true)` → unexpected 429 | **Fixed:** profile-only save when `generatePlan=false` |
+| Backend generate default `days=1` vs Android/docs 7 | **Fixed:** schema default `days=7` |
+| `docs/api.md` claimed broad Idempotency-Key + false `regenerate_scope` on generate | **Fixed:** docs match replace-only header + regenerate endpoint |
+| Profile home progress `0.35f` / water `"2.0 л"` stubs | **Fixed:** weight progress from goal span; water from `DailyMetricsStore` |
+| Today ring ignores diary macros | **Fixed:** ring = completed plan nutrition + diary extras (deduped by item id) |
+| Imperial not on every screen | Still **open** (PARTIAL) |
+| No shopping `/rebuild` — rebuild = `POST /shopping-lists/generate` | Documented; Android regenerate OK |
+| Week API = covering plan window, not always query+6 | Documented in api.md |

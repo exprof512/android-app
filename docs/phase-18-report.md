@@ -105,9 +105,17 @@ Full suite / Android unit tests / alembic check / ownership matrix: **not fully 
 
 ## Known Limitations
 - Imperial formatting not applied on every screen yet.
-- Diary macros still not fully merged into Today calorie ring.
 - No FCM; notification prefs remain local-only (explicit copy).
 - Alembic historical reflection noise from Phase 17 may still appear on `alembic check`.
+- Physical phone smoke not run in this environment.
+
+## Follow-up (post `0c4b3d7`)
+- Onboarding edit path: `generatePlan=false` no longer force-regenerates (avoids surprise 429).
+- `MealPlanGenerateRequest.days` default **7** (aligned with Android/docs).
+- `docs/api.md` Idempotency-Key / regenerate scope corrected.
+- Profile home: real weight progress + water from `DailyMetricsStore`.
+- Today ring: consumed = completed meal snapshots + diary logs (no fake macro scaling).
 
 ## Commit
 `0c4b3d7` — `refactor(phase-18): core consistency and weekly planning`
+Follow-up commit hash filled after land.

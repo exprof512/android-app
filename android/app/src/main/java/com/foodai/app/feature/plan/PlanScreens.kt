@@ -130,13 +130,41 @@ fun TodayScreen(
     val plan = state.plan
     val goal = state.profile?.goal
     val todayItems = plan?.items.orEmpty()
-    val eaten = todayItems.filter { it.isCompleted }.sumOf { it.recipe.caloriesKcal }
+    val completedItems = todayItems.filter { it.isCompleted }
+    val completedIds = completedItems.map { it.id }.toSet()
+    // Diary entries linked to an already-completed plan item are excluded to avoid double count.
+    val diaryExtras = state.nutritionLogs.filter { log ->
+        log.mealPlanItemId == null || log.mealPlanItemId !in completedIds
+    }
+    val eatenFromPlan = completedItems.sumOf { it.nutrition?.caloriesKcal ?: it.recipe.caloriesKcal }
+    val eatenFromDiary = diaryExtras.sumOf { it.caloriesKcal }
+    val eaten = eatenFromPlan + eatenFromDiary
     val target = goal?.calorieTargetKcal
         ?: plan?.dailyTargets?.caloriesKcal
         ?: 0
     val remaining = (target - eaten).coerceAtLeast(0)
     val progress = if (target > 0) min(1f, eaten.toFloat() / target.toFloat()) else 0f
-    val macros = goal?.macroTargetsG
+    val proteinCurrent = (
+        completedItems.sumOf { it.nutrition?.proteinG ?: 0.0 } +
+            diaryExtras.sumOf { it.proteinG }
+        ).toInt()
+    val fatCurrent = (
+        completedItems.sumOf { it.nutrition?.fatG ?: 0.0 } +
+            diaryExtras.sumOf { it.fatG }
+        ).toInt()
+    val carbCurrent = (
+        completedItems.sumOf { it.nutrition?.carbohydrateG ?: 0.0 } +
+            diaryExtras.sumOf { it.carbohydrateG }
+        ).toInt()
+    val proteinTarget = goal?.macroTargetsG?.protein
+        ?: plan?.dailyTargets?.proteinG?.toInt()
+        ?: 0
+    val fatTarget = goal?.macroTargetsG?.fat
+        ?: plan?.dailyTargets?.fatG?.toInt()
+        ?: 0
+    val carbTarget = goal?.macroTargetsG?.carbohydrate
+        ?: plan?.dailyTargets?.carbohydrateG?.toInt()
+        ?: 0
     val weight = state.profile?.profile?.currentWeightKg
     val metrics = state.metrics
     val waterLiters = metrics.waterMl / 1000f
@@ -196,26 +224,26 @@ fun TodayScreen(
                             style = FoodAITypography.titleLarge,
                             fontWeight = FontWeight.Bold,
                         )
-                        if (macros != null) {
+                        if (proteinTarget > 0 || fatTarget > 0 || carbTarget > 0) {
                             Spacer(Modifier.height(FoodAIDimens.Space12))
                             FoodAIMacroBar(
                                 label = "Белки",
-                                current = (macros.protein * progress).toInt(),
-                                target = macros.protein,
+                                current = proteinCurrent,
+                                target = proteinTarget,
                                 color = FoodAIColors.Primary,
                             )
                             Spacer(Modifier.height(FoodAIDimens.Space8))
                             FoodAIMacroBar(
                                 label = "Жиры",
-                                current = (macros.fat * progress).toInt(),
-                                target = macros.fat,
+                                current = fatCurrent,
+                                target = fatTarget,
                                 color = FoodAIColors.Warning,
                             )
                             Spacer(Modifier.height(FoodAIDimens.Space8))
                             FoodAIMacroBar(
                                 label = "Углеводы",
-                                current = (macros.carbohydrate * progress).toInt(),
-                                target = macros.carbohydrate,
+                                current = carbCurrent,
+                                target = carbTarget,
                                 color = androidx.compose.ui.graphics.Color(0xFF8B7CF6),
                             )
                         }

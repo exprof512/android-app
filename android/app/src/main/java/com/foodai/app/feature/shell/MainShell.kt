@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -296,6 +297,8 @@ private fun ProfileHomeRoute(
     viewModel: com.foodai.app.feature.profile.ProfileViewModel = hiltViewModel(),
 ) {
     val local by viewModel.localProfile.collectAsStateWithLifecycle()
+    val waterLabel by viewModel.waterLitersLabel.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.reload() }
     val name = viewModel.displayNameOrFallback(email)
     val p = profile?.profile
     val goal = profile?.goal
@@ -395,7 +398,13 @@ private fun ProfileHomeRoute(
                     )
                 }
                 Spacer(Modifier.height(FoodAIDimens.Space12))
-                FoodAILinearProgress(progress = 0.35f)
+                FoodAILinearProgress(
+                    progress = viewModel.weightProgress(
+                        currentKg = p?.currentWeightKg,
+                        startKg = goal.startWeightKg,
+                        targetKg = goal.targetWeightKg,
+                    ),
+                )
                 Spacer(Modifier.height(FoodAIDimens.Space8))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
@@ -419,7 +428,7 @@ private fun ProfileHomeRoute(
         Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
             MetricMini("Ккал", "${goal?.calorieTargetKcal ?: "—"}", Icons.Outlined.LocalFireDepartment, Modifier.weight(1f))
             MetricMini("Активность", p?.activityLevel ?: "—", Icons.Outlined.FitnessCenter, Modifier.weight(1f))
-            MetricMini("Вода", "2.0 л", Icons.Outlined.WaterDrop, Modifier.weight(1f))
+            MetricMini("Вода", waterLabel, Icons.Outlined.WaterDrop, Modifier.weight(1f))
         }
 
         Box(

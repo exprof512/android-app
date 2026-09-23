@@ -129,9 +129,9 @@ class OnboardingViewModel @Inject constructor(
                 profileRepository.updateProfile(body)
                 if (shouldGenerate) {
                     profileRepository.generateFirstPlan(days = 7, force = true)
-                } else {
-                    profileRepository.regeneratePlan(days = 7)
                 }
+                // Edit-questionnaire path (generatePlan=false): persist profile only —
+                // plan rebuild is explicit via «Пересобрать» on Today/Week.
                 draftStore.clear()
                 // Keep a fresh snapshot so reopening the questionnaire is filled.
                 runCatching { profileRepository.getProfile() }

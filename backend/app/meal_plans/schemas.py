@@ -14,7 +14,7 @@ from app.meal_plans import constants
 
 class MealPlanGenerateRequest(BaseModel):
     start_date: date
-    days: int = Field(default=1, ge=constants.DAYS_MIN, le=constants.DAYS_MAX)
+    days: int = Field(default=7, ge=constants.DAYS_MIN, le=constants.DAYS_MAX)
     notes: str | None = Field(default=None, max_length=500)
     # When true, ignore idempotent hash reuse and archive any overlapping ready plan.
     force: bool = False
