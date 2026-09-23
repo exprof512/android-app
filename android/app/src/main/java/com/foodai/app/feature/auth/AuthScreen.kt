@@ -43,7 +43,10 @@ fun AuthRoute(
         state = state,
         onEmailChange = viewModel::onEmailChange,
         onPasswordChange = viewModel::onPasswordChange,
+        onResetTokenChange = viewModel::onResetTokenChange,
         onToggleMode = viewModel::toggleMode,
+        onForgot = viewModel::openForgot,
+        onBackToLogin = viewModel::backToLogin,
         onSubmit = viewModel::submit,
     )
 }
@@ -53,9 +56,18 @@ fun AuthScreen(
     state: AuthUiState,
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onResetTokenChange: (String) -> Unit = {},
     onToggleMode: () -> Unit,
+    onForgot: () -> Unit = {},
+    onBackToLogin: () -> Unit = {},
     onSubmit: () -> Unit,
 ) {
+    val title = when {
+        state.isForgotMode -> "Сброс пароля"
+        state.isResetMode -> "Новый пароль"
+        state.isRegisterMode -> "Создайте аккаунт, чтобы продолжить"
+        else -> "Войдите, чтобы открыть план питания"
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -70,35 +82,46 @@ fun AuthScreen(
         )
         Spacer(Modifier.height(FoodAiTokens.SpaceSm.dp))
         Text(
-            text = if (state.isRegisterMode) {
-                "Создайте аккаунт, чтобы продолжить"
-            } else {
-                "Войдите, чтобы открыть план питания"
-            },
+            text = title,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(FoodAiTokens.SpaceXl.dp))
-        OutlinedTextField(
-            value = state.email,
-            onValueChange = onEmailChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Email") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            enabled = !state.isLoading,
-        )
-        Spacer(Modifier.height(FoodAiTokens.SpaceMd.dp))
-        OutlinedTextField(
-            value = state.password,
-            onValueChange = onPasswordChange,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Пароль") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            enabled = !state.isLoading,
-        )
+        if (!state.isResetMode) {
+            OutlinedTextField(
+                value = state.email,
+                onValueChange = onEmailChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Email") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                enabled = !state.isLoading,
+            )
+            Spacer(Modifier.height(FoodAiTokens.SpaceMd.dp))
+        }
+        if (state.isResetMode) {
+            OutlinedTextField(
+                value = state.resetToken,
+                onValueChange = onResetTokenChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Токен из письма") },
+                singleLine = true,
+                enabled = !state.isLoading,
+            )
+            Spacer(Modifier.height(FoodAiTokens.SpaceMd.dp))
+        }
+        if (!state.isForgotMode) {
+            OutlinedTextField(
+                value = state.password,
+                onValueChange = onPasswordChange,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(if (state.isResetMode) "Новый пароль" else "Пароль") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                enabled = !state.isLoading,
+            )
+        }
         if (state.error != null) {
             Spacer(Modifier.height(FoodAiTokens.SpaceMd.dp))
             Text(
@@ -128,17 +151,35 @@ fun AuthScreen(
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
-                Text(if (state.isRegisterMode) "Зарегистрироваться" else "Войти")
+                Text(
+                    when {
+                        state.isForgotMode -> "Отправить инструкции"
+                        state.isResetMode -> "Сохранить пароль"
+                        state.isRegisterMode -> "Зарегистрироваться"
+                        else -> "Войти"
+                    },
+                )
             }
         }
-        TextButton(onClick = onToggleMode, enabled = !state.isLoading) {
-            Text(
-                if (state.isRegisterMode) {
-                    "Уже есть аккаунт? Войти"
-                } else {
-                    "Нет аккаунта? Регистрация"
-                },
-            )
+        if (!state.isForgotMode && !state.isResetMode && !state.isRegisterMode) {
+            TextButton(onClick = onForgot, enabled = !state.isLoading) {
+                Text("Забыли пароль?")
+            }
+        }
+        if (state.isForgotMode || state.isResetMode) {
+            TextButton(onClick = onBackToLogin, enabled = !state.isLoading) {
+                Text("Назад ко входу")
+            }
+        } else {
+            TextButton(onClick = onToggleMode, enabled = !state.isLoading) {
+                Text(
+                    if (state.isRegisterMode) {
+                        "Уже есть аккаунт? Войти"
+                    } else {
+                        "Нет аккаунта? Регистрация"
+                    },
+                )
+            }
         }
     }
 }

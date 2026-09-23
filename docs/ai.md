@@ -99,7 +99,8 @@ flowchart TD
 | Redis cache | key содержит operation, schema version, normalized non-sensitive request fingerprint и model config version; TTL environment-configurable |
 | Persisted plans | `GET today/week` читает PostgreSQL, не вызывает AI |
 | Idempotency | `Idempotency-Key` предотвращает двойную генерацию от retry Android |
-| Rate limiting | per-user + per-IP на auth; per-user/tier на costly AI calls; `429 usage_limit_exceeded` с Retry-After |
+| Admin aggregates (Phase 17) | `GET /admin/ai/summary|daily|by-operation` over usage tables; `users.role=admin` + `ADMIN_EMAILS` bootstrap; no prompts/secrets in responses |
+| Rate limiting | per-user + per-IP на auth/analytics; per-user/tier на costly AI calls; `429 usage_limit_exceeded` с Retry-After |
 | Dedup | canonical `recipe_fingerprint` повторно использует existing recipe/image при идентичном блюде |
 
 Cache hit не расходует provider quota/cost, но audit должен отличать `cached` от real call. Entitlement проверяется server-side через `require_premium()`; Android лишь отображает результат.

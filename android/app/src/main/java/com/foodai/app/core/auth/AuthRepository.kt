@@ -55,6 +55,7 @@ class AuthRepository @Inject constructor(
     suspend fun refreshMe(): UserSummaryDto =
         wrap {
             val me = authedAuthApi.me()
+            val summary = UserSummaryDto(id = me.id, email = me.email, tier = me.tier)
             val access = tokenStore.accessToken()
             val refresh = tokenStore.refreshToken()
             if (!access.isNullOrBlank() && !refresh.isNullOrBlank()) {
@@ -63,11 +64,53 @@ class AuthRepository @Inject constructor(
                         accessToken = access,
                         refreshToken = refresh,
                         expiresIn = 0,
-                        user = me,
+                        user = summary,
                     ),
                 )
             }
-            me
+            summary
+        }
+
+    suspend fun currentAccount(): com.foodai.app.core.network.CurrentUserDto =
+        wrap { authedAuthApi.me() }
+
+    suspend fun forgotPassword(email: String) =
+        wrap { bareAuthApi.forgotPassword(com.foodai.app.core.network.EmailOnlyRequest(email.trim())) }
+
+    suspend fun resetPassword(token: String, newPassword: String) =
+        wrap {
+            bareAuthApi.resetPassword(
+                com.foodai.app.core.network.ResetPasswordRequest(token, newPassword),
+            )
+        }
+
+    suspend fun resendVerification(email: String) =
+        wrap {
+            bareAuthApi.resendVerification(com.foodai.app.core.network.EmailOnlyRequest(email.trim()))
+        }
+
+    suspend fun listSessions() = wrap { authedAuthApi.listSessions() }
+
+    suspend fun revokeSession(id: String) = wrap { authedAuthApi.revokeSession(id) }
+
+    suspend fun revokeAllSessions() = wrap { authedAuthApi.revokeAllSessions() }
+
+    suspend fun exportData() = wrap { authedAuthApi.exportData() }
+
+    suspend fun deleteAccount(): Boolean =
+        wrap {
+            val response = authedAuthApi.deleteAccount(
+                com.foodai.app.core.network.DeleteAccountRequest("DELETE"),
+            )
+            if (!response.isSuccessful) {
+                throw com.foodai.app.core.network.ApiException.Unexpected(
+                    "Не удалось удалить аккаунт",
+                    httpStatus = response.code(),
+                )
+            }
+            localSessionCleaner.clearOnLogout(tokenStore.user()?.id)
+            tokenStore.clear()
+            true
         }
 
     suspend fun logout() {

@@ -221,7 +221,9 @@ scripts/install_android.sh
 
 `build_android.sh` запускает `:app:assembleDebug` и печатает абсолютный путь к APK (`android/app/build/outputs/apk/debug/app-debug.apk`). `install_android.sh` проверяет `adb`, устройство и APK; без `adb` печатает инструкцию и выходит с ошибкой. Unit-тесты: `cd android && ./gradlew :app:testDebugUnitTest`. Каждый implementation phase после Android foundation обязан собрать APK.
 
-## Production config review (Phase 16)
+## Production config review (Phase 16 + 17)
+
+Before production: `APP_ENV=production`, non-placeholder `JWT_SECRET`, real `TERMS_URL`/`PRIVACY_URL`, strong DB/Redis/S3 secrets, TLS at the edge, and `ADMIN_EMAILS` limited to operators. See [privacy.md](privacy.md) and [analytics.md](analytics.md).
 
 Перед публичным деплоем:
 

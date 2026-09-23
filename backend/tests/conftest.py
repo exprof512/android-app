@@ -40,6 +40,9 @@ async def services(test_settings: Settings) -> AsyncIterator[Services]:
     async with database.engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
 
+    from app.core.rate_limit import MemoryRateLimiter
+    from app.email.provider import MockEmailProvider
+
     container = Services(
         database=database,
         redis=RedisClient(test_settings.redis_url),
@@ -50,6 +53,9 @@ async def services(test_settings: Settings) -> AsyncIterator[Services]:
             refresh_ttl_days=test_settings.jwt_refresh_ttl_days,
         ),
         nutrition=NutritionEngine.from_settings(test_settings),
+        settings=test_settings,
+        email_provider=MockEmailProvider(),
+        rate_limiter=MemoryRateLimiter(),
     )
     try:
         yield container

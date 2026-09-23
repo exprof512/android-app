@@ -73,6 +73,9 @@ class MealPlan(UuidPrimaryKeyMixin, TimestampMixin, Base):
     fat_target_g: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
     carbohydrate_target_g: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
     generation_request_hash: Mapped[str | None] = mapped_column(CHAR(64))
+    nutrition_policy_version: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="v1"
+    )
 
     items: Mapped[list["MealPlanItem"]] = relationship(
         back_populates="meal_plan",

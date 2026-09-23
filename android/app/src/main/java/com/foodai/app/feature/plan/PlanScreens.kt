@@ -97,6 +97,7 @@ fun TodayRoute(
             onComplete = viewModel::complete,
             onReplace = viewModel::replace,
             onAddWater = viewModel::addWater,
+            onAddSnack = { viewModel.addManualSnack("Перекус", 150) },
             onRequestStepsPermission = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -119,6 +120,7 @@ fun TodayScreen(
     onComplete: (MealPlanItemDto) -> Unit,
     onReplace: (MealPlanItemDto) -> Unit,
     onAddWater: () -> Unit,
+    onAddSnack: () -> Unit = {},
     onRequestStepsPermission: () -> Unit = {},
     onOpenRecipe: (recipeId: String, itemId: String) -> Unit,
     onOpenShopping: () -> Unit = {},
@@ -296,6 +298,24 @@ fun TodayScreen(
                 style = FoodAITypography.labelSmall,
                 color = FoodAIColors.TextMuted,
             )
+        }
+        item {
+            val logKcal = state.nutritionLogs.sumOf { it.caloriesKcal }
+            Text("Дневник питания", style = FoodAITypography.titleLarge)
+            Text(
+                "Дополнительно в дневнике: $logKcal ккал · ${state.nutritionLogs.size} записей",
+                style = FoodAITypography.bodySmall,
+                color = FoodAIColors.TextSecondary,
+            )
+            state.nutritionLogs.take(5).forEach { log ->
+                Text(
+                    "${log.mealType}: ${log.description} — ${log.caloriesKcal} ккал",
+                    style = FoodAITypography.bodyMedium,
+                )
+            }
+            TextButton(onClick = onAddSnack) {
+                Text("Добавить перекус 150 ккал", color = FoodAIColors.Primary)
+            }
         }
         item {
             FoodAIOutlinedButton(

@@ -37,6 +37,27 @@ Authorization: Bearer <access_jwt>
 | `POST /auth/logout` | access JWT | отозвать указанный refresh token/сессию |
 | `GET /users/me` | access JWT | получить безопасное user/tier summary |
 
+### Phase 17 — account lifecycle, privacy, analytics, diary
+
+| Method / path | Auth | Назначение |
+|---|---|---|
+| `POST /auth/verify-email` | нет | подтвердить email по одноразовому token |
+| `POST /auth/resend-verification` | нет | повторно отправить письмо (generic ответ) |
+| `POST /auth/forgot-password` | нет | запросить reset (generic ответ) |
+| `POST /auth/reset-password` | нет | сменить пароль; отзывает все refresh families |
+| `GET /users/me/sessions` | access JWT | список сессий (`refresh_tokens` + device meta) |
+| `DELETE /users/me/sessions/{id}` | access JWT | отозвать одну сессию |
+| `POST /users/me/sessions/revoke-all` | access JWT | отозвать все сессии |
+| `GET /users/me/export` | access JWT | JSON-экспорт user-owned данных (без secrets) |
+| `DELETE /users/me` | access JWT | hard delete; body `{"confirmation":"DELETE"}` |
+| `POST /events` | access JWT | product analytics batch ≤20, whitelist имён |
+| `GET/POST/PATCH/DELETE /nutrition/logs…` | access JWT | дневник питания; macros server-side |
+| `GET /admin/ai/summary\|daily\|by-operation` | admin JWT | агрегаты `ai_text_usage` / `ai_image_usage` |
+
+`GET /users/me` (Phase 17) дополнительно возвращает `email_verified`, `consent` (`terms_version`/`privacy_version`), `legal` (`terms_url`/`privacy_url`). Soft verify: register/login всё равно выдают tokens.
+
+`POST /meal-plan-items/{item_id}/replace` принимает optional `replace_reason` и header `Idempotency-Key`.
+
 `POST /auth/register`:
 
 ```json

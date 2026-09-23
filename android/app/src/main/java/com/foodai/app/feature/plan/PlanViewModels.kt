@@ -29,6 +29,7 @@ data class TodayUiState(
     val plan: MealPlanDto? = null,
     val profile: ProfileResponse? = null,
     val metrics: DailyMetrics = DailyMetrics(),
+    val nutritionLogs: List<com.foodai.app.core.network.NutritionLogDto> = emptyList(),
     val error: String? = null,
     val missingPlan: Boolean = false,
     val actionError: String? = null,
@@ -41,6 +42,7 @@ class TodayViewModel @Inject constructor(
     private val profiles: ProfileRepository,
     private val auth: AuthRepository,
     private val metricsStore: DailyMetricsStore,
+    private val nutritionApi: com.foodai.app.core.network.NutritionApi,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TodayUiState())
     val state: StateFlow<TodayUiState> = _state.asStateFlow()
@@ -92,11 +94,15 @@ class TodayViewModel @Inject constructor(
                 val plan = mealPlans.today(LocalDate.now())
                 val profile = runCatching { profiles.getProfile() }.getOrNull()
                 val metrics = metricsStore.metrics(userId())
+                val logs = runCatching {
+                    nutritionApi.listLogs(LocalDate.now().toString())
+                }.getOrDefault(emptyList())
                 _state.value = TodayUiState(
                     loading = false,
                     plan = plan,
                     profile = profile,
                     metrics = metrics,
+                    nutritionLogs = logs,
                 )
                 observeSteps()
             } catch (error: ApiException) {
@@ -123,6 +129,28 @@ class TodayViewModel @Inject constructor(
     fun addWater(deltaMl: Int = 250) {
         val metrics = metricsStore.addWater(userId(), deltaMl)
         _state.value = _state.value.copy(metrics = metrics)
+    }
+
+    fun addManualSnack(description: String, calories: Int) {
+        viewModelScope.launch {
+            try {
+                nutritionApi.createLog(
+                    com.foodai.app.core.network.NutritionLogCreateRequest(
+                        loggedOn = LocalDate.now().toString(),
+                        mealType = "snack",
+                        source = "manual",
+                        description = description,
+                        caloriesKcal = calories,
+                        proteinG = 0.0,
+                        fatG = 0.0,
+                        carbohydrateG = 0.0,
+                    ),
+                )
+                refresh()
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(actionError = error.toUiMessage())
+            }
+        }
     }
 
     fun generatePlan() {

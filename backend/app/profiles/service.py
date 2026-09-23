@@ -134,6 +134,7 @@ class ProfileService:
                 start_weight_kg=payload.current_weight_kg,
                 started_at=datetime.now(UTC).date(),
                 status="active",
+                nutrition_policy_version=self._nutrition.policy_version,
             )
         # start_weight_kg keeps the weight the goal began with.
         goal.goal_type = payload.goal_type
@@ -146,6 +147,7 @@ class ProfileService:
         goal.bmr_kcal = targets.bmr_kcal
         goal.tdee_kcal = targets.tdee_kcal
         goal.safety_floor_kcal = targets.applied_safety_floor_kcal
+        goal.nutrition_policy_version = self._nutrition.policy_version
         return await self._repository.add_goal(goal)
 
     @staticmethod

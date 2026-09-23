@@ -220,6 +220,9 @@ class MealPlanService:
             fat_target_g=snapshot.goal.fat_target_g,
             carbohydrate_target_g=snapshot.goal.carbohydrate_target_g,
             generation_request_hash=request_hash,
+            nutrition_policy_version=getattr(
+                snapshot.goal, "nutrition_policy_version", "v1"
+            ),
             items=[self._build_item(slot) for slot in slots],
         )
         await self._repository.add_plan(plan)
@@ -292,7 +295,19 @@ class MealPlanService:
             ),
         )
 
-    async def replace_item(self, user_id: UUID, item_id: UUID) -> MealPlanOut:
+    async def replace_item(
+        self,
+        user_id: UUID,
+        item_id: UUID,
+        *,
+        replace_reason: str = "user_requested",
+        idempotency_key: str | None = None,
+    ) -> MealPlanOut:
+        if idempotency_key:
+            cached = await self._load_idempotent_replace(user_id, idempotency_key)
+            if cached is not None:
+                return cached
+
         item = await self._repository.get_item(item_id)
         if item is None:
             raise MealPlanItemNotFound()
@@ -317,20 +332,44 @@ class MealPlanService:
             if r.restriction_type in {"allergy", "excluded"}
         ]
         allowed = await RecipeRepository(self._session).active_canonical_names()
+        day_items = await self._repository.list_items_for_dates(
+            plan.id, from_date=item.planned_date, to_date=item.planned_date
+        )
+        consumed_kcal = sum(
+            i.calories_kcal for i in day_items if i.is_completed and i.id != item.id
+        )
+        remaining_kcal = max(0, plan.calorie_target_kcal - consumed_kcal)
+        pantry_names = [p.display_name for p in snapshot.pantry]
         context = {
             "locale": "ru-RU",
             "meal_type": item.meal_type,
             "planned_date": item.planned_date.isoformat(),
             "calorie_target_kcal": snapshot.goal.calorie_target_kcal,
+            "remaining_day_calories_kcal": remaining_kcal,
+            "protein_target_g": float(snapshot.goal.protein_target_g),
+            "fat_target_g": float(snapshot.goal.fat_target_g),
+            "carbohydrate_target_g": float(snapshot.goal.carbohydrate_target_g),
             "max_cook_time_minutes": snapshot.profile.max_cook_time_minutes,
+            "grocery_budget_weekly": (
+                float(snapshot.profile.grocery_budget_weekly)
+                if snapshot.profile.grocery_budget_weekly is not None
+                else None
+            ),
             "restrictions": restricted,
             "liked_foods": [
                 p.display_name
                 for p in snapshot.preferences
                 if p.preference_type == "liked"
             ],
+            "disliked_foods": [
+                p.display_name
+                for p in snapshot.preferences
+                if p.preference_type == "disliked"
+            ],
+            "pantry": pantry_names,
             "allowed_ingredients": allowed,
             "replace_recipe_name": item.recipe.name if item.recipe else None,
+            "replace_reason": replace_reason,
         }
         fallback_warnings: list[str] = []
         try:
@@ -442,7 +481,65 @@ class MealPlanService:
                 )
         refreshed = await self._repository.get_plan(plan.id)
         assert refreshed is not None
-        return await self._to_out(refreshed, warnings=warnings)
+        out = await self._to_out(refreshed, warnings=warnings)
+        if idempotency_key:
+            await self._store_idempotent_replace(user_id, idempotency_key, out)
+        return out
+
+    async def _load_idempotent_replace(
+        self, user_id: UUID, key: str
+    ) -> MealPlanOut | None:
+        from datetime import timedelta
+
+        from sqlalchemy import select
+
+        from app.auth.models import IdempotencyKey
+        from app.core.models import as_utc, utcnow
+
+        row = (
+            await self._session.execute(
+                select(IdempotencyKey).where(
+                    IdempotencyKey.user_id == user_id,
+                    IdempotencyKey.endpoint == "meal_replace",
+                    IdempotencyKey.key == key,
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        if as_utc(row.expires_at) <= utcnow():
+            return None
+        if row.response_body:
+            return MealPlanOut.model_validate(row.response_body)
+        return None
+
+    async def _store_idempotent_replace(
+        self, user_id: UUID, key: str, out: MealPlanOut
+    ) -> None:
+        from datetime import timedelta
+
+        from app.auth.models import IdempotencyKey
+        from app.core.models import utcnow
+        import hashlib
+
+        body = out.model_dump(mode="json")
+        digest = hashlib.sha256(
+            str(body.get("id", "")).encode("utf-8")
+        ).hexdigest()
+        existing = await self._load_idempotent_replace(user_id, key)
+        if existing is not None:
+            return
+        row = IdempotencyKey(
+            user_id=user_id,
+            key=key[:255],
+            endpoint="meal_replace",
+            request_hash=digest,
+            response_status=200,
+            response_body=body,
+            expires_at=utcnow() + timedelta(hours=24),
+        )
+        self._session.add(row)
+        await self._session.commit()
 
     async def complete_item(
         self, user_id: UUID, item_id: UUID, *, completed: bool = True

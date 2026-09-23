@@ -166,6 +166,35 @@ class ProgressService:
         protein = sum((item.protein_g for item in completed), Decimal("0"))
         fat = sum((item.fat_g for item in completed), Decimal("0"))
         carbs = sum((item.carbohydrate_g for item in completed), Decimal("0"))
+
+        # Merge nutrition_logs that are not already tied to a completed meal_plan_item.
+        try:
+            from app.nutrition.models import NutritionLog
+
+            logs = list(
+                (
+                    await self._session.execute(
+                        select(NutritionLog).where(
+                            NutritionLog.user_id == user_id,
+                            NutritionLog.logged_on == on_date,
+                        )
+                    )
+                ).scalars()
+            )
+            completed_item_ids = {item.id for item in completed}
+            for log in logs:
+                if (
+                    log.meal_plan_item_id is not None
+                    and log.meal_plan_item_id in completed_item_ids
+                ):
+                    continue
+                consumed_kcal += log.calories_kcal
+                protein += log.protein_g
+                fat += log.fat_g
+                carbs += log.carbohydrate_g
+        except Exception:
+            pass
+
         return DailyNutritionBalanceOut(
             date=on_date,
             target_calories_kcal=plan.calorie_target_kcal,

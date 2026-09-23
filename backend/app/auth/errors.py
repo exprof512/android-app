@@ -45,3 +45,21 @@ class AccountDisabled(ApiError):
             code="account_disabled",
             message="Аккаунт отключён.",
         )
+
+
+class TokenExpired(ApiError):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=400,
+            code="token_expired",
+            message="Срок действия токена истёк.",
+        )
+
+
+class TokenAlreadyUsed(ApiError):
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=409,
+            code="token_already_used",
+            message="Токен уже был использован.",
+        )

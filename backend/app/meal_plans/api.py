@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 
 from app.auth.dependencies import CurrentUser
 from app.meal_plans.dependencies import get_meal_plan_service
@@ -13,6 +13,7 @@ from app.meal_plans.schemas import (
     MealPlanItemOut,
     MealPlanOut,
     MealPlanRegenerateRequest,
+    MealPlanReplaceRequest,
 )
 from app.meal_plans.service import MealPlanService
 
@@ -70,10 +71,18 @@ async def replace_meal_plan_item(
     item_id: str,
     user: CurrentUser,
     service: MealPlanService = Depends(get_meal_plan_service),
+    payload: MealPlanReplaceRequest | None = None,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> MealPlanOut:
     from uuid import UUID
 
-    return await service.replace_item(user.id, UUID(item_id))
+    reason = payload.replace_reason if payload else "user_requested"
+    return await service.replace_item(
+        user.id,
+        UUID(item_id),
+        replace_reason=reason,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.post(

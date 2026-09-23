@@ -159,7 +159,8 @@ Android строится как state-driven client: ViewModel получает 
 | **Plan** | текущий week/day, meal slots, regenerate, completion и recipe detail |
 | **Shopping** | aggregated list, filters/checked items, regenerate из plan |
 | **Progress** | weight entries, trend, target progress и дневной balance без guaranteed claims |
-| **Profile** | editable profile, preferences, restrictions, pantry, goal, tier/usage и logout |
+| **Profile** | editable profile, preferences, restrictions, pantry, goal, tier/usage, account (verify/sessions/export/delete), legal links и logout |
+| **Today diary** | nutrition logs ∪ completed meals; manual snack entry via `/nutrition/logs` |
 
 Онбординг — последовательность из семи resumable screens (draft хранится локально до submit). Заголовки экранов фиксированы product-copy:
 

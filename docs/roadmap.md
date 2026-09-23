@@ -1,4 +1,4 @@
-# Roadmap FoodAI: фазы 0–16
+# Roadmap FoodAI: фазы 0–17
 
 ## Неподвижные правила поставки
 
@@ -52,6 +52,7 @@ Master DEVELOPMENT PROMPT нумерует фазы иначе (Docker → Auth 
 | **14 — Entitlements abstraction** | Free/Premium limits, `require_premium()`, usage UX and `PaymentProvider` interface only. | **готово**: `subscriptions`/`usage_limits`; EntitlementsService; Free limits; Premium-only image regenerate; Android Free/Premium badge + paywall copy; PaymentProvider stub. |
 | **15 — Hardening and observability** | Structured logs, request IDs, security review, healthchecks, backups/restore drill, performance/cache checks. | **готово**: log redaction audit; security headers; `/health`+`/health/deps`; Compose healthchecks; `scripts/backup.sh` + `restore_drill.sh` + `healthcheck_all.sh` + `cache_smoke.sh`. |
 | **16 — MVP release candidate** | End-to-end regression, accessibility/localization review, production config review, APK build/install evidence. | **готово (RC)**: full pytest green; release checklist; version `0.1.0-rc1`; debug APK path; phone smoke items ожидают human confirmation. |
+| **17 — Productization & beta foundation** | Soft email verify/reset, sessions list/revoke, delete/export, consent versions + legal URLs, product analytics, admin AI usage aggregates, nutrition diary CRUD + Today union, replace idempotency/`replace_reason`, `NUTRITION_POLICY_VERSION` snapshot, ingredient `source_version`, Android account/settings/diary/analytics. | **готово**: migrations `0011`–`0013`; pytest `test_phase17_productization`; Android Account + diary + AnalyticsTracker; debug APK; phone smoke checklist для human. |
 
 ## MVP на Phase 16
 

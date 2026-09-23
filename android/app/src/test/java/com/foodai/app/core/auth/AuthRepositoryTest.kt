@@ -1,15 +1,24 @@
 package com.foodai.app.core.auth
 
 import com.foodai.app.core.network.AuthApi
+import com.foodai.app.core.network.CurrentUserDto
+import com.foodai.app.core.network.DeleteAccountRequest
+import com.foodai.app.core.network.EmailOnlyRequest
+import com.foodai.app.core.network.GenericMessageDto
 import com.foodai.app.core.network.LoginRequest
 import com.foodai.app.core.network.LogoutRequest
 import com.foodai.app.core.network.RefreshRequest
 import com.foodai.app.core.network.RegisterRequest
+import com.foodai.app.core.network.ResetPasswordRequest
+import com.foodai.app.core.network.SessionDto
+import com.foodai.app.core.network.TokenMessageRequest
 import com.foodai.app.core.network.TokenPairResponse
 import com.foodai.app.core.network.UserSummaryDto
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Test
+import retrofit2.Response
 
 private class FakeAuthApi(
     private var pair: TokenPairResponse,
@@ -30,7 +39,22 @@ private class FakeAuthApi(
         logoutCalls += 1
     }
 
-    override suspend fun me(): UserSummaryDto = pair.user
+    override suspend fun me(): CurrentUserDto = CurrentUserDto(
+        id = pair.user.id,
+        email = pair.user.email,
+        tier = pair.user.tier,
+    )
+
+    override suspend fun verifyEmail(body: TokenMessageRequest) = GenericMessageDto("ok")
+    override suspend fun resendVerification(body: EmailOnlyRequest) = GenericMessageDto("ok")
+    override suspend fun forgotPassword(body: EmailOnlyRequest) = GenericMessageDto("ok")
+    override suspend fun resetPassword(body: ResetPasswordRequest) = GenericMessageDto("ok")
+    override suspend fun listSessions(): List<SessionDto> = emptyList()
+    override suspend fun revokeSession(sessionId: String) = Unit
+    override suspend fun revokeAllSessions() = Unit
+    override suspend fun exportData() = buildJsonObject { }
+    override suspend fun deleteAccount(body: DeleteAccountRequest): Response<Unit> =
+        Response.success(Unit)
 }
 
 class AuthRepositoryTest {
@@ -76,6 +100,25 @@ class AuthRepositoryTest {
         }
         val repo = AuthRepository(failing, failing, store, NoOpLocalSessionCleaner)
         repo.logout()
+        assertThat(store.hasSession()).isFalse()
+    }
+
+    @Test
+    fun deleteAccountClearsLocalOnlyAfterSuccess() = runTest {
+        val store = InMemoryTokenStore()
+        store.saveSession(
+            TokenPairResponse(
+                accessToken = "a",
+                refreshToken = "r",
+                expiresIn = 900,
+                user = UserSummaryDto("u1", "a@b.c"),
+            ),
+        )
+        val api = FakeAuthApi(
+            TokenPairResponse("a", "r", expiresIn = 1, user = UserSummaryDto("u1", "a@b.c")),
+        )
+        val repo = AuthRepository(api, api, store, NoOpLocalSessionCleaner)
+        assertThat(repo.deleteAccount()).isTrue()
         assertThat(store.hasSession()).isFalse()
     }
 }

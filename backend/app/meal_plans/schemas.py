@@ -20,6 +20,17 @@ class MealPlanGenerateRequest(BaseModel):
     force: bool = False
 
 
+class MealPlanReplaceRequest(BaseModel):
+    replace_reason: Literal[
+        "dislike",
+        "too_expensive",
+        "too_long",
+        "unavailable_ingredients",
+        "nutrition_balance",
+        "user_requested",
+    ] = "user_requested"
+
+
 class MealPlanRegenerateRequest(BaseModel):
     scope: Literal["all", "day"] = "all"
     on_date: date | None = Field(default=None, alias="date")

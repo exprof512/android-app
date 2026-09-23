@@ -84,6 +84,7 @@ class Ingredient(UuidPrimaryKeyMixin, TimestampMixin, Base):
     grams_per_piece: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     density_g_per_ml: Mapped[Decimal | None] = mapped_column(Numeric(6, 3))
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="seed")
+    source_version: Mapped[str | None] = mapped_column(String(32))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 

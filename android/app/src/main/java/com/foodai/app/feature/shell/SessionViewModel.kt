@@ -2,7 +2,9 @@ package com.foodai.app.feature.shell
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.foodai.app.core.analytics.AnalyticsTracker
 import com.foodai.app.core.auth.AuthRepository
+import com.foodai.app.core.network.CurrentUserDto
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.network.UserSummaryDto
 import com.foodai.app.core.profile.ProfileRepository
@@ -15,6 +17,7 @@ import javax.inject.Inject
 
 data class SessionUiState(
     val user: UserSummaryDto? = null,
+    val account: CurrentUserDto? = null,
     val profile: ProfileResponse? = null,
     val loading: Boolean = true,
     val error: String? = null,
@@ -24,11 +27,13 @@ data class SessionUiState(
 class SessionViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
+    private val analytics: AnalyticsTracker,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SessionUiState(user = authRepository.currentUser()))
     val state: StateFlow<SessionUiState> = _state.asStateFlow()
 
     init {
+        analytics.track("app_opened")
         refresh()
     }
 
@@ -37,11 +42,18 @@ class SessionViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, error = null)
             try {
                 val me = authRepository.refreshMe()
+                val account = runCatching { authRepository.currentAccount() }.getOrNull()
                 val profile = runCatching { profileRepository.getProfile() }.getOrNull()
-                _state.value = SessionUiState(user = me, profile = profile, loading = false)
+                _state.value = SessionUiState(
+                    user = me,
+                    account = account,
+                    profile = profile,
+                    loading = false,
+                )
             } catch (error: Exception) {
                 _state.value = SessionUiState(
                     user = authRepository.currentUser(),
+                    account = _state.value.account,
                     profile = _state.value.profile,
                     loading = false,
                     error = error.message,

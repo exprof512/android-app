@@ -85,6 +85,106 @@ data class UserSummaryDto(
 )
 
 @Serializable
+data class ConsentDto(
+    @SerialName("terms_version") val termsVersion: String? = null,
+    @SerialName("privacy_version") val privacyVersion: String? = null,
+    @SerialName("accepted_terms_at") val acceptedTermsAt: String? = null,
+    @SerialName("terms_url") val termsUrl: String? = null,
+    @SerialName("privacy_url") val privacyUrl: String? = null,
+)
+
+@Serializable
+data class CurrentUserDto(
+    val id: String,
+    val email: String,
+    val tier: String = "free",
+    val locale: String = "ru-RU",
+    @SerialName("is_active") val isActive: Boolean = true,
+    val role: String = "user",
+    @SerialName("email_verified") val emailVerified: Boolean = false,
+    @SerialName("email_verified_at") val emailVerifiedAt: String? = null,
+    @SerialName("accepted_terms_at") val acceptedTermsAt: String? = null,
+    @SerialName("terms_version") val termsVersion: String? = null,
+    @SerialName("privacy_version") val privacyVersion: String? = null,
+    val consent: ConsentDto? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class GenericMessageDto(val message: String)
+
+@Serializable
+data class EmailOnlyRequest(val email: String)
+
+@Serializable
+data class TokenMessageRequest(val token: String)
+
+@Serializable
+data class ResetPasswordRequest(
+    val token: String,
+    @SerialName("new_password") val newPassword: String,
+)
+
+@Serializable
+data class DeleteAccountRequest(val confirmation: String = "DELETE")
+
+@Serializable
+data class SessionDto(
+    val id: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("last_used_at") val lastUsedAt: String? = null,
+    @SerialName("expires_at") val expiresAt: String,
+    @SerialName("device_label") val deviceLabel: String? = null,
+    val platform: String? = null,
+    @SerialName("app_version") val appVersion: String? = null,
+    @SerialName("is_current") val isCurrent: Boolean = false,
+)
+
+@Serializable
+data class AnalyticsEventDto(
+    @SerialName("event_name") val eventName: String,
+    @SerialName("event_version") val eventVersion: Int = 1,
+    val platform: String? = "android",
+    @SerialName("app_version") val appVersion: String? = null,
+    val properties: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class AnalyticsBatchRequest(val events: List<AnalyticsEventDto>)
+
+@Serializable
+data class AnalyticsAcceptedDto(val accepted: Int)
+
+@Serializable
+data class NutritionLogDto(
+    val id: String,
+    @SerialName("logged_on") val loggedOn: String,
+    @SerialName("meal_type") val mealType: String,
+    val description: String,
+    @SerialName("calories_kcal") val caloriesKcal: Int,
+    @SerialName("protein_g") val proteinG: Double,
+    @SerialName("fat_g") val fatG: Double,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double,
+    val servings: Double = 1.0,
+    val source: String,
+    @SerialName("recipe_id") val recipeId: String? = null,
+    @SerialName("meal_plan_item_id") val mealPlanItemId: String? = null,
+)
+
+@Serializable
+data class NutritionLogCreateRequest(
+    @SerialName("logged_on") val loggedOn: String,
+    @SerialName("meal_type") val mealType: String,
+    val source: String,
+    val description: String? = null,
+    @SerialName("calories_kcal") val caloriesKcal: Int? = null,
+    @SerialName("protein_g") val proteinG: Double? = null,
+    @SerialName("fat_g") val fatG: Double? = null,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double? = null,
+    val servings: Double = 1.0,
+)
+
+@Serializable
 data class LoginRequest(
     val email: String,
     val password: String,

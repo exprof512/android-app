@@ -81,10 +81,38 @@ class Settings(BaseSettings):
     # None = unlimited for premium
     entitlement_premium_daily_limit: int | None = None
 
+    # Phase 17 — legal, consent, admin, email, nutrition policy
+    terms_url: str = "https://example.com/terms"
+    privacy_url: str = "https://example.com/privacy"
+    terms_version: str = "v1"
+    privacy_version: str = "v1"
+    admin_emails: str = ""
+    email_provider: Literal["mock"] = "mock"
+    email_verification_ttl_hours: int = 24
+    password_reset_ttl_hours: int = 1
+    public_app_base_url: str = "https://example.com"
+    nutrition_policy_version: str = "v1"
+
     @field_validator("api_prefix")
     @classmethod
     def api_prefix_has_no_trailing_slash(cls, value: str) -> str:
         return value.rstrip("/")
+
+    def admin_email_set(self) -> set[str]:
+        return {
+            part.strip().lower()
+            for part in self.admin_emails.split(",")
+            if part.strip()
+        }
+
+    def validate_production_legal(self) -> None:
+        if self.app_env != "production":
+            return
+        placeholders = {"", "https://example.com/terms", "https://example.com/privacy"}
+        if self.terms_url in placeholders or self.privacy_url in placeholders:
+            raise RuntimeError(
+                "TERMS_URL and PRIVACY_URL must be set to real URLs in production"
+            )
 
     @field_validator(
         "image_max_concurrent_jobs",

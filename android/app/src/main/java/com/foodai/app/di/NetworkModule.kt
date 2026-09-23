@@ -3,16 +3,20 @@ package com.foodai.app.di
 import com.foodai.app.BuildConfig
 import com.foodai.app.core.auth.SecureTokenStore
 import com.foodai.app.core.auth.TokenStore
+import com.foodai.app.core.network.AnalyticsApi
 import com.foodai.app.core.network.AuthApi
 import com.foodai.app.core.network.AuthApiProvider
 import com.foodai.app.core.network.AuthInterceptor
 import com.foodai.app.core.network.ChatApi
 import com.foodai.app.core.network.MealPlanApi
+import com.foodai.app.core.network.NutritionApi
 import com.foodai.app.core.network.ProfileApi
 import com.foodai.app.core.network.ProgressApi
 import com.foodai.app.core.network.RecipeApi
 import com.foodai.app.core.network.ShoppingApi
 import com.foodai.app.core.network.TokenAuthenticator
+import com.foodai.app.core.analytics.AnalyticsTracker
+import com.foodai.app.core.analytics.BackendAnalyticsTracker
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -34,6 +38,10 @@ abstract class AuthBindModule {
     @Binds
     @Singleton
     abstract fun bindTokenStore(impl: SecureTokenStore): TokenStore
+
+    @Binds
+    @Singleton
+    abstract fun bindAnalytics(impl: BackendAnalyticsTracker): AnalyticsTracker
 }
 
 @Module
@@ -133,6 +141,16 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideChatApi(retrofit: Retrofit): ChatApi = retrofit.create(ChatApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAnalyticsApi(retrofit: Retrofit): AnalyticsApi =
+        retrofit.create(AnalyticsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideNutritionApi(retrofit: Retrofit): NutritionApi =
+        retrofit.create(NutritionApi::class.java)
 
     private fun buildRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()

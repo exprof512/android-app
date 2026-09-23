@@ -108,6 +108,7 @@ class NutritionTargets:
     applied_safety_floor_kcal: int
     macro_targets_g: MacroTargets
     warnings: list[str] = field(default_factory=list)
+    policy_version: str = "v1"
 
 
 def _round_int(value: Decimal) -> int:
@@ -128,11 +129,13 @@ class NutritionEngine:
         min_daily_calories_female: int,
         min_daily_calories_male: int,
         max_weekly_weight_change_kg: Decimal,
+        policy_version: str = "v1",
     ) -> None:
         self._activity_factors = activity_factors
         self._min_daily_calories_female = min_daily_calories_female
         self._min_daily_calories_male = min_daily_calories_male
         self._max_weekly_weight_change_kg = max_weekly_weight_change_kg
+        self.policy_version = policy_version
 
     @classmethod
     def from_settings(cls, settings: object) -> "NutritionEngine":
@@ -151,6 +154,7 @@ class NutritionEngine:
                 if max_change is None
                 else Decimal(str(max_change))
             ),
+            policy_version=str(getattr(settings, "nutrition_policy_version", "v1")),
         )
 
     @property
@@ -199,6 +203,7 @@ class NutritionEngine:
                 calories_kcal=target_kcal, weight_kg=request.current_weight_kg
             ),
             warnings=warnings,
+            policy_version=self.policy_version,
         )
 
     def recipe_nutrition(

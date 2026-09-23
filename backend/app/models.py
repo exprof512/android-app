@@ -1,11 +1,19 @@
 """Model registry so Alembic autogenerate sees every table in ``Base.metadata``."""
 
 from app.ai.models import AiTextUsage
-from app.auth.models import RefreshToken, User
+from app.analytics.models import ProductEvent
+from app.auth.models import (
+    EmailVerificationToken,
+    IdempotencyKey,
+    PasswordResetToken,
+    RefreshToken,
+    User,
+)
 from app.chat.models import AiConversation, AiMessage
 from app.entitlements.models import Subscription, UsageLimit
 from app.images.models import AiImageUsage, RecipeImage
 from app.meal_plans.models import MealPlan, MealPlanItem
+from app.nutrition.models import NutritionLog
 from app.profiles.models import (
     AvailableProduct,
     FoodPreference,
@@ -28,12 +36,17 @@ __all__ = [
     "AiMessage",
     "AiTextUsage",
     "AvailableProduct",
+    "EmailVerificationToken",
     "FoodPreference",
     "FoodRestriction",
     "Goal",
+    "IdempotencyKey",
     "Ingredient",
     "MealPlan",
     "MealPlanItem",
+    "NutritionLog",
+    "PasswordResetToken",
+    "ProductEvent",
     "Recipe",
     "RecipeImage",
     "RecipeIngredient",

@@ -1,20 +1,22 @@
-# FoodAI MVP release checklist (Phase 16)
+# FoodAI MVP release checklist (Phase 16 + Phase 17)
 
-Использовать перед объявлением MVP release candidate. Отмечать только после проверки на **физическом телефоне** (эмулятор не используется).
+Использовать перед объявлением MVP release candidate / beta. Отмечать только после проверки на **физическом телефоне** (эмулятор не используется).
 
 ## Backend / infra
 
 - [x] `docker compose ps` — все сервисы `healthy` (postgres, redis, minio, backend, worker, nginx)
 - [x] `GET /health` → `{"status":"ok"}` и `X-Request-ID`
 - [x] `GET /health/deps` → postgres/redis/storage без секретов
-- [x] Alembic head применён (`0010_entitlements_ingredients`)
-- [x] Full backend pytest suite green
+- [x] Alembic head применён (`0013_nutrition_diary_policy`)
+- [x] Full backend pytest suite green (incl. `test_phase17_productization`)
 - [x] Postgres restore drill (isolated DB) passed
 - [x] Structured logs не содержат password/JWT/API keys (audit + redaction tests)
 - [x] Security headers на API/Nginx
 - [ ] Production `.env`: `APP_ENV=production`, сильный `JWT_SECRET` (≥32), не placeholder
+- [ ] Production `TERMS_URL` / `PRIVACY_URL` — реальные URL (не example.com)
 - [ ] Production `MEDIA_PUBLIC_BASE_URL` и TLS на публичном edge
 - [ ] OpenAI/DeepSeek keys только в secret store / Compose env, не в git/APK
+- [ ] `ADMIN_EMAILS` bootstrap только для trusted operators
 
 ## Android
 
@@ -30,6 +32,10 @@
   - [ ] Shopping complete toggle
   - [ ] Progress weight entry
   - [ ] Profile Free badge / edit profile / logout
+  - [ ] Account: verification state, sessions, export, delete confirm
+  - [ ] Forgot / reset password
+  - [ ] Today nutrition diary (manual snack log)
+  - [ ] Legal links (Terms / Privacy)
 
 ## Product MVP scope (roadmap)
 

@@ -149,6 +149,9 @@ class Goal(UuidPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="active")
     started_at: Mapped[date | None] = mapped_column(Date)
     ended_at: Mapped[date | None] = mapped_column(Date)
+    nutrition_policy_version: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="v1"
+    )
 
 
 class FoodPreference(UuidPrimaryKeyMixin, TimestampMixin, Base):

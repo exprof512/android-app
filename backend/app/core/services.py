@@ -33,6 +33,9 @@ class Services:
         nutrition: NutritionEngine,
         text_provider: TextGenerationProvider | None = None,
         storage: StorageProvider | None = None,
+        settings: Settings | None = None,
+        email_provider=None,
+        rate_limiter=None,
     ) -> None:
         self.database = database
         self.redis = redis
@@ -41,6 +44,9 @@ class Services:
         self.nutrition = nutrition
         self.text_provider = text_provider
         self.storage = storage
+        self.settings = settings
+        self.email_provider = email_provider
+        self.rate_limiter = rate_limiter
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Services":
@@ -54,6 +60,7 @@ class Services:
             raise RuntimeError(
                 f"Sample or too short secrets are rejected in {settings.app_env}: {weak_names}"
             )
+        settings.validate_production_legal()
         storage = None
         if settings.app_env != "test":
             access = settings.s3_access_key or settings.minio_root_user
@@ -69,9 +76,19 @@ class Services:
                     use_ssl=settings.s3_use_ssl,
                     presigned_ttl_seconds=settings.s3_presigned_url_ttl_seconds,
                 )
+        from app.core.rate_limit import MemoryRateLimiter, RedisRateLimiter
+        from app.email.provider import MockEmailProvider
+
+        email = MockEmailProvider()
+        redis = RedisClient(settings.redis_url)
+        limiter: object = (
+            MemoryRateLimiter()
+            if settings.app_env == "test"
+            else RedisRateLimiter(redis)
+        )
         return cls(
             database=Database(settings.database_url),
-            redis=RedisClient(settings.redis_url),
+            redis=redis,
             passwords=PasswordHasher(settings.password_hasher),
             tokens=TokenService(
                 secret=settings.jwt_secret,
@@ -80,6 +97,9 @@ class Services:
             ),
             nutrition=NutritionEngine.from_settings(settings),
             storage=storage,
+            settings=settings,
+            email_provider=email,
+            rate_limiter=limiter,
         )
 
     async def start(self) -> None:

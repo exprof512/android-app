@@ -93,9 +93,11 @@ fun MainShellRoute(
             email = state.user?.email ?: "—",
             tier = state.user?.tier ?: "free",
             user = state.user,
+            account = state.account,
             profile = state.profile,
             onLogout = { viewModel.logout(onSignedOut) },
             onEditQuestionnaire = onEditProfile,
+            onSignedOut = onSignedOut,
         )
     }
 }
@@ -105,9 +107,11 @@ fun MainShell(
     email: String,
     tier: String,
     user: com.foodai.app.core.network.UserSummaryDto?,
+    account: com.foodai.app.core.network.CurrentUserDto? = null,
     profile: ProfileResponse?,
     onLogout: () -> Unit,
     onEditQuestionnaire: () -> Unit,
+    onSignedOut: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
@@ -118,7 +122,8 @@ fun MainShell(
         current == Routes.Shopping ||
         current == "settings" ||
         current == "notifications" ||
-        current == "profile-details"
+        current == "profile-details" ||
+        current == "account"
 
     Scaffold(
         containerColor = FoodAIColors.Background,
@@ -127,7 +132,8 @@ fun MainShell(
                 FoodAINavigationBar(
                     items = mainTabs,
                     currentRoute = when {
-                        current == "settings" || current == "notifications" || current == "profile-details" ->
+                        current == "settings" || current == "notifications" ||
+                            current == "profile-details" || current == "account" ->
                             Routes.Profile
                         else -> current
                     },
@@ -188,10 +194,18 @@ fun MainShell(
                     profile = profile,
                     onOpenDetails = { navController.navigate("profile-details") },
                     onOpenSettings = { navController.navigate("settings") },
+                    onOpenAccount = { navController.navigate("account") },
                     onOpenNotifications = { navController.navigate("notifications") },
                     onEditQuestionnaire = onEditQuestionnaire,
                     onPremium = { navController.navigate("premium") },
                     onLogout = onLogout,
+                    emailVerified = account?.emailVerified == true,
+                )
+            }
+            composable("account") {
+                com.foodai.app.feature.profile.AccountRoute(
+                    onBack = { navController.popBackStack() },
+                    onDeleted = onSignedOut,
                 )
             }
             composable("settings") {
@@ -273,10 +287,12 @@ private fun ProfileHomeRoute(
     profile: ProfileResponse?,
     onOpenDetails: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAccount: () -> Unit = {},
     onOpenNotifications: () -> Unit,
     onEditQuestionnaire: () -> Unit,
     onPremium: () -> Unit,
     onLogout: () -> Unit,
+    emailVerified: Boolean = true,
     viewModel: com.foodai.app.feature.profile.ProfileViewModel = hiltViewModel(),
 ) {
     val local by viewModel.localProfile.collectAsStateWithLifecycle()
@@ -434,6 +450,22 @@ private fun ProfileHomeRoute(
             }
         }
 
+        if (!emailVerified) {
+            FoodAICard {
+                Text("Подтверди email", style = FoodAITypography.titleMedium)
+                Text(
+                    "Аккаунт работает, но письмо ещё не подтверждено. Открой «Аккаунт», чтобы отправить письмо снова.",
+                    style = FoodAITypography.bodySmall,
+                )
+            }
+        }
+
+        ProfileMenuItem(
+            "Аккаунт",
+            "Сессии, экспорт, удаление, Terms/Privacy",
+            Icons.Outlined.Settings,
+            onOpenAccount,
+        )
         ProfileMenuItem(
             "Мои данные",
             "Возраст, рост, вес, цели — анкета питания",
