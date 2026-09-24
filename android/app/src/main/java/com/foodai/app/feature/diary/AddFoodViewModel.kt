@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.foodai.app.core.auth.toUiMessage
+import com.foodai.app.core.network.ApiErrorParser
 import com.foodai.app.core.network.ApiException
 import com.foodai.app.core.network.FoodCalculateRequest
 import com.foodai.app.core.network.FoodSearchHitDto
@@ -258,12 +259,13 @@ class AddFoodViewModel @Inject constructor(
                     tab = "photo_review",
                 )
             } catch (error: Exception) {
-                val api = error as? ApiException
+                val api = ApiErrorParser.fromThrowable(error)
                 val mapped = when {
-                    api?.httpStatus == 413 || api?.code == "image_too_large" ->
+                    api.httpStatus == 413 || api.code == "image_too_large" ->
                         "Фото слишком большое. Попробуйте другое фото или уменьшите размер."
-                    api != null -> api.toUiMessage()
-                    else -> "Не удалось распознать фото"
+                    api.code == "unsupported_image_type" ->
+                        api.toUiMessage()
+                    else -> api.toUiMessage().ifBlank { "Не удалось распознать фото" }
                 }
                 _state.value = _state.value.copy(
                     loading = false,
@@ -370,8 +372,10 @@ class AddFoodViewModel @Inject constructor(
                 )
                 bus.emit(DomainEvent.NutritionLogChanged())
                 onDone()
-            } catch (error: ApiException) {
-                _state.value = _state.value.copy(error = error.toUiMessage())
+            } catch (error: Exception) {
+                _state.value = _state.value.copy(
+                    error = ApiErrorParser.fromThrowable(error).toUiMessage(),
+                )
             } finally {
                 _state.value = _state.value.copy(loading = false)
             }
