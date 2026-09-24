@@ -13,7 +13,7 @@ from app.chat.models import AiConversation, AiMessage
 from app.entitlements.models import Subscription, UsageLimit
 from app.images.models import AiImageUsage, RecipeImage
 from app.meal_plans.models import MealPlan, MealPlanItem
-from app.nutrition.models import NutritionLog
+from app.nutrition.models import MealTemplate, MealTemplateItem, NutritionLog
 from app.profiles.models import (
     AvailableProduct,
     FoodPreference,
@@ -46,6 +46,8 @@ __all__ = [
     "Ingredient",
     "MealPlan",
     "MealPlanItem",
+    "MealTemplate",
+    "MealTemplateItem",
     "NutritionLog",
     "PasswordResetToken",
     "ProductEvent",

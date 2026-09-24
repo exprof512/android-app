@@ -1,4 +1,8 @@
-"""Text AI FastAPI dependencies."""
+"""Text AI FastAPI dependencies.
+
+Phase 21 routing: DeepSeek is the exclusive product text provider.
+OpenAI is never used for chat/plans/recipes/suggestions here.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,6 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.cache import MemoryCacheStore, RedisCacheStore, TextAICache
-from app.ai.fallback import FallbackTextProvider
 from app.ai.mock import MockTextProvider
 from app.ai.provider import TextGenerationProvider
 from app.ai.service import TextAIService
@@ -15,40 +18,19 @@ from app.core.config import Settings
 from app.core.dependencies import get_db_session, get_redis, get_services
 from app.core.services import Services
 from app.integrations.deepseek.text import DeepSeekChatProvider
-from app.integrations.openai.text import OpenAIResponsesProvider
 
 
 def build_text_provider(settings: Settings) -> TextGenerationProvider:
-    """OpenAI (ChatGPT) first when keyed; DeepSeek only as fallback; mock if none."""
-    chain: list[tuple[str, TextGenerationProvider]] = []
-    if settings.openai_api_key.strip():
-        chain.append(
-            (
-                "openai",
-                OpenAIResponsesProvider(
-                    api_key=settings.openai_api_key,
-                    model=settings.openai_text_model or "gpt-4.1-mini",
-                    timeout_seconds=settings.openai_text_timeout_seconds,
-                ),
-            )
-        )
+    """DeepSeek-only text AI. OpenAI Responses is not in this chain."""
     if settings.deepseek_api_key.strip():
-        chain.append(
-            (
-                "deepseek",
-                DeepSeekChatProvider(
-                    api_key=settings.deepseek_api_key,
-                    model=settings.deepseek_text_model or "deepseek-chat",
-                    timeout_seconds=settings.deepseek_text_timeout_seconds,
-                    base_url=settings.deepseek_base_url or "https://api.deepseek.com",
-                ),
-            )
+        return DeepSeekChatProvider(
+            api_key=settings.deepseek_api_key,
+            model=settings.deepseek_text_model or "deepseek-chat",
+            timeout_seconds=settings.deepseek_text_timeout_seconds,
+            base_url=settings.deepseek_base_url or "https://api.deepseek.com",
         )
-    if not chain:
-        return MockTextProvider(model=settings.openai_text_model or "mock-text-model")
-    if len(chain) == 1:
-        return chain[0][1]
-    return FallbackTextProvider(chain)
+    # No DeepSeek key → mock (never silently route product text to OpenAI).
+    return MockTextProvider(model=settings.deepseek_text_model or "mock-text-model")
 
 
 def get_text_provider(
@@ -59,7 +41,7 @@ def get_text_provider(
         return provider
     settings: Settings = request.app.state.settings
     if settings.app_env == "test":
-        return MockTextProvider(model=settings.openai_text_model or "mock-text-model")
+        return MockTextProvider(model=settings.deepseek_text_model or "mock-text-model")
     if services.text_provider is None:
         services.text_provider = build_text_provider(settings)
     return services.text_provider
@@ -84,11 +66,7 @@ def get_text_ai_service(
         ttl_seconds=settings.ai_cache_ttl_seconds,
         schema_version=settings.openai_response_schema_version,
     )
-    model_name = (
-        settings.openai_text_model
-        or settings.deepseek_text_model
-        or "gpt-4.1-mini"
-    )
+    model_name = settings.deepseek_text_model or "deepseek-chat"
     return TextAIService(
         provider=provider,
         cache=cache,

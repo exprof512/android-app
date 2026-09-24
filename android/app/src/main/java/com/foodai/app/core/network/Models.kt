@@ -169,6 +169,10 @@ data class NutritionLogDto(
     val source: String,
     @SerialName("recipe_id") val recipeId: String? = null,
     @SerialName("meal_plan_item_id") val mealPlanItemId: String? = null,
+    @SerialName("ingredient_id") val ingredientId: String? = null,
+    @SerialName("quantity_g") val quantityG: Double? = null,
+    val unit: String? = null,
+    val notes: String? = null,
 )
 
 @Serializable
@@ -182,6 +186,146 @@ data class NutritionLogCreateRequest(
     @SerialName("fat_g") val fatG: Double? = null,
     @SerialName("carbohydrate_g") val carbohydrateG: Double? = null,
     val servings: Double = 1.0,
+    @SerialName("recipe_id") val recipeId: String? = null,
+    @SerialName("meal_plan_item_id") val mealPlanItemId: String? = null,
+    @SerialName("ingredient_id") val ingredientId: String? = null,
+    @SerialName("quantity_g") val quantityG: Double? = null,
+    val unit: String? = null,
+    val notes: String? = null,
+)
+
+@Serializable
+data class NutritionLogUpdateRequest(
+    val description: String? = null,
+    @SerialName("meal_type") val mealType: String? = null,
+    @SerialName("calories_kcal") val caloriesKcal: Int? = null,
+    @SerialName("protein_g") val proteinG: Double? = null,
+    @SerialName("fat_g") val fatG: Double? = null,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double? = null,
+    val servings: Double? = null,
+    @SerialName("quantity_g") val quantityG: Double? = null,
+    @SerialName("ingredient_id") val ingredientId: String? = null,
+    val notes: String? = null,
+)
+
+@Serializable
+data class DiaryDayDto(
+    val date: String,
+    val totals: DiaryTotalsDto,
+    val meals: Map<String, List<DiaryMealEntryDto>> = emptyMap(),
+)
+
+@Serializable
+data class DiaryTotalsDto(
+    @SerialName("calories_kcal") val caloriesKcal: Int = 0,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("fat_g") val fatG: Double = 0.0,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double = 0.0,
+    val entries: Int = 0,
+)
+
+@Serializable
+data class DiaryMealEntryDto(
+    val id: String,
+    val description: String,
+    @SerialName("calories_kcal") val caloriesKcal: Int,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("fat_g") val fatG: Double = 0.0,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double = 0.0,
+    @SerialName("quantity_g") val quantityG: Double? = null,
+    val source: String,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+@Serializable
+data class DiaryHistoryDayDto(
+    val date: String,
+    @SerialName("calories_kcal") val caloriesKcal: Int,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("fat_g") val fatG: Double = 0.0,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double = 0.0,
+    val entries: Int = 0,
+)
+
+@Serializable
+data class FoodSearchHitDto(
+    @SerialName("ingredient_id") val ingredientId: String,
+    val name: String,
+    @SerialName("calories_per_100g") val caloriesPer100g: Double,
+    @SerialName("protein_per_100g") val proteinPer100g: Double,
+    @SerialName("fat_per_100g") val fatPer100g: Double,
+    @SerialName("carbohydrate_per_100g") val carbohydratePer100g: Double,
+)
+
+@Serializable
+data class RecentFoodDto(
+    val description: String,
+    @SerialName("ingredient_id") val ingredientId: String? = null,
+    @SerialName("quantity_g") val quantityG: Double? = null,
+    @SerialName("calories_kcal") val caloriesKcal: Int = 0,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("fat_g") val fatG: Double = 0.0,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double = 0.0,
+    val source: String = "manual",
+)
+
+@Serializable
+data class FoodCalculateRequest(
+    @SerialName("ingredient_id") val ingredientId: String,
+    @SerialName("quantity_g") val quantityG: Double,
+)
+
+@Serializable
+data class FoodCalculateDto(
+    @SerialName("ingredient_id") val ingredientId: String,
+    val name: String,
+    @SerialName("quantity_g") val quantityG: Double,
+    @SerialName("calories_kcal") val caloriesKcal: Int,
+    @SerialName("protein_g") val proteinG: Double,
+    @SerialName("fat_g") val fatG: Double,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double,
+)
+
+@Serializable
+data class PhotoAnalyzeDto(
+    val items: List<PhotoItemDto> = emptyList(),
+    @SerialName("overall_confidence") val overallConfidence: Double = 0.0,
+    @SerialName("estimated_total_kcal") val estimatedTotalKcal: Int? = null,
+    val warnings: List<String> = emptyList(),
+    val model: String? = null,
+    @SerialName("needs_manual_review") val needsManualReview: Boolean = false,
+)
+
+@Serializable
+data class PhotoItemDto(
+    val name: String,
+    @SerialName("estimated_grams") val estimatedGrams: Double? = null,
+    val confidence: Double = 0.0,
+    val matched: Boolean = false,
+    @SerialName("ingredient_id") val ingredientId: String? = null,
+    @SerialName("canonical_name") val canonicalName: String? = null,
+    @SerialName("calories_kcal") val caloriesKcal: Int? = null,
+    @SerialName("protein_g") val proteinG: Double? = null,
+    @SerialName("fat_g") val fatG: Double? = null,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double? = null,
+    @SerialName("low_confidence") val lowConfidence: Boolean = false,
+    val notes: String? = null,
+)
+
+@Serializable
+data class PhotoConfirmRequest(
+    @SerialName("logged_on") val loggedOn: String,
+    @SerialName("meal_type") val mealType: String = "snack",
+    val items: List<PhotoConfirmItemDto>,
+)
+
+@Serializable
+data class PhotoConfirmItemDto(
+    @SerialName("ingredient_id") val ingredientId: String? = null,
+    val description: String,
+    @SerialName("quantity_g") val quantityG: Double,
+    @SerialName("meal_type") val mealType: String = "snack",
+    val notes: String? = null,
 )
 
 @Serializable

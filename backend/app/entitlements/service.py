@@ -164,6 +164,9 @@ class EntitlementsService:
             constants.FEATURE_AI_RECOMMENDATION: (
                 self._settings.entitlement_free_ai_recommendation_per_day
             ),
+            constants.FEATURE_FOOD_PHOTO: (
+                self._settings.entitlement_free_food_photo_per_day
+            ),
             constants.FEATURE_IMAGE_REGENERATE: 0,
         }
         return mapping.get(feature, self._settings.entitlement_free_default_per_day)

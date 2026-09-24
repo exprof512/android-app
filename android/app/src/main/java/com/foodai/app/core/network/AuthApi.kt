@@ -1,11 +1,16 @@
 package com.foodai.app.core.network
 
+import okhttp3.MultipartBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -69,6 +74,43 @@ interface NutritionApi {
     @POST("nutrition/logs")
     suspend fun createLog(@Body body: NutritionLogCreateRequest): NutritionLogDto
 
+    @PATCH("nutrition/logs/{id}")
+    suspend fun patchLog(
+        @Path("id") id: String,
+        @Body body: NutritionLogUpdateRequest,
+    ): NutritionLogDto
+
     @DELETE("nutrition/logs/{id}")
     suspend fun deleteLog(@Path("id") id: String)
+
+    @POST("nutrition/logs/{id}/duplicate")
+    suspend fun duplicateLog(@Path("id") id: String): NutritionLogDto
+
+    @GET("nutrition/diary/day")
+    suspend fun diaryDay(@Query("date") date: String? = null): DiaryDayDto
+
+    @GET("nutrition/diary/history")
+    suspend fun diaryHistory(@Query("days") days: Int = 7): List<DiaryHistoryDayDto>
+
+    @GET("nutrition/foods/search")
+    suspend fun searchFoods(@Query("q") query: String): List<FoodSearchHitDto>
+
+    @GET("nutrition/foods/recent")
+    suspend fun recentFoods(): List<RecentFoodDto>
+
+    @POST("nutrition/foods/calculate")
+    suspend fun calculateFood(@Body body: FoodCalculateRequest): FoodCalculateDto
+
+    @Multipart
+    @POST("nutrition/photo/analyze")
+    suspend fun analyzePhoto(@Part file: MultipartBody.Part): PhotoAnalyzeDto
+
+    @POST("nutrition/photo/confirm")
+    suspend fun confirmPhoto(
+        @Body body: PhotoConfirmRequest,
+        @Header("Idempotency-Key") idempotencyKey: String? = null,
+    ): List<NutritionLogDto>
+
+    @POST("nutrition/photo/recalculate")
+    suspend fun recalculatePhoto(@Body body: FoodCalculateRequest): FoodCalculateDto
 }

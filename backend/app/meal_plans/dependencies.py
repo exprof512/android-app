@@ -43,7 +43,7 @@ def get_meal_plan_service(
         recipe_engine=RecipeEngine(services.nutrition),
         meal_plan_engine=MealPlanEngine(),
         text_ai=text_ai,
-        ai_model=settings.openai_text_model or "gpt-4.1-mini",
+        ai_model=settings.deepseek_text_model or "deepseek-chat",
         image_service=image_service,
         entitlements=entitlements,
     )

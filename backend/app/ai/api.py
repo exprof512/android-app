@@ -74,11 +74,7 @@ def get_recommendation_service(
     services: Services = Depends(get_services),
 ) -> RecommendationService:
     settings = services.settings
-    model_name = (
-        settings.openai_text_model
-        or settings.deepseek_text_model
-        or "mock-text-model"
-    )
+    model_name = settings.deepseek_text_model or "deepseek-chat"
     return RecommendationService(
         session=session,
         text_ai=text_ai,

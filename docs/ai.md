@@ -126,23 +126,25 @@ NUTRITION_MIN_DAILY_CALORIES_MALE=1500
 
 ## Тестируемость
 
-`TextGenerationProvider` имеет production `OpenAIResponsesProvider`, optional `DeepSeekChatProvider` и test `MockTextProvider`. pytest не выполняет сетевых вызовов к OpenAI/DeepSeek. Обязательные tests: JSON schema failure/retry, unknown ingredients, nutrition override attempt, allergy/exclusion violation, plan daily mismatch, context ownership, cache/idempotency, quota/rate limit и safe chat response. Параллельный image contract использует `MockImageProvider`, никогда реальный Image API.
+`TextGenerationProvider` для product text — только `DeepSeekChatProvider` (или `MockTextProvider` в test / без DeepSeek-ключа). OpenAI Responses **не** используется для chat/plan/recipe/suggestion. Food photo → `OpenAIVisionProvider`. Image generation → `OpenAIImageProvider`. Матрица: [ai-provider-routing.md](ai-provider-routing.md).
+
+pytest не выполняет сетевых вызовов к OpenAI/DeepSeek. Обязательные tests: provider routing, JSON schema failure/retry, unknown ingredients, nutrition override, allergy/exclusion, plan mismatch, ownership, cache/idempotency, quota, food photo mock vision, safe chat. Image contract — `MockImageProvider`.
 
 ## Phase 5 implementation notes
 
 Реализовано в коде:
 
-- `backend/app/integrations/openai/` — OpenAI SDK boundary (`client.py`, `text.py`, `images.py`);
-- `backend/app/integrations/deepseek/` — DeepSeek Chat Completions + JSON mode (тот же OpenAI SDK, `base_url`);
-- `backend/app/ai/` — `TextAIService`, schemas, prompts, cache, `ai_text_usage`, `MockTextProvider`, `FallbackTextProvider`, draft converter;
+- `backend/app/integrations/openai/` — OpenAI SDK boundary (`client.py`, `text.py`, `images.py`, `vision.py`);
+- `backend/app/integrations/deepseek/` — DeepSeek Chat Completions + JSON mode;
+- `backend/app/ai/` — `TextAIService`, schemas, prompts, cache, `ai_text_usage`, `MockTextProvider`;
 - migration `0004_ai_text_usage`;
 - Redis cache key = operation + model + schema version + normalized payload fingerprint;
 - repair retry bounded by `OPENAI_TEXT_MAX_ATTEMPTS` (default 2);
-- runtime chain: OpenAI/ChatGPT (если `OPENAI_API_KEY`) → DeepSeek (если `DEEPSEEK_API_KEY`) → meal-plan catalog fallback; без ключей — `MockTextProvider`.
+- **Phase 21 runtime:** DeepSeek = exclusive product text; OpenAI = vision + image generation only.
 
-Meal-plan HTTP endpoints и Chat API появляются в следующих фазах и вызывают этот слой.
+Meal-plan HTTP endpoints и Chat API вызывают этот слой.
 
-Связанные спецификации: [architecture.md](architecture.md), [database.md](database.md), [api.md](api.md), [development.md](development.md).
+Связанные спецификации: [architecture.md](architecture.md), [database.md](database.md), [api.md](api.md), [development.md](development.md), [ai-provider-routing.md](ai-provider-routing.md).
 
 ## Phase 20 — Adaptive AI
 

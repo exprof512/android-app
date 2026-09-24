@@ -7,6 +7,7 @@ FEATURE_MEAL_REPLACE = "meal_plan_replace"
 FEATURE_CHAT_MESSAGE = "chat_message"
 FEATURE_IMAGE_REGENERATE = "image_regenerate"
 FEATURE_AI_RECOMMENDATION = "ai_recommendation"
+FEATURE_FOOD_PHOTO = "food_photo_analysis"
 
 PREMIUM_ONLY_FEATURES = frozenset({FEATURE_IMAGE_REGENERATE})
 

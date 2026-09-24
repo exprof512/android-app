@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     deepseek_text_model: str = "deepseek-chat"
     deepseek_text_timeout_seconds: int = 60
 
+    # OpenAI Vision — food photo analysis only (never product text AI).
+    openai_vision_model: str = "gpt-4.1-mini"
+    openai_vision_timeout_seconds: int = 60
+    openai_vision_max_image_bytes: int = 5_242_880
+    openai_vision_max_dimension: int = 2048
+
+    entitlement_free_food_photo_per_day: int = 10
+
     s3_provider: str = "minio"
     s3_endpoint: str = "http://minio:9000"
     s3_region: str = "us-east-1"

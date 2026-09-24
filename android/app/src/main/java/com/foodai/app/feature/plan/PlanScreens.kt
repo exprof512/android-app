@@ -79,6 +79,7 @@ import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
 import com.foodai.app.feature.ai.AiPreviewSheet
 import com.foodai.app.feature.ai.AiPreviewState
+import com.foodai.app.feature.diary.AddFoodSheet
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -223,10 +224,7 @@ fun TodayScreen(
     if (showAddFood) {
         AddFoodSheet(
             onDismiss = { showAddFood = false },
-            onSubmit = { desc, kcal, p, f, c ->
-                onAddFood(desc, kcal, p, f, c)
-                showAddFood = false
-            },
+            onSaved = { onRefresh() },
         )
     }
     if (showWeight) {
@@ -706,83 +704,6 @@ private fun ReplaceReasonDialog(
             TextButton(onClick = onDismiss) { Text("Отмена") }
         },
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddFoodSheet(
-    onDismiss: () -> Unit,
-    onSubmit: (String, Int, Double, Double, Double) -> Unit,
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var description by remember { mutableStateOf("") }
-    var calories by remember { mutableStateOf("") }
-    var protein by remember { mutableStateOf("") }
-    var fat by remember { mutableStateOf("") }
-    var carbs by remember { mutableStateOf("") }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(FoodAIDimens.ScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
-        ) {
-            Text("Добавить еду", style = FoodAITypography.titleLarge)
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Описание") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = calories,
-                onValueChange = { calories = it.filter { ch -> ch.isDigit() } },
-                label = { Text("Ккал") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = protein,
-                    onValueChange = { protein = it.filter { ch -> ch.isDigit() || ch == '.' || ch == ',' } },
-                    label = { Text("Белки") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-                OutlinedTextField(
-                    value = fat,
-                    onValueChange = { fat = it.filter { ch -> ch.isDigit() || ch == '.' || ch == ',' } },
-                    label = { Text("Жиры") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-                OutlinedTextField(
-                    value = carbs,
-                    onValueChange = { carbs = it.filter { ch -> ch.isDigit() || ch == '.' || ch == ',' } },
-                    label = { Text("Углеводы") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                )
-            }
-            FoodAIPrimaryButton(
-                label = "Сохранить",
-                onClick = {
-                    val kcal = calories.toIntOrNull() ?: return@FoodAIPrimaryButton
-                    if (description.isBlank()) return@FoodAIPrimaryButton
-                    onSubmit(
-                        description.trim(),
-                        kcal,
-                        protein.replace(',', '.').toDoubleOrNull() ?: 0.0,
-                        fat.replace(',', '.').toDoubleOrNull() ?: 0.0,
-                        carbs.replace(',', '.').toDoubleOrNull() ?: 0.0,
-                    )
-                },
-                enabled = description.isNotBlank() && (calories.toIntOrNull() ?: 0) > 0,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(FoodAIDimens.Space16))
-        }
-    }
 }
 
 @Composable
