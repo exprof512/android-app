@@ -48,6 +48,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -82,7 +83,6 @@ import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
 import com.foodai.app.feature.ai.AiPreviewSheet
 import com.foodai.app.feature.ai.AiPreviewState
-import com.foodai.app.feature.diary.AddFoodSheet
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -106,18 +106,31 @@ fun TodayRoute(
     onOpenShopping: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenPlan: () -> Unit = {},
+    onOpenDiary: () -> Unit = {},
+    pendingAiAction: String? = null,
+    onAiActionConsumed: () -> Unit = {},
     viewModel: TodayViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> viewModel.onStepsPermissionResult(granted) }
+    var replaceNonce by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         } else {
             viewModel.onStepsPermissionResult(true)
         }
+    }
+    LaunchedEffect(pendingAiAction) {
+        when (pendingAiAction) {
+            "what_to_eat" -> viewModel.requestWhatToEat()
+            "adapt_day" -> viewModel.requestAdaptDay()
+            "replace" -> replaceNonce += 1
+            null -> Unit
+        }
+        if (pendingAiAction != null) onAiActionConsumed()
     }
     when {
         state.generating -> LoadingPane("Создаём план питания…")
@@ -151,6 +164,8 @@ fun TodayRoute(
             onOpenShopping = onOpenShopping,
             onOpenProgress = onOpenProgress,
             onOpenPlan = onOpenPlan,
+            onOpenDiary = onOpenDiary,
+            replaceNonce = replaceNonce,
             onWhatToEat = { viewModel.requestWhatToEat() },
             onAdaptDay = viewModel::requestAdaptDay,
             onPantryCook = { viewModel.requestWhatToEat(intent = "pantry_cook") },
@@ -181,6 +196,8 @@ fun TodayScreen(
     onOpenShopping: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenPlan: () -> Unit = {},
+    onOpenDiary: () -> Unit = {},
+    replaceNonce: Int = 0,
     onWhatToEat: () -> Unit = {},
     onAdaptDay: () -> Unit = {},
     onPantryCook: () -> Unit = {},
@@ -213,7 +230,6 @@ fun TodayScreen(
     }
 
     var replaceTarget by remember { mutableStateOf<MealPlanItemDto?>(null) }
-    var showAddFood by remember { mutableStateOf(false) }
     var showWeight by remember { mutableStateOf(false) }
     var weightInput by remember { mutableStateOf(weight?.toString().orEmpty()) }
 
@@ -226,11 +242,10 @@ fun TodayScreen(
             },
         )
     }
-    if (showAddFood) {
-        AddFoodSheet(
-            onDismiss = { showAddFood = false },
-            onSaved = { onRefresh() },
-        )
+    LaunchedEffect(replaceNonce) {
+        if (replaceNonce > 0) {
+            replaceTarget = nextMeal ?: todayItems.firstOrNull { !it.isCompleted && it.status != "skipped" }
+        }
     }
     if (showWeight) {
         WeightDialog(
@@ -268,9 +283,9 @@ fun TodayScreen(
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(dateHeadline, style = FoodAITypography.headlineMedium)
+                    Text(dateHeadline, style = FoodAITypography.titleLarge)
                     Text(
-                        "Дневной цикл: еда, вода, вес",
+                        "Сегодня · твой план питания",
                         style = FoodAITypography.bodyMedium,
                         color = FoodAIColors.TextSecondary,
                     )
@@ -298,39 +313,6 @@ fun TodayScreen(
                 tipId = "today_loop",
                 text = "Отмечай съеденное, пропускай лишнее и заменяй блюда — прогресс дня считает сервер.",
             )
-        }
-        item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(FoodAIShapes.Card)
-                    .background(FoodAIColors.Surface)
-                    .padding(FoodAIDimens.Space16),
-                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
-            ) {
-                Text("FoodAI", style = FoodAITypography.titleMedium)
-                Text(
-                    "Нужна помощь с выбором?",
-                    style = FoodAITypography.bodySmall,
-                    color = FoodAIColors.TextSecondary,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
-                ) {
-                    TextButton(onClick = onWhatToEat) {
-                        Text("Что съесть?", color = FoodAIColors.Primary)
-                    }
-                    TextButton(onClick = onAdaptDay) {
-                        Text("Адаптировать день", color = FoodAIColors.TextSecondary)
-                    }
-                    if (state.profile?.availableProducts?.isNotEmpty() == true) {
-                        TextButton(onClick = onPantryCook) {
-                            Text("Из продуктов", color = FoodAIColors.TextSecondary)
-                        }
-                    }
-                }
-            }
         }
         item {
             DayProgressCard(progress = progress, fallbackTargets = plan?.dailyTargets)
@@ -379,9 +361,9 @@ fun TodayScreen(
             item {
                 FoodAIEmptyState(
                     title = "Нет запланированных приёмов",
-                    subtitle = "Добавьте еду вручную или создайте план на неделю.",
-                    actionLabel = "Добавить еду",
-                    onAction = { showAddFood = true },
+                    subtitle = "Откройте дневник, чтобы записать еду, или соберите план.",
+                    actionLabel = "Дневник",
+                    onAction = onOpenDiary,
                 )
             }
         }
@@ -400,8 +382,8 @@ fun TodayScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space16),
             ) {
-                TextButton(onClick = { showAddFood = true }) {
-                    Text("Добавить еду", color = FoodAIColors.Primary)
+                TextButton(onClick = onOpenDiary) {
+                    Text("Дневник", color = FoodAIColors.Primary)
                 }
                 TextButton(onClick = onOpenPlan) {
                     Text("План", color = FoodAIColors.TextSecondary)
@@ -516,8 +498,8 @@ private fun DayProgressCard(
             Column(Modifier.weight(1f)) {
                 Text("Съедено", style = FoodAITypography.labelSmall, color = FoodAIColors.TextSecondary)
                 Text(
-                    "%,d".format(consumed),
-                    style = FoodAITypography.headlineMedium,
+                    "%,d / %,d ккал".format(consumed, target),
+                    style = FoodAITypography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = if (overTarget > 0) FoodAIColors.Warning else FoodAIColors.TextPrimary,
                 )
@@ -526,23 +508,18 @@ private fun DayProgressCard(
                     style = FoodAITypography.titleMedium,
                     color = if (overTarget > 0) FoodAIColors.Warning else FoodAIColors.Primary,
                 )
-                if (progress != null) {
+                if (fromDiary > 0) {
                     Text(
-                        "${progress.completedMeals}/${progress.plannedMeals} приёмов плана" +
-                            if (progress.skippedMeals > 0) " · пропущено ${progress.skippedMeals}" else "",
+                        "Вне плана: %,d ккал".format(fromDiary),
                         style = FoodAITypography.bodySmall,
                         color = FoodAIColors.TextSecondary,
                     )
                 }
-                if (fromDiary > 0 || plannedRemaining > 0) {
+                if (plannedRemaining > 0) {
                     Text(
-                        buildString {
-                            if (fromDiary > 0) append("Дневник +,%,d ккал".format(fromDiary))
-                            if (fromDiary > 0 && plannedRemaining > 0) append(" · ")
-                            if (plannedRemaining > 0) append("В плане ещё %,d".format(plannedRemaining))
-                        },
-                        style = FoodAITypography.labelSmall,
-                        color = FoodAIColors.TextMuted,
+                        "В плане ещё %,d ккал — не съедено".format(plannedRemaining),
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
                     )
                 }
             }
@@ -936,7 +913,7 @@ fun WeekScreen(
                 Column(Modifier.weight(1f)) {
                     Text("План на неделю", style = FoodAITypography.headlineMedium)
                     Text(
-                        "Вкусное, полезное и разнообразное питание по твоим целям.",
+                        "Запланировано. В калории дня попадёт только после «Съел».",
                         style = FoodAITypography.bodyMedium,
                         color = FoodAIColors.TextSecondary,
                     )

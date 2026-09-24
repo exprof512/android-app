@@ -10,17 +10,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -148,29 +145,29 @@ fun DiaryScreen(
             }
         }
         item {
-            TextButton(onClick = onAdd) {
-                Icon(Icons.Outlined.Add, contentDescription = null, tint = FoodAIColors.Primary)
-                Spacer(Modifier.width(4.dp))
-                Text("Добавить еду", color = FoodAIColors.Primary)
-            }
-        }
-        if (state.logs.isEmpty()) {
-            item {
-                Text(
-                    "Пока нет записей за этот день. Добавьте еду через + или отметьте приём в плане.",
-                    style = FoodAITypography.bodyMedium,
-                    color = FoodAIColors.TextSecondary,
-                )
-            }
+            val eatenTitle = if (state.date == LocalDate.now().toString()) "Сегодня съедено" else "Съедено"
+            Text(eatenTitle, style = FoodAITypography.titleMedium)
         }
         for ((meal, rows) in grouped) {
-            if (rows.isEmpty()) continue
             item {
-                Text(mealTypeLabel(meal), style = FoodAITypography.titleMedium)
+                Text(mealTypeLabel(meal), style = FoodAITypography.titleSmall, color = FoodAIColors.TextSecondary)
             }
-            items(rows, key = { it.id }) { log ->
-                DiaryEntryRow(log = log, onDelete = { onDelete(log.id) })
+            if (rows.isEmpty()) {
+                item {
+                    Text("Нет записей", style = FoodAITypography.bodySmall, color = FoodAIColors.TextMuted)
+                }
+            } else {
+                items(rows, key = { it.id }) { log ->
+                    DiaryEntryRow(log = log, onDelete = { onDelete(log.id) })
+                }
             }
+        }
+        item {
+            com.foodai.app.core.ui.components.FoodAIPrimaryButton(
+                label = "Добавить еду",
+                onClick = onAdd,
+                showArrow = false,
+            )
         }
         item { Spacer(Modifier.height(FoodAIDimens.Space32)) }
     }

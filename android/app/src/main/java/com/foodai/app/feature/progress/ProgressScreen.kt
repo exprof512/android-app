@@ -170,8 +170,7 @@ fun ProgressScreen(
             Text("Сегодня", style = FoodAITypography.titleLarge)
             if (today != null) {
                 Text(
-                    "Съедено ${today.consumedCaloriesKcal} / цель ${goalKcal ?: "—"} ккал" +
-                        " · план ${today.plannedCaloriesKcal}",
+                    "Съедено ${today.consumedCaloriesKcal} ккал · цель ${goalKcal ?: "—"}",
                     style = FoodAITypography.bodyMedium,
                 )
                 Text(

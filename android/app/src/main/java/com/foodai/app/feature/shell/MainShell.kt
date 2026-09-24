@@ -19,22 +19,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalFireDepartment
-import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material.icons.outlined.WaterDrop
-import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -56,6 +52,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
@@ -73,7 +70,6 @@ import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
 import com.foodai.app.feature.chat.ChatRoute
-import com.foodai.app.feature.diary.AddFoodSheet
 import com.foodai.app.feature.diary.DiaryRoute
 import com.foodai.app.feature.plan.TodayRoute
 import com.foodai.app.feature.plan.WeekRoute
@@ -85,10 +81,19 @@ import com.foodai.app.navigation.Routes
 private val mainTabs = listOf(
     FoodAINavItem(Routes.Home, "Сегодня", Icons.Outlined.Home),
     FoodAINavItem(Routes.Plan, "План", Icons.Outlined.CalendarMonth),
-    FoodAINavItem(Routes.Diary, "Дневник", Icons.Outlined.MenuBook),
     FoodAINavItem(Routes.Progress, "Прогресс", Icons.AutoMirrored.Outlined.ShowChart),
     FoodAINavItem(Routes.Profile, "Профиль", Icons.Outlined.Person),
 )
+
+private fun openTab(navController: NavHostController, route: String) {
+    navController.navigate(route) {
+        popUpTo(navController.graph.findStartDestination().id) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
 
 @Composable
 fun MainShellRoute(
@@ -130,7 +135,8 @@ fun MainShell(
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
-    var showAddFood by remember { mutableStateOf(false) }
+    var showAiHub by remember { mutableStateOf(false) }
+    var pendingAiAction by remember { mutableStateOf<String?>(null) }
     val hideBottomBar = current?.startsWith("recipe/") == true ||
         current?.startsWith("chat") == true ||
         current == "premium" ||
@@ -142,31 +148,37 @@ fun MainShell(
         current == "favorites" ||
         current == "recipe-search"
 
-    if (showAddFood) {
-        AddFoodSheet(
-            onDismiss = { showAddFood = false },
-            onSaved = { showAddFood = false },
+    if (showAiHub) {
+        com.foodai.app.feature.ai.AiHubSheet(
+            onDismiss = { showAiHub = false },
+            onWhatToEat = {
+                showAiHub = false
+                pendingAiAction = "what_to_eat"
+                openTab(navController, Routes.Home)
+            },
+            onAdaptDay = {
+                showAiHub = false
+                pendingAiAction = "adapt_day"
+                openTab(navController, Routes.Home)
+            },
+            onReplaceMeal = {
+                showAiHub = false
+                pendingAiAction = "replace"
+                openTab(navController, Routes.Home)
+            },
+            onShopping = {
+                showAiHub = false
+                navController.navigate(Routes.Shopping)
+            },
+            onChat = {
+                showAiHub = false
+                navController.navigate("chat")
+            },
         )
     }
 
     Scaffold(
         containerColor = FoodAIColors.Background,
-        floatingActionButton = {
-            if (!hideBottomBar) {
-                FloatingActionButton(
-                    onClick = { showAddFood = true },
-                    containerColor = FoodAIColors.Primary,
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "Добавить еду",
-                    )
-                }
-            }
-        },
-        floatingActionButtonPosition = FabPosition.Center,
         bottomBar = {
             if (!hideBottomBar) {
                 FoodAINavigationBar(
@@ -177,17 +189,8 @@ fun MainShell(
                             Routes.Profile
                         else -> current
                     },
-                    onSelect = { route ->
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    // Center slot reserves space under Scaffold FAB (not clipped).
-                    onFabClick = { showAddFood = true },
+                    onSelect = { route -> openTab(navController, route) },
+                    onCenterClick = { showAiHub = true },
                 )
             }
         },
@@ -212,15 +215,10 @@ fun MainShell(
                             restoreState = true
                         }
                     },
-                    onOpenPlan = {
-                        navController.navigate(Routes.Plan) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
+                    onOpenPlan = { openTab(navController, Routes.Plan) },
+                    onOpenDiary = { navController.navigate(Routes.Diary) },
+                    pendingAiAction = pendingAiAction,
+                    onAiActionConsumed = { pendingAiAction = null },
                 )
             }
             composable(Routes.Plan) {

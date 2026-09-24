@@ -14,17 +14,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,7 +34,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.foodai.app.core.network.RecipeImageDto
@@ -174,9 +180,8 @@ data class FoodAINavItem(
 )
 
 /**
- * Bottom navigation. Optional [onFabClick] reserves a center slot for a docked FAB
- * drawn by the parent [androidx.compose.material3.Scaffold] — do not overlay a
- * clipped circle here (touches get eaten by bottomBar bounds).
+ * Bottom navigation with an inline center AI action.
+ * [items] should be four destinations (two on each side). Labels stay on one line.
  */
 @Composable
 fun FoodAINavigationBar(
@@ -184,11 +189,11 @@ fun FoodAINavigationBar(
     currentRoute: String?,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    onFabClick: (() -> Unit)? = null,
+    onCenterClick: () -> Unit,
+    centerLabel: String = "AI",
 ) {
-    NavigationBar(
-        containerColor = FoodAIColors.Surface,
-        tonalElevation = 0.dp,
+    Surface(
+        color = FoodAIColors.Surface,
         modifier = modifier
             .fillMaxWidth()
             .border(
@@ -197,31 +202,53 @@ fun FoodAINavigationBar(
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             ),
     ) {
-        if (onFabClick == null) {
-            items.forEach { item ->
-                NavBarSlot(item = item, currentRoute = currentRoute, onSelect = onSelect)
-            }
-        } else {
-            // Even split around the center FAB slot (e.g. 2 + FAB + 2 for 4 tabs,
-            // or 2 + FAB + 3 for 5 tabs — prefer even counts when possible).
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .height(80.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             val leftCount = items.size / 2
-            val left = items.take(leftCount)
-            val right = items.drop(leftCount)
-            left.forEach { item ->
+            items.take(leftCount).forEach { item ->
                 NavBarSlot(item = item, currentRoute = currentRoute, onSelect = onSelect)
             }
-            NavigationBarItem(
-                selected = false,
-                onClick = onFabClick,
-                icon = {
-                    // Invisible placeholder; real FAB is Scaffold.floatingActionButton.
-                    Spacer(Modifier.size(48.dp))
-                },
-                label = { Text(" ") },
-                colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
-                enabled = true,
-            )
-            right.forEach { item ->
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(72.dp)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = centerLabel
+                    }
+                    .clickable(onClick = onCenterClick),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(FoodAIColors.Primary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                Text(
+                    centerLabel,
+                    color = FoodAIColors.Primary,
+                    style = FoodAITypography.labelSmall,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            items.drop(leftCount).forEach { item ->
                 NavBarSlot(item = item, currentRoute = currentRoute, onSelect = onSelect)
             }
         }
@@ -235,32 +262,34 @@ private fun androidx.compose.foundation.layout.RowScope.NavBarSlot(
     onSelect: (String) -> Unit,
 ) {
     val selected = currentRoute == item.route
-    NavigationBarItem(
-        selected = selected,
-        onClick = { onSelect(item.route) },
-        icon = {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(FoodAIDimens.RadiusPill))
-                    .background(if (selected) FoodAIColors.NavSelected else Color.Transparent)
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            ) {
-                Icon(
-                    item.icon,
-                    contentDescription = item.label,
-                    tint = if (selected) FoodAIColors.Primary else FoodAIColors.TextMuted,
-                )
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .height(72.dp)
+            .semantics {
+                role = Role.Tab
+                contentDescription = item.label
             }
-        },
-        label = {
-            Text(
-                item.label,
-                color = if (selected) FoodAIColors.Primary else FoodAIColors.TextMuted,
-                style = FoodAITypography.labelMedium,
-            )
-        },
-        colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
-    )
+            .clickable { onSelect(item.route) },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            item.icon,
+            contentDescription = null,
+            tint = if (selected) FoodAIColors.Primary else FoodAIColors.TextMuted,
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            item.label,
+            color = if (selected) FoodAIColors.Primary else FoodAIColors.TextMuted,
+            style = FoodAITypography.labelSmall,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 @Composable

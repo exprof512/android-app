@@ -26,9 +26,13 @@ object FoodAIDimens {
     val RadiusPill: Dp = 28.dp
 
     val ButtonHeight: Dp = 56.dp
+    val CompactButtonHeight: Dp = 48.dp
     val IconButtonSize: Dp = 40.dp
     val TouchTarget: Dp = 48.dp
     val StepBarHeight: Dp = 6.dp
     val SelectableIconSize: Dp = 40.dp
     val FoodTileSize: Dp = 64.dp
 }
+
+/** Alias used by screens that talk about spacing rather than the full token set. */
+typealias FoodAISpacing = FoodAIDimens
