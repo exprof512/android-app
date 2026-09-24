@@ -1,6 +1,6 @@
 # Phase 23 Report — Bug Hunt, Refactoring & Stability
 
-**Status: PARTIAL** — P0/P1 code fixes + regression tests + APK landed; **physical-device smoke must be confirmed by the user on a phone**.
+**Status: PARTIAL** — final verification in [`docs/phase-23-verification.md`](phase-23-verification.md). Unresolved P1: **B23-14 timezone only**. Physical-device smoke is **pending** (not run).
 
 ## 1. Audit summary
 
