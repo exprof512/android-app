@@ -96,7 +96,7 @@ async def build_catalog_meal_plan_proposal(
             ingredients = _ingredients_for(ingredient_specs, by_name)
             recipes.append(
                 RecipeCandidate(
-                    name=f"{name} ({day.isoformat()})",
+                    name=name,
                     description="Каталожный fallback без OpenAI.",
                     servings=1,
                     cooking_method="mixed",

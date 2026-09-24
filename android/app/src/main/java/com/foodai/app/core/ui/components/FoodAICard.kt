@@ -1,6 +1,5 @@
 package com.foodai.app.core.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,8 +48,8 @@ fun FoodAICard(
             modifier = modifier.fillMaxWidth(),
             shape = shape,
             color = FoodAIColors.Surface,
-            border = BorderStroke(1.dp, FoodAIColors.Divider),
             shadowElevation = 1.dp,
+            tonalElevation = 0.dp,
         ) {
             Column(modifier = Modifier.padding(FoodAIDimens.Space16), content = content)
         }
@@ -59,8 +58,8 @@ fun FoodAICard(
             modifier = modifier.fillMaxWidth(),
             shape = shape,
             color = FoodAIColors.Surface,
-            border = BorderStroke(1.dp, FoodAIColors.Divider),
             shadowElevation = 1.dp,
+            tonalElevation = 0.dp,
         ) {
             Column(modifier = Modifier.padding(FoodAIDimens.Space16), content = content)
         }

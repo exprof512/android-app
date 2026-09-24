@@ -62,10 +62,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.network.DayProgressDto
 import com.foodai.app.core.network.MealPlanItemDto
+import com.foodai.app.core.network.NutritionLogDto
 import com.foodai.app.core.network.WeekDayDto
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.RecipeImagePane
+import com.foodai.app.core.ui.displayRecipeName
 import com.foodai.app.core.ui.components.FoodAICard
 import com.foodai.app.core.ui.components.FoodAIEmptyState
 import com.foodai.app.core.ui.components.FoodAIMacroBar
@@ -135,6 +137,7 @@ fun TodayRoute(
             onAddWater = viewModel::addWater,
             onUndoWater = viewModel::undoWater,
             onAddFood = viewModel::addFood,
+            onDeleteFood = viewModel::deleteFood,
             onAddWeight = viewModel::addWeight,
             onRequestStepsPermission = {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -170,6 +173,7 @@ fun TodayScreen(
     onAddWater: (Int) -> Unit,
     onUndoWater: () -> Unit,
     onAddFood: (description: String, calories: Int, protein: Double, fat: Double, carbs: Double) -> Unit,
+    onDeleteFood: (String) -> Unit = {},
     onAddWeight: (Double) -> Unit,
     onRequestStepsPermission: () -> Unit = {},
     onOpenRecipe: (recipeId: String, itemId: String) -> Unit,
@@ -295,31 +299,35 @@ fun TodayScreen(
             )
         }
         item {
-            FoodAICard {
-                Text("AI-помощник", style = FoodAITypography.titleMedium)
-                Spacer(Modifier.height(FoodAIDimens.Space8))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.Card)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
+                Text("FoodAI", style = FoodAITypography.titleMedium)
                 Text(
-                    "Предложения появляются только по запросу — ничего не меняется без вашего подтверждения.",
+                    "Нужна помощь с выбором?",
                     style = FoodAITypography.bodySmall,
                     color = FoodAIColors.TextSecondary,
                 )
-                Spacer(Modifier.height(FoodAIDimens.Space12))
-                FoodAIPrimaryButton(
-                    label = "Что мне съесть?",
-                    onClick = onWhatToEat,
-                    showArrow = false,
-                )
-                Spacer(Modifier.height(FoodAIDimens.Space8))
-                FoodAIOutlinedButton(
-                    label = "Адаптировать остаток дня",
-                    onClick = onAdaptDay,
-                )
-                if (state.profile?.availableProducts?.isNotEmpty() == true) {
-                    Spacer(Modifier.height(FoodAIDimens.Space8))
-                    FoodAIOutlinedButton(
-                        label = "Что приготовить из этого?",
-                        onClick = onPantryCook,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+                ) {
+                    TextButton(onClick = onWhatToEat) {
+                        Text("Что съесть?", color = FoodAIColors.Primary)
+                    }
+                    TextButton(onClick = onAdaptDay) {
+                        Text("Адаптировать день", color = FoodAIColors.TextSecondary)
+                    }
+                    if (state.profile?.availableProducts?.isNotEmpty() == true) {
+                        TextButton(onClick = onPantryCook) {
+                            Text("Из продуктов", color = FoodAIColors.TextSecondary)
+                        }
+                    }
                 }
             }
         }
@@ -328,10 +336,10 @@ fun TodayScreen(
         }
         if (progress?.suggestions?.isNotEmpty() == true) {
             item {
-                FoodAICard {
-                    Text("Подсказки", style = FoodAITypography.titleMedium)
-                    progress.suggestions.forEach { tip ->
-                        Text("• $tip", style = FoodAITypography.bodyMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Подсказки", style = FoodAITypography.labelMedium, color = FoodAIColors.TextSecondary)
+                    progress.suggestions.take(2).forEach { tip ->
+                        Text("• $tip", style = FoodAITypography.bodySmall, color = FoodAIColors.TextSecondary)
                     }
                 }
             }
@@ -339,7 +347,7 @@ fun TodayScreen(
         progress?.dailyEstimatedCostAmount?.let { cost ->
             item {
                 Text(
-                    "≈ ${"%.0f".format(cost)} ₽ · Ориентировочно на день",
+                    "≈ ${"%.0f".format(cost)} ₽ · ориентировочно на день",
                     style = FoodAITypography.bodySmall,
                     color = FoodAIColors.TextSecondary,
                 )
@@ -364,15 +372,15 @@ fun TodayScreen(
             }
         }
         item {
-            Text("Таймлайн дня", style = FoodAITypography.titleLarge)
+            Text("Приёмы пищи", style = FoodAITypography.titleLarge)
         }
         if (todayItems.isEmpty()) {
             item {
                 FoodAIEmptyState(
-                    title = "Нет приёмов пищи",
-                    subtitle = "Создайте план на неделю, чтобы увидеть меню на сегодня.",
-                    actionLabel = "Создать план",
-                    onAction = onRebuild,
+                    title = "Нет запланированных приёмов",
+                    subtitle = "Добавьте еду вручную или создайте план на неделю.",
+                    actionLabel = "Добавить еду",
+                    onAction = { showAddFood = true },
                 )
             }
         }
@@ -385,6 +393,23 @@ fun TodayScreen(
                 onSkip = { onSkip(item) },
                 onReplace = { replaceTarget = item },
             )
+        }
+        val diaryOnly = state.nutritionLogs.filter { log ->
+            log.mealPlanItemId == null ||
+                todayItems.none { it.id == log.mealPlanItemId && (it.isCompleted || it.status == "completed") }
+        }
+        if (diaryOnly.isNotEmpty()) {
+            item {
+                Text("Дневник (вне плана)", style = FoodAITypography.titleLarge)
+                Text(
+                    "Эти записи входят в «Съедено», но не показаны в таймлайне плана.",
+                    style = FoodAITypography.bodySmall,
+                    color = FoodAIColors.TextSecondary,
+                )
+            }
+            items(diaryOnly, key = { "diary-${it.id}" }) { log ->
+                DiaryLogRow(log = log, onDelete = { onDeleteFood(log.id) })
+            }
         }
         item {
             Row(
@@ -410,7 +435,14 @@ fun TodayScreen(
             )
         }
         item {
-            FoodAICard {
+            val hasWater = waterTotal > 0
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.Card)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+            ) {
                 Text("Вода", style = FoodAITypography.titleMedium)
                 Text(
                     String.format("%.1f / %.1f л", waterTotal / 1000f, waterGoal / 1000f),
@@ -424,8 +456,10 @@ fun TodayScreen(
                     TextButton(onClick = { onAddWater(500) }) {
                         Text("+500 мл", color = FoodAIColors.Primary)
                     }
-                    TextButton(onClick = onUndoWater) {
-                        Text("Отменить", color = FoodAIColors.TextSecondary)
+                    if (hasWater) {
+                        TextButton(onClick = onUndoWater) {
+                            Text("Отменить", color = FoodAIColors.TextSecondary)
+                        }
                     }
                 }
             }
@@ -473,64 +507,116 @@ private fun DayProgressCard(
     val consumed = progress?.consumedKcal ?: 0
     val target = progress?.targetKcal ?: fallbackTargets?.caloriesKcal ?: 0
     val remaining = progress?.remainingKcal ?: (target - consumed).coerceAtLeast(0)
+    val overTarget = progress?.overTargetKcal
+        ?: (consumed - target).coerceAtLeast(0).takeIf { target > 0 } ?: 0
+    val plannedRemaining = progress?.plannedRemainingKcal ?: 0
+    val fromDiary = progress?.fromDiaryKcal ?: 0
     val ring = if (target > 0) min(1f, consumed.toFloat() / target.toFloat()) else 0f
     val protein = progress?.protein
     val fat = progress?.fat
     val carbs = progress?.carbs
+    val headline = when {
+        target <= 0 -> "Цель не задана"
+        overTarget > 0 -> "+$overTarget ккал сверх цели"
+        else -> "$remaining ккал осталось"
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(FoodAIShapes.CardLarge)
-            .background(FoodAIColors.PrimarySoft)
+            .background(FoodAIColors.Surface)
             .padding(FoodAIDimens.Space16),
     ) {
+        Text(
+            if (target > 0) "Цель · %,d ккал".format(target) else "Калории",
+            style = FoodAITypography.labelMedium,
+            color = FoodAIColors.TextSecondary,
+        )
+        Spacer(Modifier.height(FoodAIDimens.Space8))
         Row(verticalAlignment = Alignment.CenterVertically) {
             CalorieRing(progress = ring, eaten = consumed, target = target)
             Spacer(Modifier.width(FoodAIDimens.Space16))
             Column(Modifier.weight(1f)) {
-                Text("Калории на сегодня", style = FoodAITypography.labelMedium)
+                Text("Съедено", style = FoodAITypography.labelSmall, color = FoodAIColors.TextSecondary)
                 Text(
-                    if (target > 0) "Ещё $remaining ккал" else "Цель не задана",
-                    style = FoodAITypography.titleLarge,
+                    "%,d".format(consumed),
+                    style = FoodAITypography.headlineMedium,
                     fontWeight = FontWeight.Bold,
+                    color = if (overTarget > 0) FoodAIColors.Warning else FoodAIColors.TextPrimary,
+                )
+                Text(
+                    headline,
+                    style = FoodAITypography.titleMedium,
+                    color = if (overTarget > 0) FoodAIColors.Warning else FoodAIColors.Primary,
                 )
                 if (progress != null) {
                     Text(
-                        "${progress.completedMeals}/${progress.plannedMeals} приёмов" +
+                        "${progress.completedMeals}/${progress.plannedMeals} приёмов плана" +
                             if (progress.skippedMeals > 0) " · пропущено ${progress.skippedMeals}" else "",
                         style = FoodAITypography.bodySmall,
                         color = FoodAIColors.TextSecondary,
                     )
                 }
-                Spacer(Modifier.height(FoodAIDimens.Space12))
-                FoodAIMacroBar(
-                    label = "Белки",
-                    current = (protein?.consumedG ?: 0.0).toInt(),
-                    target = (protein?.targetG ?: fallbackTargets?.proteinG ?: 0.0).toInt(),
-                    color = FoodAIColors.Primary,
-                )
-                Spacer(Modifier.height(FoodAIDimens.Space8))
-                FoodAIMacroBar(
-                    label = "Жиры",
-                    current = (fat?.consumedG ?: 0.0).toInt(),
-                    target = (fat?.targetG ?: fallbackTargets?.fatG ?: 0.0).toInt(),
-                    color = FoodAIColors.Warning,
-                )
-                Spacer(Modifier.height(FoodAIDimens.Space8))
-                FoodAIMacroBar(
-                    label = "Углеводы",
-                    current = (carbs?.consumedG ?: 0.0).toInt(),
-                    target = (carbs?.targetG ?: fallbackTargets?.carbohydrateG ?: 0.0).toInt(),
-                    color = androidx.compose.ui.graphics.Color(0xFF8B7CF6),
-                )
-                if (protein != null) {
+                if (fromDiary > 0 || plannedRemaining > 0) {
                     Text(
-                        "Осталось: Б ${protein.remainingG.toInt()} · Ж ${fat?.remainingG?.toInt() ?: 0} · У ${carbs?.remainingG?.toInt() ?: 0} г",
+                        buildString {
+                            if (fromDiary > 0) append("Дневник +,%,d ккал".format(fromDiary))
+                            if (fromDiary > 0 && plannedRemaining > 0) append(" · ")
+                            if (plannedRemaining > 0) append("В плане ещё %,d".format(plannedRemaining))
+                        },
                         style = FoodAITypography.labelSmall,
                         color = FoodAIColors.TextMuted,
                     )
                 }
             }
+        }
+        Spacer(Modifier.height(FoodAIDimens.Space16))
+        FoodAIMacroBar(
+            label = "Белки",
+            current = (protein?.consumedG ?: 0.0).toInt(),
+            target = (protein?.targetG ?: fallbackTargets?.proteinG ?: 0.0).toInt(),
+            color = FoodAIColors.Primary,
+        )
+        Spacer(Modifier.height(FoodAIDimens.Space8))
+        FoodAIMacroBar(
+            label = "Жиры",
+            current = (fat?.consumedG ?: 0.0).toInt(),
+            target = (fat?.targetG ?: fallbackTargets?.fatG ?: 0.0).toInt(),
+            color = FoodAIColors.Warning,
+        )
+        Spacer(Modifier.height(FoodAIDimens.Space8))
+        FoodAIMacroBar(
+            label = "Углеводы",
+            current = (carbs?.consumedG ?: 0.0).toInt(),
+            target = (carbs?.targetG ?: fallbackTargets?.carbohydrateG ?: 0.0).toInt(),
+            color = androidx.compose.ui.graphics.Color(0xFF8B7CF6),
+        )
+    }
+}
+
+@Composable
+private fun DiaryLogRow(
+    log: NutritionLogDto,
+    onDelete: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(FoodAIShapes.Card)
+            .background(FoodAIColors.Surface)
+            .padding(horizontal = FoodAIDimens.Space12, vertical = FoodAIDimens.Space12),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(displayRecipeName(log.description), style = FoodAITypography.titleMedium, maxLines = 2)
+            Text(
+                "${log.caloriesKcal} ккал · ${mealTypeLabel(log.mealType)}",
+                style = FoodAITypography.bodySmall,
+                color = FoodAIColors.TextSecondary,
+            )
+        }
+        TextButton(onClick = onDelete) {
+            Text("Удалить", color = FoodAIColors.Error)
         }
     }
 }
@@ -543,7 +629,14 @@ private fun NextMealCard(
     onSkip: () -> Unit,
     onReplace: () -> Unit,
 ) {
-    FoodAICard {
+    val title = displayRecipeName(item.recipe.name)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(FoodAIShapes.Card)
+            .background(FoodAIColors.Surface)
+            .padding(FoodAIDimens.Space12),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -552,8 +645,8 @@ private fun NextMealCard(
         ) {
             RecipeImagePane(
                 image = item.recipe.image,
-                contentDescription = item.recipe.name,
-                modifier = Modifier.size(80.dp).clip(FoodAIShapes.Tile),
+                contentDescription = title,
+                modifier = Modifier.size(64.dp).clip(FoodAIShapes.Tile),
                 enforceAspect = false,
             )
             Spacer(Modifier.width(FoodAIDimens.Space12))
@@ -563,14 +656,15 @@ private fun NextMealCard(
                     style = FoodAITypography.labelMedium,
                     color = FoodAIColors.Primary,
                 )
-                Text(item.recipe.name, style = FoodAITypography.titleMedium, maxLines = 2)
+                Text(title, style = FoodAITypography.titleMedium, maxLines = 2)
                 Text(
                     "${item.recipe.caloriesKcal} ккал · ${item.recipe.cookTimeMinutes} мин",
                     style = FoodAITypography.bodySmall,
+                    color = FoodAIColors.TextSecondary,
                 )
             }
         }
-        Spacer(Modifier.height(FoodAIDimens.Space12))
+        Spacer(Modifier.height(FoodAIDimens.Space8))
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
@@ -598,55 +692,55 @@ private fun MealTimelineCard(
     onReplace: () -> Unit,
 ) {
     val statusLabel = mealStatusLabel(item)
-    val borderColor = when {
-        highlighted -> FoodAIColors.Primary
+    val title = displayRecipeName(item.recipe.name)
+    val accent = when {
         item.status == "completed" || item.isCompleted -> FoodAIColors.Success
         item.status == "skipped" -> FoodAIColors.TextMuted
         item.status == "replaced" -> FoodAIColors.Warning
+        highlighted -> FoodAIColors.Primary
         else -> FoodAIColors.Divider
     }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(FoodAIShapes.CardLarge)
+            .clip(FoodAIShapes.Card)
             .background(FoodAIColors.Surface)
-            .border(1.dp, borderColor, FoodAIShapes.CardLarge)
             .padding(FoodAIDimens.Space12),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box {
-                RecipeImagePane(
-                    image = item.recipe.image,
-                    contentDescription = item.recipe.name,
-                    modifier = Modifier.size(64.dp).clip(FoodAIShapes.Tile),
-                    enforceAspect = false,
-                )
-                Box(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                    FoodAIStatusDot(complete = item.isCompleted || item.status == "completed")
-                }
-            }
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(48.dp)
+                    .clip(FoodAIShapes.Pill)
+                    .background(accent),
+            )
             Spacer(Modifier.width(FoodAIDimens.Space12))
             Column(Modifier.weight(1f)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
                     Text(
                         mealTypeLabel(item.mealType),
                         style = FoodAITypography.labelMedium,
-                        color = FoodAIColors.Primary,
+                        color = FoodAIColors.TextSecondary,
                     )
-                    Text(statusLabel, style = FoodAITypography.labelSmall, color = FoodAIColors.TextMuted)
+                    Text(statusLabel, style = FoodAITypography.labelSmall, color = accent)
                 }
-                Text(item.recipe.name, style = FoodAITypography.titleMedium, maxLines = 2)
+                Text(title, style = FoodAITypography.titleMedium, maxLines = 1)
                 Text(
                     "${item.recipe.caloriesKcal} ккал · ${item.recipe.cookTimeMinutes} мин",
                     style = FoodAITypography.bodySmall,
+                    color = FoodAIColors.TextSecondary,
                 )
             }
             Icon(Icons.Outlined.ChevronRight, null, tint = FoodAIColors.TextMuted)
         }
-        if (item.status == "planned" || (!item.isCompleted && item.status != "skipped")) {
+        if (item.status == "planned" || (!item.isCompleted && item.status != "skipped" && item.status != "completed")) {
             Spacer(Modifier.height(FoodAIDimens.Space8))
             Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12)) {
                 Text(
@@ -1082,8 +1176,8 @@ fun mealTypeLabel(raw: String): String = when (raw) {
 }
 
 fun mealStatusLabel(item: MealPlanItemDto): String = when {
-    item.status == "completed" || item.isCompleted -> "съедено"
-    item.status == "skipped" -> "пропущено"
-    item.status == "replaced" -> "заменено"
-    else -> "запланировано"
+    item.status == "completed" || item.isCompleted -> "Съедено"
+    item.status == "skipped" -> "Пропущено"
+    item.status == "replaced" -> "Заменено"
+    else -> "Запланировано"
 }

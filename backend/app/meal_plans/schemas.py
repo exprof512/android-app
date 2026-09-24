@@ -59,6 +59,13 @@ class DayProgressOut(BaseModel):
     consumed_kcal: int
     target_kcal: int
     remaining_kcal: int
+    # Positive when consumed > target; remaining_kcal is then 0.
+    over_target_kcal: int = 0
+    # Sum of not-yet-eaten planned slots (informational; never in consumed).
+    planned_remaining_kcal: int = 0
+    # Breakdown for transparency (sums to consumed_kcal).
+    from_plan_kcal: int = 0
+    from_diary_kcal: int = 0
     protein: MacroProgressOut
     fat: MacroProgressOut
     carbs: MacroProgressOut

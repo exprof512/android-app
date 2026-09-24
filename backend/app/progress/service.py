@@ -214,7 +214,11 @@ class ProgressService:
             ).scalars()
         )
         planned_kcal = sum(item.calories_kcal for item in items)
-        completed = [item for item in items if item.is_completed]
+        completed = [
+            item
+            for item in items
+            if item.status == "completed" or item.is_completed
+        ]
         consumed_kcal = sum(item.calories_kcal for item in completed)
         protein = sum((item.protein_g for item in completed), Decimal("0"))
         fat = sum((item.fat_g for item in completed), Decimal("0"))

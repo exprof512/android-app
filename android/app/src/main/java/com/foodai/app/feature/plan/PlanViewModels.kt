@@ -312,6 +312,19 @@ class TodayViewModel @Inject constructor(
         }
     }
 
+    fun deleteFood(logId: String) {
+        viewModelScope.launch {
+            try {
+                nutritionApi.deleteLog(logId)
+                analytics.track("food_deleted")
+                bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
+                refresh()
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(actionError = error.toUiMessage())
+            }
+        }
+    }
+
     fun addWeight(weightKg: Double) {
         viewModelScope.launch {
             try {

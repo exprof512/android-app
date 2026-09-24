@@ -5,10 +5,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,10 +34,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.ui.components.FoodAIOutlinedButton
 import com.foodai.app.core.ui.components.FoodAIPrimaryButton
+import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAITypography
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AddFoodSheet(
     onDismiss: () -> Unit,
@@ -60,32 +64,50 @@ fun AddFoodSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(FoodAIDimens.ScreenPadding),
-            verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+                .padding(FoodAIDimens.ScreenPadding)
+                .padding(bottom = FoodAIDimens.Space32),
+            verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12),
         ) {
             Text("Добавить еду", style = FoodAITypography.titleLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(
-                    "quick" to "Быстро",
-                    "search" to "Поиск",
-                    "recent" to "Недавние",
-                    "photo" to "Фото",
-                ).forEach { (key, label) ->
-                    FilterChip(
-                        selected = state.tab == key || (key == "photo" && state.tab == "photo_review"),
-                        onClick = {
-                            if (key == "photo") {
-                                viewModel.setTab("photo")
-                                gallery.launch("image/*")
-                            } else {
-                                viewModel.setTab(key)
-                            }
-                        },
-                        label = { Text(label) },
-                    )
-                }
+            Text(
+                "Сфотографируйте блюдо или найдите продукт — FoodAI оценит ккал и БЖУ.",
+                style = FoodAITypography.bodySmall,
+                color = FoodAIColors.TextSecondary,
+            )
+
+            FoodAIPrimaryButton(
+                label = "📷  Фото блюда",
+                onClick = {
+                    viewModel.setTab("photo")
+                    gallery.launch("image/*")
+                },
+                showArrow = false,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
+                FoodAIOutlinedButton(
+                    label = "🔎 Поиск",
+                    onClick = { viewModel.setTab("search") },
+                    modifier = Modifier.weight(1f),
+                )
+                FoodAIOutlinedButton(
+                    label = "🕘 Недавние",
+                    onClick = { viewModel.setTab("recent") },
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FoodAIOutlinedButton(
+                label = "⚡ Быстрые калории",
+                onClick = { viewModel.setTab("quick") },
+            )
+
+            Text("Приём пищи", style = FoodAITypography.labelMedium, color = FoodAIColors.TextSecondary)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
                 listOf(
                     "breakfast" to "Завтрак",
                     "lunch" to "Обед",
@@ -95,55 +117,65 @@ fun AddFoodSheet(
                     FilterChip(
                         selected = state.mealType == key,
                         onClick = { viewModel.setMealType(key) },
-                        label = { Text(label) },
+                        label = {
+                            Text(label, modifier = Modifier.padding(horizontal = 4.dp))
+                        },
+                        modifier = Modifier.heightIn(min = FoodAIDimens.TouchTarget),
                     )
                 }
             }
+
             val errorText = state.error
             if (errorText != null) {
-                Text(errorText, style = FoodAITypography.bodyMedium)
+                Text(errorText, style = FoodAITypography.bodyMedium, color = FoodAIColors.Error)
             }
 
             when (state.tab) {
                 "quick" -> {
+                    Text("Что вы съели?", style = FoodAITypography.titleMedium)
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Описание") },
+                        label = { Text("Название блюда") },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
                         value = calories,
                         onValueChange = { calories = it.filter(Char::isDigit) },
-                        label = { Text("Ккал") },
+                        label = { Text("ккал") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        "БЖУ (необязательно)",
+                        style = FoodAITypography.labelSmall,
+                        color = FoodAIColors.TextMuted,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
                             value = protein,
                             onValueChange = { protein = it },
-                            label = { Text("Б") },
+                            label = { Text("Белки") },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
                         OutlinedTextField(
                             value = fat,
                             onValueChange = { fat = it },
-                            label = { Text("Ж") },
+                            label = { Text("Жиры") },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
                         OutlinedTextField(
                             value = carbs,
                             onValueChange = { carbs = it },
-                            label = { Text("У") },
+                            label = { Text("Углеводы") },
                             modifier = Modifier.weight(1f),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         )
                     }
                     FoodAIPrimaryButton(
-                        label = if (state.loading) "Сохраняем…" else "Сохранить",
+                        label = if (state.loading) "Сохраняем…" else "Добавить в дневник",
                         onClick = {
                             val kcal = calories.toIntOrNull() ?: return@FoodAIPrimaryButton
                             if (description.isBlank()) return@FoodAIPrimaryButton
@@ -160,7 +192,7 @@ fun AddFoodSheet(
                         },
                         enabled = !state.loading && description.isNotBlank() &&
                             (calories.toIntOrNull() ?: 0) > 0,
-                        modifier = Modifier.fillMaxWidth(),
+                        showArrow = false,
                     )
                 }
                 "search" -> {
@@ -206,13 +238,17 @@ fun AddFoodSheet(
                                 }
                             },
                             enabled = !state.loading,
-                            modifier = Modifier.fillMaxWidth(),
+                            showArrow = false,
                         )
                     }
                 }
                 "recent" -> {
                     if (state.recent.isEmpty()) {
-                        Text("Пока нет недавних продуктов", style = FoodAITypography.bodyMedium)
+                        Text(
+                            "Пока нет недавних продуктов",
+                            style = FoodAITypography.bodyMedium,
+                            color = FoodAIColors.TextSecondary,
+                        )
                     }
                     state.recent.forEach { item ->
                         Text(
@@ -242,7 +278,6 @@ fun AddFoodSheet(
                         FoodAIOutlinedButton(
                             label = "Выбрать фото",
                             onClick = { gallery.launch("image/*") },
-                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     state.photoReview.forEachIndexed { index, item ->
@@ -261,12 +296,11 @@ fun AddFoodSheet(
                             )
                             val itemKcal = item.caloriesKcal
                             if (itemKcal != null) {
-                                Text("≈ $itemKcal ккал (backend)", style = FoodAITypography.bodyMedium)
+                                Text("≈ $itemKcal ккал", style = FoodAITypography.bodyMedium)
                             }
                             FoodAIOutlinedButton(
                                 label = "Убрать",
                                 onClick = { viewModel.removePhotoItem(index) },
-                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
@@ -282,7 +316,7 @@ fun AddFoodSheet(
                                 }
                             },
                             enabled = !state.loading,
-                            modifier = Modifier.fillMaxWidth(),
+                            showArrow = false,
                         )
                     }
                 }

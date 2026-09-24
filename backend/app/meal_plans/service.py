@@ -944,9 +944,16 @@ class MealPlanService:
         day_items = [i for i in items if i.planned_date == on_date]
         completed = [i for i in day_items if i.status == "completed" or i.is_completed]
         skipped = [i for i in day_items if i.status == "skipped"]
+        open_planned = [
+            i
+            for i in day_items
+            if i.status not in {"completed", "skipped"} and not i.is_completed
+        ]
         planned_meals = len(day_items)
 
-        consumed_kcal = sum(i.calories_kcal for i in completed)
+        # Invariant: only COMPLETED plan slots contribute from the plan.
+        from_plan_kcal = sum(i.calories_kcal for i in completed)
+        consumed_kcal = from_plan_kcal
         consumed_protein = sum((i.protein_g for i in completed), Decimal("0"))
         consumed_fat = sum((i.fat_g for i in completed), Decimal("0"))
         consumed_carbs = sum((i.carbohydrate_g for i in completed), Decimal("0"))
@@ -965,12 +972,14 @@ class MealPlanService:
                 )
             ).scalars()
         )
+        from_diary_kcal = 0
         for log in logs:
             if (
                 log.meal_plan_item_id is not None
                 and log.meal_plan_item_id in completed_ids
             ):
                 continue
+            from_diary_kcal += log.calories_kcal
             consumed_kcal += log.calories_kcal
             consumed_protein += log.protein_g
             consumed_fat += log.fat_g
@@ -981,10 +990,10 @@ class MealPlanService:
         target_fat = Decimal(str(plan.fat_target_g))
         target_carbs = Decimal(str(plan.carbohydrate_target_g))
 
-        remaining_kcal = max(0, target_kcal - int(consumed_kcal))
-        remaining_protein = max(Decimal("0"), target_protein - consumed_protein)
-        remaining_fat = max(Decimal("0"), target_fat - consumed_fat)
-        remaining_carbs = max(Decimal("0"), target_carbs - consumed_carbs)
+        delta = int(consumed_kcal) - target_kcal
+        remaining_kcal = max(0, -delta)
+        over_target_kcal = max(0, delta)
+        planned_remaining_kcal = sum(i.calories_kcal for i in open_planned)
 
         next_item = next(
             (
@@ -1002,14 +1011,22 @@ class MealPlanService:
         suggestions = self._build_suggestions(
             day_items=day_items,
             next_item=next_item,
-            remaining_protein=remaining_protein,
+            remaining_protein=max(Decimal("0"), target_protein - consumed_protein),
             target_protein=target_protein,
         )
+
+        remaining_protein = max(Decimal("0"), target_protein - consumed_protein)
+        remaining_fat = max(Decimal("0"), target_fat - consumed_fat)
+        remaining_carbs = max(Decimal("0"), target_carbs - consumed_carbs)
 
         return DayProgressOut(
             consumed_kcal=int(consumed_kcal),
             target_kcal=target_kcal,
             remaining_kcal=remaining_kcal,
+            over_target_kcal=over_target_kcal,
+            planned_remaining_kcal=planned_remaining_kcal,
+            from_plan_kcal=int(from_plan_kcal),
+            from_diary_kcal=int(from_diary_kcal),
             protein=MacroProgressOut(
                 consumed_g=consumed_protein.quantize(Decimal("0.01")),
                 target_g=target_protein.quantize(Decimal("0.01")),
@@ -1109,6 +1126,13 @@ class MealPlanService:
         return WeekSummaryOut(days=days)
 
     @staticmethod
+    def _display_recipe_name(name: str) -> str:
+        """Strip trailing (YYYY-MM-DD) used by legacy fallback titles."""
+        import re
+
+        return re.sub(r"\s*\(\d{4}-\d{2}-\d{2}\)\s*$", "", name).strip() or name
+
+    @staticmethod
     def _item_out(
         item: MealPlanItem,
         recipe: Recipe,
@@ -1131,7 +1155,7 @@ class MealPlanService:
             estimated_cost_amount=item.estimated_cost_amount,
             recipe=MealPlanRecipeSummary(
                 id=recipe.id,
-                name=recipe.name,
+                name=MealPlanService._display_recipe_name(recipe.name),
                 calories_kcal=recipe.calories_kcal,
                 cook_time_minutes=recipe.cook_time_minutes,
                 image=image

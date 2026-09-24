@@ -196,4 +196,13 @@ Nginx выдаёт media через backend-authorized route или подпис
 
 `PaymentProvider` — только интерфейс для будущих `create_purchase`, `verify_purchase`, `cancel`, `get_entitlement`; реальный провайдер в Phase 0 не подключается. Возможные адаптеры: Google Play Billing, RU provider и international provider. Вебхук будущего provider проверяется на backend и меняет entitlement транзакционно.
 
-Связанные решения: [api.md](api.md), [database.md](database.md), [ai.md](ai.md), [storage.md](storage.md), [development.md](development.md), [roadmap.md](roadmap.md).
+Связанные решения: [api.md](api.md), [database.md](database.md), [ai.md](ai.md), [storage.md](storage.md), [development.md](development.md), [roadmap.md](roadmap.md), [ui-design-system.md](ui-design-system.md).
+
+## Phase 22 — nutrition invariants (Today)
+
+Authoritative daily consumed totals live in `MealPlanService._build_day_progress` / `GET /meal-plans/today` → `day_progress`:
+
+- **Consumed** = completed plan items for the date ∪ untied `nutrition_logs` for the date.
+- **Planned** slots never contribute to consumed until marked eaten.
+- Android displays `day_progress` as SSOT and surfaces diary-only logs so totals match the UI.
+- Over-target uses `over_target_kcal` (remaining stays 0 when exceeded).

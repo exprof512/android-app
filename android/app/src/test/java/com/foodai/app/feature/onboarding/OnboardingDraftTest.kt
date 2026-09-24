@@ -40,8 +40,8 @@ class OnboardingDraftTest {
 
     @Test
     fun rejectsUnsafeWeeklyChangeLocally() {
-        val draft = OnboardingDraft(desiredWeeklyChangeKg = "1.5")
-        assertThat(draft.validateStep(OnboardingStep.GoalDetails)).contains("1.0")
+        val draft = OnboardingDraft(desiredWeeklyChangeKg = "2.5")
+        assertThat(draft.validateStep(OnboardingStep.GoalDetails)).contains("2.0")
     }
 
     @Test
@@ -53,6 +53,6 @@ class OnboardingDraftTest {
     @Test
     fun humanizesWeeklyChangeError() {
         val msg = humanizeNutritionError("desired_weekly_change_kg", "exceeds_safe_weekly_change")
-        assertThat(msg).contains("1.0")
+        assertThat(msg).contains("2.0")
     }
 }

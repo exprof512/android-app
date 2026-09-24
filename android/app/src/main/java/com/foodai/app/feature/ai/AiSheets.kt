@@ -76,7 +76,11 @@ fun CandidateCard(
         )
         candidate.reason?.takeIf { it.isNotBlank() }?.let { reason ->
             Spacer(Modifier.height(6.dp))
-            Text("Почему: $reason", style = FoodAITypography.bodyMedium)
+            Text(
+                "Почему: ${reason.take(120)}${if (reason.length > 120) "…" else ""}",
+                style = FoodAITypography.bodySmall,
+                color = FoodAIColors.TextSecondary,
+            )
         }
         if (selected) {
             Spacer(Modifier.height(4.dp))

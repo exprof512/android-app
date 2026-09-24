@@ -30,6 +30,10 @@ class Phase19ModelsTest {
                 "consumed_kcal": 400,
                 "target_kcal": 1800,
                 "remaining_kcal": 1400,
+                "over_target_kcal": 0,
+                "planned_remaining_kcal": 900,
+                "from_plan_kcal": 400,
+                "from_diary_kcal": 0,
                 "protein": {"consumed_g": 20, "target_g": 120, "remaining_g": 100},
                 "fat": {"consumed_g": 10, "target_g": 60, "remaining_g": 50},
                 "carbs": {"consumed_g": 40, "target_g": 180, "remaining_g": 140},
@@ -60,6 +64,9 @@ class Phase19ModelsTest {
         val plan = json.decodeFromString(MealPlanDto.serializer(), raw)
         assertThat(plan.dayProgress).isNotNull()
         assertThat(plan.dayProgress!!.remainingKcal).isEqualTo(1400)
+        assertThat(plan.dayProgress!!.overTargetKcal).isEqualTo(0)
+        assertThat(plan.dayProgress!!.plannedRemainingKcal).isEqualTo(900)
+        assertThat(plan.dayProgress!!.fromPlanKcal).isEqualTo(400)
         assertThat(plan.dayProgress!!.protein.remainingG).isEqualTo(100.0)
         assertThat(plan.dayProgress!!.suggestions).containsExactly("Добавь белок")
         assertThat(plan.dayProgress!!.dailyEstimatedCostAmount).isEqualTo(450.5)
