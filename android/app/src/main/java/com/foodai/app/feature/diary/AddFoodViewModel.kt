@@ -239,10 +239,11 @@ class AddFoodViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null, photoReview = emptyList())
             try {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                val raw = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: error("Не удалось прочитать фото")
                 val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-                val body = bytes.toRequestBody(mime.toMediaTypeOrNull())
+                val (bytes, outMime) = downscaleForUpload(raw, mime)
+                val body = bytes.toRequestBody(outMime.toMediaTypeOrNull())
                 val part = MultipartBody.Part.createFormData("file", "meal.jpg", body)
                 val result: PhotoAnalyzeDto = nutritionApi.analyzePhoto(part)
                 val review = result.items.map { it.toReview() }
@@ -257,12 +258,51 @@ class AddFoodViewModel @Inject constructor(
                     tab = "photo_review",
                 )
             } catch (error: Exception) {
+                val api = error as? ApiException
+                val mapped = when {
+                    api?.httpStatus == 413 || api?.code == "image_too_large" ->
+                        "Фото слишком большое. Попробуйте другое фото или уменьшите размер."
+                    api != null -> api.toUiMessage()
+                    else -> "Не удалось распознать фото"
+                }
                 _state.value = _state.value.copy(
                     loading = false,
-                    error = (error as? ApiException)?.toUiMessage()
-                        ?: "Не удалось распознать фото",
+                    error = mapped,
                 )
             }
+        }
+    }
+
+    /** Keep uploads under nginx/backend limits (~5–8 MB). */
+    private fun downscaleForUpload(bytes: ByteArray, mime: String): Pair<ByteArray, String> {
+        if (bytes.size <= 900_000) return bytes to (mime.ifBlank { "image/jpeg" })
+        return try {
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                ?: return bytes to mime
+            val maxDim = 1600
+            val scale = minOf(
+                1f,
+                maxDim.toFloat() / maxOf(bitmap.width, bitmap.height).toFloat(),
+            )
+            val w = maxOf(1, (bitmap.width * scale).toInt())
+            val h = maxOf(1, (bitmap.height * scale).toInt())
+            val scaled = if (scale < 1f) {
+                android.graphics.Bitmap.createScaledBitmap(bitmap, w, h, true)
+            } else {
+                bitmap
+            }
+            val stream = java.io.ByteArrayOutputStream()
+            var quality = 85
+            do {
+                stream.reset()
+                scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, quality, stream)
+                quality -= 10
+            } while (stream.size() > 900_000 && quality >= 50)
+            if (scaled !== bitmap) scaled.recycle()
+            bitmap.recycle()
+            stream.toByteArray() to "image/jpeg"
+        } catch (_: Exception) {
+            bytes to mime
         }
     }
 

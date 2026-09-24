@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -394,45 +395,21 @@ fun TodayScreen(
                 onReplace = { replaceTarget = item },
             )
         }
-        val diaryOnly = state.nutritionLogs.filter { log ->
-            log.mealPlanItemId == null ||
-                todayItems.none { it.id == log.mealPlanItemId && (it.isCompleted || it.status == "completed") }
-        }
-        if (diaryOnly.isNotEmpty()) {
-            item {
-                Text("Дневник (вне плана)", style = FoodAITypography.titleLarge)
-                Text(
-                    "Эти записи входят в «Съедено», но не показаны в таймлайне плана.",
-                    style = FoodAITypography.bodySmall,
-                    color = FoodAIColors.TextSecondary,
-                )
-            }
-            items(diaryOnly, key = { "diary-${it.id}" }) { log ->
-                DiaryLogRow(log = log, onDelete = { onDeleteFood(log.id) })
-            }
-        }
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+                horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space16),
             ) {
-                FoodAIOutlinedButton(
-                    label = "Добавить еду",
-                    onClick = { showAddFood = true },
-                    modifier = Modifier.weight(1f),
-                )
-                FoodAIOutlinedButton(
-                    label = "Мой план",
-                    onClick = onOpenPlan,
-                    modifier = Modifier.weight(1f),
-                )
+                TextButton(onClick = { showAddFood = true }) {
+                    Text("Добавить еду", color = FoodAIColors.Primary)
+                }
+                TextButton(onClick = onOpenPlan) {
+                    Text("План", color = FoodAIColors.TextSecondary)
+                }
+                TextButton(onClick = onOpenShopping) {
+                    Text("Покупки", color = FoodAIColors.TextSecondary)
+                }
             }
-            Spacer(Modifier.height(FoodAIDimens.Space8))
-            FoodAIOutlinedButton(
-                label = "Покупки",
-                onClick = onOpenShopping,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
         item {
             val hasWater = waterTotal > 0
@@ -992,20 +969,38 @@ fun WeekScreen(
                     val dayKey = date.take(10)
                     val selected = dayKey == selectedDay
                     val day = dayByDate[dayKey]
+                    val todayKey = LocalDate.now().toString()
+                    val isToday = dayKey == todayKey
                     val dayLabel = runCatching {
                         val d = LocalDate.parse(dayKey)
                         val dow = d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale("ru"))
-                        "$dow ${d.dayOfMonth}.${d.monthValue.toString().padStart(2, '0')}"
+                            .replace(".", "")
+                            .uppercase(Locale("ru"))
+                        "${d.dayOfMonth} $dow"
                     }.getOrDefault(dayKey.takeLast(5))
                     val status = day?.status ?: state.dayStatuses[date] ?: state.dayStatuses[dayKey] ?: "missing"
                     Box(
                         modifier = Modifier
-                            .clip(FoodAIShapes.Pill)
-                            .background(if (selected) FoodAIColors.Primary else FoodAIColors.SurfaceMuted)
+                            .widthIn(min = 64.dp)
+                            .clip(FoodAIShapes.Card)
+                            .background(
+                                when {
+                                    selected -> FoodAIColors.Primary
+                                    isToday -> FoodAIColors.PrimarySoft
+                                    else -> FoodAIColors.Surface
+                                },
+                            )
                             .clickable { onSelectDate(dayKey) }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            if (isToday) {
+                                Text(
+                                    "Сегодня",
+                                    color = if (selected) FoodAIColors.TextOnPrimary else FoodAIColors.Primary,
+                                    style = FoodAITypography.labelSmall,
+                                )
+                            }
                             Text(
                                 dayLabel,
                                 color = if (selected) FoodAIColors.TextOnPrimary else FoodAIColors.TextPrimary,
@@ -1022,28 +1017,22 @@ fun WeekScreen(
             }
         }
         item {
-            FoodAICard {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Итоги недели", style = FoodAITypography.titleMedium)
                 if (summaryDays.isNotEmpty()) {
-                    val plannedDays = summaryDays.count { it.status == "planned" }
+                    val plannedDays = summaryDays.count { it.status != "missing" }
                     val avgKcal = summaryDays.map { it.caloriesKcal }.average().toInt()
+                    val avgProtein = summaryDays.map { it.proteinG }.average().toInt()
                     val completed = summaryDays.sumOf { it.completedMeals }
-                    val planned = summaryDays.sumOf { it.plannedMeals }
                     val weekCost = summaryDays.mapNotNull { it.estimatedCostAmount }.sum()
-                    Text("Дней с планом: $plannedDays / ${summaryDays.size}", style = FoodAITypography.bodySmall)
-                    Text("Средние ккал/день: $avgKcal", style = FoodAITypography.bodySmall)
-                    Text("Завершено приёмов: $completed / $planned", style = FoodAITypography.bodySmall)
-                    if (weekCost > 0) {
-                        Text(
-                            "Ориентировочная стоимость: ${"%.0f".format(weekCost)} ₽",
-                            style = FoodAITypography.bodySmall,
-                        )
-                    }
+                    Text(
+                        "$plannedDays/${summaryDays.size} дней · ~$avgKcal ккал · Б ~$avgProtein г · $completed приёмов" +
+                            if (weekCost > 0) " · ≈ ${"%.0f".format(weekCost)} ₽" else "",
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
                 } else {
-                    val allItems = plan?.items.orEmpty()
-                    val plannedDays = state.dayStatuses.count { it.value == "planned" }
-                    Text("Дней с планом: $plannedDays / ${dates.size}", style = FoodAITypography.bodySmall)
-                    Text("Завершено приёмов: ${allItems.count { it.isCompleted }} / ${allItems.size}", style = FoodAITypography.bodySmall)
+                    Text("Нет данных за неделю", style = FoodAITypography.bodySmall)
                 }
             }
         }

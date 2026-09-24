@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
@@ -37,6 +38,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +69,8 @@ import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
 import com.foodai.app.feature.chat.ChatRoute
+import com.foodai.app.feature.diary.AddFoodSheet
+import com.foodai.app.feature.diary.DiaryRoute
 import com.foodai.app.feature.plan.TodayRoute
 import com.foodai.app.feature.plan.WeekRoute
 import com.foodai.app.feature.progress.ProgressRoute
@@ -75,6 +81,7 @@ import com.foodai.app.navigation.Routes
 private val mainTabs = listOf(
     FoodAINavItem(Routes.Home, "Сегодня", Icons.Outlined.Home),
     FoodAINavItem(Routes.Plan, "План", Icons.Outlined.CalendarMonth),
+    FoodAINavItem(Routes.Diary, "Дневник", Icons.Outlined.MenuBook),
     FoodAINavItem(Routes.Progress, "Прогресс", Icons.AutoMirrored.Outlined.ShowChart),
     FoodAINavItem(Routes.Profile, "Профиль", Icons.Outlined.Person),
 )
@@ -119,6 +126,7 @@ fun MainShell(
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val current = backStack?.destination?.route
+    var showAddFood by remember { mutableStateOf(false) }
     val hideBottomBar = current?.startsWith("recipe/") == true ||
         current?.startsWith("chat") == true ||
         current == "premium" ||
@@ -129,6 +137,13 @@ fun MainShell(
         current == "account" ||
         current == "favorites" ||
         current == "recipe-search"
+
+    if (showAddFood) {
+        AddFoodSheet(
+            onDismiss = { showAddFood = false },
+            onSaved = { showAddFood = false },
+        )
+    }
 
     Scaffold(
         containerColor = FoodAIColors.Background,
@@ -151,7 +166,7 @@ fun MainShell(
                             restoreState = true
                         }
                     },
-                    onFabClick = { navController.navigate("chat") },
+                    onFabClick = { showAddFood = true },
                 )
             }
         },
@@ -194,6 +209,9 @@ fun MainShell(
                     },
                     onOpenShopping = { navController.navigate(Routes.Shopping) },
                 )
+            }
+            composable(Routes.Diary) {
+                DiaryRoute()
             }
             composable(Routes.Shopping) {
                 ShoppingRoute(onBack = { navController.popBackStack() })

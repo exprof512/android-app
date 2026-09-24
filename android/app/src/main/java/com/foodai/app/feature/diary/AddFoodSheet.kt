@@ -76,7 +76,7 @@ fun AddFoodSheet(
             )
 
             FoodAIPrimaryButton(
-                label = "📷  Фото блюда",
+                label = "Сфотографировать",
                 onClick = {
                     viewModel.setTab("photo")
                     gallery.launch("image/*")
@@ -88,18 +88,18 @@ fun AddFoodSheet(
                 horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
             ) {
                 FoodAIOutlinedButton(
-                    label = "🔎 Поиск",
+                    label = "Найти продукт",
                     onClick = { viewModel.setTab("search") },
                     modifier = Modifier.weight(1f),
                 )
                 FoodAIOutlinedButton(
-                    label = "🕘 Недавние",
+                    label = "Недавние",
                     onClick = { viewModel.setTab("recent") },
                     modifier = Modifier.weight(1f),
                 )
             }
             FoodAIOutlinedButton(
-                label = "⚡ Быстрые калории",
+                label = "Быстрые калории",
                 onClick = { viewModel.setTab("quick") },
             )
 

@@ -28,6 +28,7 @@ object Routes {
     const val Main = "main"
     const val Home = "home"
     const val Plan = "plan"
+    const val Diary = "diary"
     const val Shopping = "shopping"
     const val Progress = "progress"
     const val Profile = "profile"

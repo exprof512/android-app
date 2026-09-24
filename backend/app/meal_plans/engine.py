@@ -111,6 +111,47 @@ class MealPlanEngine:
                 )
             cursor = date.fromordinal(cursor.toordinal() + 1)
 
+        # Cross-day diversity: reject cloned weeks (same dish for a meal type).
+        by_meal_type: dict[str, list[str]] = defaultdict(list)
+        for slot in slots:
+            by_meal_type[slot.meal_type].append(
+                normalize_food_name(slot.recipe.name) or slot.recipe.name
+            )
+        for meal_type, names in by_meal_type.items():
+            if len(names) < 3:
+                continue
+            unique = len(set(names))
+            if unique == 1:
+                details.append(
+                    {
+                        "field": "diversity",
+                        "reason": "same_meal_repetition",
+                    }
+                )
+            elif unique < max(2, (len(names) + 1) // 2):
+                details.append(
+                    {
+                        "field": "diversity",
+                        "reason": "daily_variety",
+                    }
+                )
+
+        # Same recipe name used too often across the whole plan.
+        all_names = [
+            normalize_food_name(slot.recipe.name) or slot.recipe.name for slot in slots
+        ]
+        if len(all_names) >= 6:
+            from collections import Counter
+
+            top_count = Counter(all_names).most_common(1)[0][1]
+            if top_count >= max(4, len(all_names) // 2):
+                details.append(
+                    {
+                        "field": "diversity",
+                        "reason": "same_recipe_repetition",
+                    }
+                )
+
         if details:
             # Deduplicate while preserving order.
             unique: list[dict[str, str]] = []

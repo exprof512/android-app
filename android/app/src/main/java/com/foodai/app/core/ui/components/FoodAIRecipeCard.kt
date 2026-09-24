@@ -229,7 +229,7 @@ fun FoodAINavigationBar(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
-                    contentDescription = "Ask AI",
+                    contentDescription = "Добавить еду",
                     tint = Color.White,
                     modifier = Modifier.size(28.dp),
                 )

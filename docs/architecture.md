@@ -204,5 +204,15 @@ Authoritative daily consumed totals live in `MealPlanService._build_day_progress
 
 - **Consumed** = completed plan items for the date ∪ untied `nutrition_logs` for the date.
 - **Planned** slots never contribute to consumed until marked eaten.
-- Android displays `day_progress` as SSOT and surfaces diary-only logs so totals match the UI.
+- Android displays `day_progress` as SSOT; diary UI is on **Diary** tab (not Today).
 - Over-target uses `over_target_kcal` (remaining stays 0 when exceeded).
+
+## Phase 22 — plan continuity
+
+- `ensure_current_day_plan()` on Today/Week: if no covering plan, idempotent 7-day generate.
+- Near plan end (`days_remaining <= 1`), prepare next week window.
+- Catalog fallback rotates distinct meals per day; engine rejects cloned weeks (`same_meal_repetition`, `daily_variety`, `same_recipe_repetition`).
+
+## Phase 22 — photo uploads
+
+Nginx `client_max_body_size` must be ≥ vision limit (8m). Android downscales camera JPEGs before multipart upload.

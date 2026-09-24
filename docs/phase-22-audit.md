@@ -1,51 +1,99 @@
-# Phase 22 Audit — UI/UX + Nutrition Consistency
+# Phase 22 Audit — UX/UI 2.0 + Smart Plan Continuity
 
-## Current architecture (relevant)
+> Extends prior nutrition-consistency audit. Focus: navigation, diary split, plan continuity, week diversity, photo recognition.
 
-| Layer | Role |
-|---|---|
-| `meal_plan_items` | Planned day slots; `status` planned/completed/skipped/replaced |
-| `nutrition_logs` | Actual diary entries (manual, recipe, photo_ai, meal_plan_item, …) |
-| `MealPlanService._build_day_progress` | Authoritative Today totals |
-| `GET /meal-plans/today` → `day_progress` | Android Today consumes this |
-| `AppStateBus` | Invalidation after mutations |
+## Navigation (current)
 
-## Planned vs consumed (as designed in code)
+| Tab | Route | Screen |
+|---|---|---|
+| Сегодня | `Routes.Home` | `TodayRoute` / `PlanScreens.kt` |
+| План | `Routes.Plan` | `WeekRoute` |
+| Прогресс | `Routes.Progress` | `ProgressRoute` |
+| Профиль | `Routes.Profile` | Profile home in `MainShell` |
 
-`day_progress.consumed_*` =
-1. Sum of **completed** `meal_plan_items` for the date
-2. **Plus** all `nutrition_logs` for the date whose `meal_plan_item_id` is not already counted via (1)
+No Diary tab. No center FAB. Shopping is a nested route from Today/Plan.
 
-**Planned / skipped items are NOT included** in backend aggregation. Verified in `_build_day_progress`.
+State: `TodayViewModel` / `WeekViewModel` + `AppStateBus` + `SelectedDateStore`. Backend is SSOT for nutrition; Room only for offline UI cache where present.
 
-## Root cause of screenshot bug (2448 kcal / 1 of 3 meals)
+## Today / Week data flow
 
-User `exprof512@gmail.com` on 2026-09-24:
+```
+GET /meal-plans/today?date=
+  → MealPlanService.today()
+  → find_covering(user, date)
+  → if None: MealPlanNotFound (404)
+  → else: items for date + day_progress
+```
 
-| Source | kcal |
-|---|---|
-| Completed breakfast (plan) | 374 |
-| Extra diary logs (recipe/manual, not shown on meal timeline) | ~2074 |
-| **day_progress total** | **~2448** |
+**Confirmed gap:** No auto-generation when today is outside the active plan window. Android shows error / “create plan” CTA. New calendar day after `end_date` → empty Today.
 
-Lunch/dinner **planned** slots were never counted. The UI showed only 3 plan cards, so the user inferred “only breakfast was eaten → totals must be ~374”. Hidden diary entries from AI suggestions / manual / recipe logging explain the macros (protein ~170 g).
+```
+GET /meal-plans/week
+POST /meal-plans/generate
+POST /meal-plans/{id}/regenerate
+```
 
-**Primary product bug:** Today does not surface diary entries, so authoritative totals look “wrong” relative to the meal timeline.
+Generation uses AI proposal → validate → persist; on AI failure uses `build_catalog_meal_plan_proposal` (4 fixed templates cycled by meal_type **identically every day**).
 
-**Secondary UX bugs:** remaining shows “0” when over target; recipe titles include `(YYYY-MM-DD)` from catalog fallback; Add Food chip layout clips “Фото”.
+## Duplicate menu root cause (backend)
 
-## Meal state machine (existing)
+`backend/app/ai/fallback_plans.py`: one breakfast/lunch/dinner/snack template reused for every day. When DeepSeek quota fails or validation falls back, all 7 days look the same.
 
-`planned` | `completed` | `skipped` | `replaced` (+ `is_completed` bool). No new status system needed.
+AI path may also under-diversify; engine `validate_plan` checks macros/cook time/allergies — **not** cross-day recipe uniqueness.
 
-## State sync
+## Photo recognition pipeline
 
-`NutritionLogChanged` / `PlanChanged` refresh Today. Logs are fetched into `TodayUiState.nutritionLogs` but **not rendered**.
+```
+AddFoodViewModel.analyzePhoto
+  → multipart POST /nutrition/photo/analyze
+  → nginx (client_max_body_size **1m**)
+  → PhotoAnalysisService.analyze
+  → OpenAIVisionProvider
+  → catalog match → PhotoAnalyzeOut
+```
 
-## Proposed fixes (Phase 22)
+UI error «Не удалось распознать фото» from:
+1. Generic catch in `AddFoodViewModel` (non-ApiException / poorly mapped HTTP)
+2. `TextAIUnavailable` message from vision exception wrap
 
-1. Show diary section on Today; label totals as “Съедено” with breakdown.
-2. `day_progress`: add `over_target_kcal`, `planned_remaining_kcal`; fix over-target copy.
-3. Strip date suffixes from user-facing recipe names (display + stop generating).
-4. Soften design system (less green borders); compact meals; fix Add Food chips.
-5. Regression tests: planned never counted; diary-only entries counted; eat/skip/delete transitions.
+### Confirmed P0: nginx body limit
+
+`nginx/nginx.conf` → `client_max_body_size 1m;`
+
+Phone camera JPEGs are typically 2–8 MB. Backend allows ~5 MB (`openai_vision_max_image_bytes`). Nginx rejects large uploads **before** the app (413 HTML), Android maps to generic failure.
+
+Secondary risks: missing OpenAI key, MIME quirks, provider timeout, quota on `FEATURE_FOOD_PHOTO`.
+
+## Diary vs plan (product)
+
+| Concept | Storage | Today (prior Phase 22) |
+|---|---|---|
+| Planned meals | `meal_plan_items` | Timeline |
+| Consumed | `nutrition_logs` + completed items | Totals + «Дневник вне плана» block |
+
+**Product decision this phase:** move all actual consumption UI to **Diary** screen; Today only shows plan + progress + quick actions.
+
+## Problems classified
+
+| Issue | Layer | Severity |
+|---|---|---|
+| Photo fails on real camera shots | Edge nginx + Android upload size | P0 |
+| Identical week menu on fallback | Backend fallback templates | P0 |
+| Empty Today on new day past plan end | Backend missing ensure | P0 |
+| Manual “Пересобрать” for next week | Backend continuity gap | P1 |
+| No Diary tab; diary jammed into Today | Android IA | P1 |
+| No FAB for add food | Android IA | P1 |
+| Week day chips clipped | Android UX | P2 |
+| Green outline button clutter | Android design | P2 |
+| Settings may include non-working toggles | Android | P2 |
+
+## Proposed fixes (this phase)
+
+1. Raise nginx limit to ≥6m; client-side image downscale before upload; clearer 413 mapping.
+2. Expand rotating catalog fallback + diversity validation (`same_recipe_repetition` etc.).
+3. `ensure_current_day_plan` on today (idempotent generate covering today).
+4. Auto-schedule next week when `days_remaining <= 1` (async-friendly, idempotent).
+5. Nav: Сегодня · План · Дневник · Прогресс · Профиль + FAB.
+6. Compact Today; dedicated `DiaryScreen`.
+7. Week day selector + compact summary polish.
+8. Tests + APK; physical smoke required for COMPLETE.

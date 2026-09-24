@@ -1,82 +1,54 @@
-# Phase 22 Report — UI/UX + Data Consistency
+# Phase 22 Report — UX/UI 2.0 + Smart Plan Continuity
 
-**Status: PARTIAL** — code and automated tests landed; physical-device smoke not executed in this session.
+**Status: PARTIAL** — core backend/Android fixes landed; physical-device smoke must be run by the user on a phone.
 
-**Commit message:** `refactor(phase-22): ui ux and data consistency`
+## UX / navigation
 
-## UI audit
-
-| Issue | Severity | Fix |
-|---|---|---|
-| Today totals looked “wrong” vs 1/3 meals | P0 (product) | Diary section + breakdown; not aggregation bug |
-| Remaining showed 0 when over target | P1 | `over_target_kcal` + copy |
-| Recipe titles with `(YYYY-MM-DD)` | P2 | Strip on API display + stop generating + Android helper |
-| Add Food “Фото” narrow vertical chip | P2 | Full-width photo CTA + FlowRow meal chips |
-| Excessive green/outlined cards | P2 | Surface elevation; meal accent bar |
-| AI block dominated Today | P2 | Compact FoodAI row |
-| Water “Отменить” always visible | P3 | Shown only when `total > 0` |
-
-## Critical bugs / root causes
-
-**Screenshot 2448 kcal / 1 of 3 meals:** Backend `day_progress` correctly excluded planned slots. Consumed included completed breakfast **plus** untied `nutrition_logs` (AI/manual/recipe) that Today did not render. UX made totals appear inconsistent with the meal timeline.
-
-## Nutrition aggregation rules (authoritative)
-
-```
-consumed = Σ completed meal_plan_items (date)
-         + Σ nutrition_logs (date) not already counted via completed item link
-```
-
-Planned / skipped / replaced originals do **not** enter consumed.
-
-API fields added to `DayProgressOut`:
-
-- `over_target_kcal`
-- `planned_remaining_kcal`
-- `from_plan_kcal`
-- `from_diary_kcal`
-
-## Planned vs actual
-
-| State | Consumed? |
+| Before | After |
 |---|---|
-| PLANNED | No |
-| EATEN / completed | Yes |
-| SKIPPED | No |
-| REPLACED | Only if new item completed / diary entry exists |
-| Diary-only log | Yes (shown under «Дневник (вне плана)») |
+| Сегодня · План · Прогресс · Профиль | Сегодня · План · **Дневник** · Прогресс · Профиль |
+| FAB → Chat | FAB → **Add Food** sheet |
+| Diary jammed into Today | Dedicated `DiaryScreen` + date switching |
+| Large outline CTAs on Today | Compact text actions; add via FAB |
 
-## State synchronization
+## Plan continuity
 
-Unchanged bus events; Today now **renders** `nutritionLogs` and supports delete. Mutations still emit `NutritionLogChanged` / `PlanChanged`.
+- `MealPlanService.ensure_current_day_plan()` — idempotent generate when `GET /meal-plans/today` has no covering plan.
+- `_maybe_prepare_next_week()` when `days_remaining <= 1`.
+- Week endpoint also ensures a plan exists.
 
-## Design system
+## Diversity
 
-See `docs/ui-design-system.md`.
+- Catalog fallback rotates **7 distinct** breakfast/lunch/dinner/snack templates by day offset (`fallback_plans.py`).
+- `MealPlanEngine.validate_plan` rejects `same_meal_repetition` / `daily_variety` / `same_recipe_repetition` → repair via catalog fallback.
 
-## Screens touched
+## Image recognition — root cause
 
-- Today (progress, meals, diary, water, AI)
-- Add Food sheet
-- AI recommendation cards (shorter “why”)
-- FoodAICard (no default border stroke)
+**Confirmed:** `nginx/nginx.conf` had `client_max_body_size 1m`. Real phone JPEGs (often 2–8 MB) got **HTTP 413 from nginx** before FastAPI/OpenAI. Android showed generic «Не удалось распознать фото».
+
+**Reproduction:** `curl` 1.5 MB JPEG → 413 HTML from nginx; after `client_max_body_size 8m` → request reaches API (401 without auth).
+
+**Fixes:**
+1. Nginx limit → **8m**
+2. Android `downscaleForUpload` (~900 KB JPEG) before multipart
+3. Clearer 413 / `image_too_large` UI message
 
 ## Tests
 
-- `backend/tests/test_phase22_nutrition_invariants.py`
-- Android: `DisplayNamesTest`, extended `Phase19ModelsTest`
+- `tests/test_phase22_plan_continuity.py` — auto today + fallback diversity
+- Existing `tests/test_phase22_nutrition_invariants.py`
 
-## Physical device
+## Physical device smoke
 
-**Not run** — cannot claim smoke PASS.
+**Not executed in this environment.** Install APK and verify checklist in the phase prompt (especially photo + new day plan).
 
-## Remaining / out of scope
+## Known limitations
 
-- Full Profile/FAB/shopping visual pass beyond soft card elevation
-- Compose UI instrumentation tests on device
-- Historical recipe rows in DB still store dated names (display stripped)
-- Production hardening (Phase later)
+- Next-week generation is synchronous on Today/Week fetch (not Arq job yet) — may add latency near week end.
+- Settings theme/units audit not fully completed this pass.
+- Progress chart polish deferred.
+- Full UI instrumentation suite not added.
 
-## AI providers
+## Commit
 
-Unchanged: DeepSeek text; OpenAI vision/images (Phase 21).
+`feat(phase-22): ux ui and smart plan continuity`

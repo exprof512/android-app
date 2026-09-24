@@ -277,24 +277,72 @@ class MealPlanService:
         return await self._to_out(plan, warnings=warnings, reused=False)
 
     async def today(self, user_id: UUID, on_date: date) -> MealPlanOut:
-        plan = await self._repository.find_covering(user_id, on_date=on_date)
-        if plan is None:
-            raise MealPlanNotFound()
+        """Return today's plan, generating one if missing (idempotent continuity)."""
+        plan = await self.ensure_current_day_plan(user_id, on_date)
         items = await self._repository.list_items_for_dates(
             plan.id, from_date=on_date, to_date=on_date
         )
-        return await self._to_out(
+        out = await self._to_out(
             plan,
             warnings=[],
             items_override=items,
             day_progress_date=on_date,
             include_week_summary=False,
         )
+        await self._maybe_prepare_next_week(user_id, plan, on_date)
+        # Reload day items in case next-week gen archived something (should not).
+        return out
 
-    async def week(self, user_id: UUID, start_date: date) -> MealPlanOut:
-        plan = await self._repository.find_covering(user_id, on_date=start_date)
+    async def ensure_current_day_plan(self, user_id: UUID, on_date: date) -> MealPlan:
+        """Idempotent: return covering plan or generate a 7-day window from on_date."""
+        plan = await self._repository.find_covering(user_id, on_date=on_date)
+        if plan is not None:
+            return plan
+        logger.info(
+            "ensure_current_day_plan_generate",
+            extra={"user_id": str(user_id), "on_date": on_date.isoformat()},
+        )
+        generated = await self.generate(
+            user_id,
+            MealPlanGenerateRequest(start_date=on_date, days=7, force=False),
+        )
+        plan = await self._repository.get_plan(generated.id)
         if plan is None:
             raise MealPlanNotFound()
+        return plan
+
+    async def _maybe_prepare_next_week(
+        self, user_id: UUID, plan: MealPlan, on_date: date
+    ) -> None:
+        """When ≤1 day remains in the active plan, ensure the next 7-day window exists."""
+        days_remaining = (plan.end_date - on_date).days
+        if days_remaining > 1:
+            return
+        next_start = plan.end_date + timedelta(days=1)
+        existing = await self._repository.find_covering(user_id, on_date=next_start)
+        if existing is not None:
+            return
+        try:
+            logger.info(
+                "ensure_next_week_plan_generate",
+                extra={
+                    "user_id": str(user_id),
+                    "next_start": next_start.isoformat(),
+                },
+            )
+            await self.generate(
+                user_id,
+                MealPlanGenerateRequest(start_date=next_start, days=7, force=False),
+            )
+        except Exception:
+            logger.warning(
+                "ensure_next_week_plan_failed",
+                extra={"user_id": str(user_id), "error_code": "next_week_generate"},
+                exc_info=True,
+            )
+
+    async def week(self, user_id: UUID, start_date: date) -> MealPlanOut:
+        plan = await self.ensure_current_day_plan(user_id, start_date)
         # Always return the full active plan window (typically 7 days),
         # not only [request_date .. request_date+6] which collapses to "today"
         # when the plan ends on that day.
