@@ -91,4 +91,4 @@ cd android && ./gradlew :app:assembleDebug
 - Phone smoke not performed by agent.
 
 ## Commit
-(recorded after feat commit)
+`cbd8d52` — `feat(phase-20): adaptive AI nutrition intelligence`
