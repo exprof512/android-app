@@ -1,12 +1,14 @@
 package com.foodai.app.core.auth
 
 import com.foodai.app.core.network.AuthApi
+import com.foodai.app.core.network.AuthApiProvider
 import com.foodai.app.core.network.CurrentUserDto
 import com.foodai.app.core.network.DeleteAccountRequest
 import com.foodai.app.core.network.EmailOnlyRequest
 import com.foodai.app.core.network.GenericMessageDto
 import com.foodai.app.core.network.LoginRequest
 import com.foodai.app.core.network.LogoutRequest
+import com.foodai.app.core.network.RefreshCoordinator
 import com.foodai.app.core.network.RefreshRequest
 import com.foodai.app.core.network.RegisterRequest
 import com.foodai.app.core.network.ResetPasswordRequest
@@ -59,9 +61,14 @@ private class FakeAuthApi(
     }
     override suspend fun deleteAccount(body: DeleteAccountRequest): Response<okhttp3.ResponseBody> {
         deleteCalls += 1
-        // Simulate HTTP 204 empty body (the real failure mode for Response<Unit>).
         return Response.success(null)
     }
+}
+
+private fun repo(api: AuthApi, store: InMemoryTokenStore): AuthRepository {
+    val provider = AuthApiProvider().also { it.authApi = api }
+    val refresh = RefreshCoordinator(store, provider)
+    return AuthRepository(api, api, store, NoOpLocalSessionCleaner, refresh)
 }
 
 class AuthRepositoryTest {
@@ -76,9 +83,9 @@ class AuthRepositoryTest {
                 user = UserSummaryDto("u1", "anna@example.com", "free"),
             ),
         )
-        val repo = AuthRepository(api, api, store, NoOpLocalSessionCleaner)
+        val authRepo = repo(api, store)
 
-        val pair = repo.login("Anna@Example.com", "password123")
+        val pair = authRepo.login("Anna@Example.com", "password123")
 
         assertThat(pair.accessToken).isEqualTo("access-1")
         assertThat(store.hasSession()).isTrue()
@@ -105,8 +112,8 @@ class AuthRepositoryTest {
                 error("boom")
             }
         }
-        val repo = AuthRepository(failing, failing, store, NoOpLocalSessionCleaner)
-        repo.logout()
+        val authRepo = repo(failing, store)
+        authRepo.logout()
         assertThat(store.hasSession()).isFalse()
     }
 
@@ -124,8 +131,8 @@ class AuthRepositoryTest {
         val api = FakeAuthApi(
             TokenPairResponse("a", "r", expiresIn = 1, user = UserSummaryDto("u1", "a@b.c")),
         )
-        val repo = AuthRepository(api, api, store, NoOpLocalSessionCleaner)
-        assertThat(repo.deleteAccount()).isTrue()
+        val authRepo = repo(api, store)
+        assertThat(authRepo.deleteAccount()).isTrue()
         assertThat(store.hasSession()).isFalse()
     }
 }

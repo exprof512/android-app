@@ -5,6 +5,7 @@ import com.foodai.app.core.network.AuthApi
 import com.foodai.app.core.network.LoginRequest
 import com.foodai.app.core.network.LogoutRequest
 import com.foodai.app.core.network.RegisterRequest
+import com.foodai.app.core.network.RefreshCoordinator
 import com.foodai.app.core.network.TokenPairResponse
 import com.foodai.app.core.network.UserSummaryDto
 import java.time.Instant
@@ -18,6 +19,7 @@ class AuthRepository @Inject constructor(
     @Named("authed") private val authedAuthApi: AuthApi,
     private val tokenStore: TokenStore,
     private val localSessionCleaner: LocalSessionCleaner,
+    private val refreshCoordinator: RefreshCoordinator,
 ) {
     fun hasSession(): Boolean = tokenStore.hasSession()
 
@@ -121,6 +123,7 @@ class AuthRepository @Inject constructor(
                 )
             }
             localSessionCleaner.clearOnLogout(tokenStore.user()?.id)
+            refreshCoordinator.bumpSessionEpoch()
             tokenStore.clear()
             true
         }
@@ -135,6 +138,7 @@ class AuthRepository @Inject constructor(
         } catch (_: Exception) {
             // Local clear always wins — logout is idempotent server-side.
         } finally {
+            refreshCoordinator.bumpSessionEpoch()
             localSessionCleaner.clearOnLogout(previousUserId)
             tokenStore.clear()
         }

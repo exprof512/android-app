@@ -127,11 +127,6 @@ class PhotoAnalysisService:
                 message="Файл изображения повреждён или пуст.",
             )
 
-        if self._entitlements is not None:
-            await self._entitlements.consume(
-                user_id, entitlement_constants.FEATURE_FOOD_PHOTO
-            )
-
         image_bytes = _maybe_downscale(
             image_bytes,
             max_dim=int(
@@ -157,6 +152,12 @@ class PhotoAnalysisService:
                 code=code if isinstance(code, str) else "ai_generation_unavailable",
                 message="Не удалось распознать фото. Попробуйте ещё раз или введите еду вручную.",
             ) from exc
+
+        # Charge Free quota only after a successful provider response.
+        if self._entitlements is not None:
+            await self._entitlements.consume(
+                user_id, entitlement_constants.FEATURE_FOOD_PHOTO
+            )
 
         await self._record_usage(
             user_id=user_id,

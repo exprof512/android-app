@@ -3,6 +3,7 @@ package com.foodai.app.feature.diary
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.foodai.app.core.auth.toUiMessage
+import com.foodai.app.core.network.ApiErrorParser
 import com.foodai.app.core.network.ApiException
 import com.foodai.app.core.network.NutritionApi
 import com.foodai.app.core.network.NutritionLogDto
@@ -12,6 +13,7 @@ import com.foodai.app.core.sync.SelectedDateStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +39,8 @@ class DiaryViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(DiaryUiState())
     val state: StateFlow<DiaryUiState> = _state.asStateFlow()
+    private var refreshJob: Job? = null
+    private var refreshGeneration = 0L
 
     init {
         viewModelScope.launch {
@@ -57,10 +61,13 @@ class DiaryViewModel @Inject constructor(
     }
 
     fun refresh(date: LocalDate = selectedDate.date.value) {
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        val generation = ++refreshGeneration
+        refreshJob = viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null, date = date.toString())
             try {
                 val logs = nutritionApi.listLogs(date.toString())
+                if (generation != refreshGeneration) return@launch
                 _state.value = DiaryUiState(
                     loading = false,
                     date = date.toString(),
@@ -70,10 +77,12 @@ class DiaryViewModel @Inject constructor(
                     fatG = logs.sumOf { it.fatG },
                     carbsG = logs.sumOf { it.carbohydrateG },
                 )
-            } catch (error: ApiException) {
+            } catch (error: Throwable) {
+                if (generation != refreshGeneration) return@launch
+                val parsed = ApiErrorParser.fromThrowable(error)
                 _state.value = _state.value.copy(
                     loading = false,
-                    error = error.toUiMessage(),
+                    error = parsed.toUiMessage(),
                 )
             }
         }
@@ -92,9 +101,11 @@ class DiaryViewModel @Inject constructor(
             try {
                 nutritionApi.deleteLog(id)
                 bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
+                bus.emit(DomainEvent.PlanChanged("diary_delete"))
                 refresh()
-            } catch (error: ApiException) {
-                _state.value = _state.value.copy(error = error.toUiMessage())
+            } catch (error: Throwable) {
+                val parsed = ApiErrorParser.fromThrowable(error)
+                _state.value = _state.value.copy(error = parsed.toUiMessage())
             }
         }
     }

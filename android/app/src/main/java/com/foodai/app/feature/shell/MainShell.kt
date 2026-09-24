@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Favorite
@@ -32,6 +33,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrackChanges
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -44,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -147,6 +151,22 @@ fun MainShell(
 
     Scaffold(
         containerColor = FoodAIColors.Background,
+        floatingActionButton = {
+            if (!hideBottomBar) {
+                FloatingActionButton(
+                    onClick = { showAddFood = true },
+                    containerColor = FoodAIColors.Primary,
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Добавить еду",
+                    )
+                }
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center,
         bottomBar = {
             if (!hideBottomBar) {
                 FoodAINavigationBar(
@@ -166,6 +186,7 @@ fun MainShell(
                             restoreState = true
                         }
                     },
+                    // Center slot reserves space under Scaffold FAB (not clipped).
                     onFabClick = { showAddFood = true },
                 )
             }

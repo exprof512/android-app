@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.time.LocalDate
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -130,11 +129,13 @@ class MealPlanRepository @Inject constructor(
     suspend fun regenerate(days: Int = 7): MealPlanDto = generate(days = days, force = true)
 
     suspend fun replaceItem(itemId: String, reason: String = "user_requested"): MealPlanDto {
+        // Stable per action so double-tap / retry hits server idempotency cache.
+        val idempotencyKey = "replace:$itemId:$reason"
         val plan = wrap {
             mealPlanApi.replaceItem(
                 itemId = itemId,
                 body = MealPlanReplaceRequest(replaceReason = reason),
-                idempotencyKey = UUID.randomUUID().toString(),
+                idempotencyKey = idempotencyKey,
             )
         }
         _weekPlan.value = PlanSnapshot(plan = plan, lastUpdatedEpochMs = System.currentTimeMillis())

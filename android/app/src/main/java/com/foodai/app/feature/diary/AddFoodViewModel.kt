@@ -18,9 +18,9 @@ import com.foodai.app.core.network.PhotoItemDto
 import com.foodai.app.core.network.RecentFoodDto
 import com.foodai.app.core.sync.AppStateBus
 import com.foodai.app.core.sync.DomainEvent
+import com.foodai.app.core.sync.SelectedDateStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.LocalDate
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,10 +67,15 @@ data class AddFoodUiState(
 class AddFoodViewModel @Inject constructor(
     private val nutritionApi: NutritionApi,
     private val bus: AppStateBus,
+    private val selectedDate: SelectedDateStore,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AddFoodUiState())
     val state: StateFlow<AddFoodUiState> = _state.asStateFlow()
+    /** Stable while the sheet is open so confirm retries are idempotent. */
+    private val photoConfirmKey: String = "photo-confirm:${UUID.randomUUID()}"
+
+    private fun loggedOnDate(): String = selectedDate.date.value.toString()
 
     fun setTab(tab: String) {
         _state.value = _state.value.copy(tab = tab, error = null)
@@ -149,7 +154,7 @@ class AddFoodViewModel @Inject constructor(
                 val source = if (protein == 0.0 && fat == 0.0 && carbs == 0.0) "quick_add" else "manual"
                 nutritionApi.createLog(
                     NutritionLogCreateRequest(
-                        loggedOn = LocalDate.now().toString(),
+                        loggedOn = loggedOnDate(),
                         mealType = _state.value.mealType,
                         source = source,
                         description = description,
@@ -159,10 +164,10 @@ class AddFoodViewModel @Inject constructor(
                         carbohydrateG = carbs,
                     ),
                 )
-                bus.emit(DomainEvent.NutritionLogChanged())
+                bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
                 onDone()
-            } catch (error: ApiException) {
-                _state.value = _state.value.copy(error = error.toUiMessage(), loading = false)
+            } catch (error: Throwable) {
+                _state.value = _state.value.copy(error = ApiErrorParser.fromThrowable(error).toUiMessage())
             } finally {
                 _state.value = _state.value.copy(loading = false)
             }
@@ -177,7 +182,7 @@ class AddFoodViewModel @Inject constructor(
             try {
                 nutritionApi.createLog(
                     NutritionLogCreateRequest(
-                        loggedOn = LocalDate.now().toString(),
+                        loggedOn = loggedOnDate(),
                         mealType = _state.value.mealType,
                         source = "search",
                         description = hit.name,
@@ -186,10 +191,10 @@ class AddFoodViewModel @Inject constructor(
                         unit = "g",
                     ),
                 )
-                bus.emit(DomainEvent.NutritionLogChanged())
+                bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
                 onDone()
-            } catch (error: ApiException) {
-                _state.value = _state.value.copy(error = error.toUiMessage())
+            } catch (error: Throwable) {
+                _state.value = _state.value.copy(error = ApiErrorParser.fromThrowable(error).toUiMessage())
             } finally {
                 _state.value = _state.value.copy(loading = false)
             }
@@ -203,7 +208,7 @@ class AddFoodViewModel @Inject constructor(
                 if (item.ingredientId != null && item.quantityG != null) {
                     nutritionApi.createLog(
                         NutritionLogCreateRequest(
-                            loggedOn = LocalDate.now().toString(),
+                            loggedOn = loggedOnDate(),
                             mealType = _state.value.mealType,
                             source = "search",
                             description = item.description,
@@ -215,7 +220,7 @@ class AddFoodViewModel @Inject constructor(
                 } else {
                     nutritionApi.createLog(
                         NutritionLogCreateRequest(
-                            loggedOn = LocalDate.now().toString(),
+                            loggedOn = loggedOnDate(),
                             mealType = _state.value.mealType,
                             source = "manual",
                             description = item.description,
@@ -226,10 +231,10 @@ class AddFoodViewModel @Inject constructor(
                         ),
                     )
                 }
-                bus.emit(DomainEvent.NutritionLogChanged())
+                bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
                 onDone()
-            } catch (error: ApiException) {
-                _state.value = _state.value.copy(error = error.toUiMessage())
+            } catch (error: Throwable) {
+                _state.value = _state.value.copy(error = ApiErrorParser.fromThrowable(error).toUiMessage())
             } finally {
                 _state.value = _state.value.copy(loading = false)
             }
@@ -357,7 +362,7 @@ class AddFoodViewModel @Inject constructor(
             try {
                 nutritionApi.confirmPhoto(
                     PhotoConfirmRequest(
-                        loggedOn = LocalDate.now().toString(),
+                        loggedOn = loggedOnDate(),
                         mealType = _state.value.mealType,
                         items = items.map {
                             PhotoConfirmItemDto(
@@ -368,9 +373,9 @@ class AddFoodViewModel @Inject constructor(
                             )
                         },
                     ),
-                    idempotencyKey = UUID.randomUUID().toString(),
+                    idempotencyKey = photoConfirmKey,
                 )
-                bus.emit(DomainEvent.NutritionLogChanged())
+                bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
                 onDone()
             } catch (error: Exception) {
                 _state.value = _state.value.copy(

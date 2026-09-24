@@ -305,7 +305,8 @@ async def test_calculate_target_previews_without_saving(
     assert profile.current_weight_kg is None
 
 
-async def test_calculate_target_rejects_an_unsafe_pace(client: AsyncClient) -> None:
+async def test_calculate_target_allows_pace_within_engine_cap(client: AsyncClient) -> None:
+    """Schema max is 2.0 kg/week; 1.5 must be accepted (engine default cap is 2.0)."""
     tokens = await register(client, "anna@example.com")
     payload = {
         "sex": "male",
@@ -322,10 +323,28 @@ async def test_calculate_target_rejects_an_unsafe_pace(client: AsyncClient) -> N
         f"{API_PREFIX}/profile/calculate-target", headers=auth(tokens), json=payload
     )
 
+    assert response.status_code == 200, response.text
+    assert response.json()["recommended_calorie_target_kcal"] > 0
+
+
+async def test_calculate_target_rejects_pace_above_schema_max(client: AsyncClient) -> None:
+    tokens = await register(client, "pace-max@example.com")
+    payload = {
+        "sex": "male",
+        "age_years": 40,
+        "height_cm": 180,
+        "current_weight_kg": 95,
+        "target_weight_kg": 85,
+        "activity_level": "light",
+        "goal_type": "lose_weight",
+        "desired_weekly_change_kg": 2.5,
+    }
+
+    response = await client.post(
+        f"{API_PREFIX}/profile/calculate-target", headers=auth(tokens), json=payload
+    )
+
     assert response.status_code == 422
-    assert response.json()["error"]["details"] == [
-        {"field": "desired_weekly_change_kg", "reason": "exceeds_safe_weekly_change"}
-    ]
 
 
 async def test_profile_endpoints_require_authentication(client: AsyncClient) -> None:

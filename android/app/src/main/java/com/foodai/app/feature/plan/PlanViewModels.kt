@@ -71,7 +71,9 @@ class TodayViewModel @Inject constructor(
     private val _state = MutableStateFlow(TodayUiState())
     val state: StateFlow<TodayUiState> = _state.asStateFlow()
     private var stepsJob: Job? = null
+    private var refreshJob: Job? = null
     private var openedTracked = false
+    private var refreshGeneration = 0L
 
     init {
         viewModelScope.launch {
@@ -140,7 +142,9 @@ class TodayViewModel @Inject constructor(
     }
 
     fun refresh(date: LocalDate = selectedDate.date.value) {
-        viewModelScope.launch {
+        refreshJob?.cancel()
+        val generation = ++refreshGeneration
+        refreshJob = viewModelScope.launch {
             val keepData = _state.value.plan != null
             _state.value = _state.value.copy(
                 loading = !keepData,
@@ -151,6 +155,7 @@ class TodayViewModel @Inject constructor(
             )
             try {
                 val plan = mealPlans.today(date)
+                if (generation != refreshGeneration) return@launch
                 val profile = runCatching { profiles.refreshProfile() }.getOrNull()
                 val water = runCatching { waterRepo.today(date) }.getOrNull()
                 if (water != null) {
@@ -162,9 +167,9 @@ class TodayViewModel @Inject constructor(
                         waterGoalMl = water?.goalMl ?: m.waterGoalMl,
                     )
                 }
-                val logs = runCatching {
-                    nutritionApi.listLogs(date.toString())
-                }.getOrDefault(emptyList())
+                val logsResult = runCatching { nutritionApi.listLogs(date.toString()) }
+                val logs = logsResult.getOrNull()
+                if (generation != refreshGeneration) return@launch
                 _state.value = TodayUiState(
                     loading = false,
                     refreshing = false,
@@ -172,12 +177,15 @@ class TodayViewModel @Inject constructor(
                     profile = profile,
                     metrics = metrics,
                     water = water,
-                    nutritionLogs = logs,
+                    nutritionLogs = logs ?: _state.value.nutritionLogs,
                     selectedDate = date.toString(),
                     lastUpdatedEpochMs = System.currentTimeMillis(),
                     aiPreview = _state.value.aiPreview,
                     actionError = _state.value.actionError,
-                    infoMessage = _state.value.infoMessage,
+                    infoMessage = when {
+                        logsResult.isFailure -> "Не удалось обновить дневник еды"
+                        else -> _state.value.infoMessage
+                    },
                 )
                 observeSteps()
                 if (!openedTracked) {
@@ -185,10 +193,9 @@ class TodayViewModel @Inject constructor(
                     analytics.track("today_opened")
                 }
             } catch (error: ApiException) {
+                if (generation != refreshGeneration) return@launch
                 val missing = error.code == "meal_plan_not_found" || error.httpStatus == 404
                 val cached = mealPlans.todayPlan.value.plan ?: _state.value.plan
-                val isNetwork = error is ApiException.Network ||
-                    error.httpStatus == null && !missing
                 if (cached != null && !missing) {
                     _state.value = _state.value.copy(
                         loading = false,
@@ -214,6 +221,7 @@ class TodayViewModel @Inject constructor(
                     )
                 }
             } catch (error: Exception) {
+                if (generation != refreshGeneration) return@launch
                 val cached = mealPlans.todayPlan.value.plan ?: _state.value.plan
                 if (cached != null) {
                     _state.value = _state.value.copy(

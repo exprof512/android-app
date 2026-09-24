@@ -1,4 +1,8 @@
-"""Try multiple text providers in order (OpenAI → DeepSeek)."""
+"""Try multiple text providers in order.
+
+Legacy helper: production DI uses DeepSeek-only via ``build_text_provider``.
+Do not wire OpenAI text as a silent fallback for product AI.
+"""
 
 from __future__ import annotations
 

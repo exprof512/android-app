@@ -10,7 +10,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models import as_utc
-from app.meal_plans.models import MealPlan, MealPlanItem
 from app.profiles.models import Goal, UserProfile
 from app.progress.models import WeightEntry
 from app.progress.repository import ProgressRepository
@@ -184,84 +183,24 @@ class ProgressService:
     async def _daily_balance(
         self, user_id: UUID, on_date: date, goal: Goal | None
     ) -> DailyNutritionBalanceOut:
-        plan = (
-            await self._session.execute(
-                select(MealPlan)
-                .where(
-                    MealPlan.user_id == user_id,
-                    MealPlan.start_date <= on_date,
-                    MealPlan.end_date >= on_date,
-                    MealPlan.status == "ready",
-                )
-                .order_by(MealPlan.updated_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if plan is None:
-            return DailyNutritionBalanceOut(
-                date=on_date,
-                target_calories_kcal=goal.calorie_target_kcal if goal else None,
-            )
+        from app.nutrition.day_balance import compute_day_consumed
 
-        items = list(
-            (
-                await self._session.execute(
-                    select(MealPlanItem).where(
-                        MealPlanItem.meal_plan_id == plan.id,
-                        MealPlanItem.planned_date == on_date,
-                    )
-                )
-            ).scalars()
+        balance = await compute_day_consumed(
+            self._session, user_id=user_id, on_date=on_date
         )
-        planned_kcal = sum(item.calories_kcal for item in items)
-        completed = [
-            item
-            for item in items
-            if item.status == "completed" or item.is_completed
-        ]
-        consumed_kcal = sum(item.calories_kcal for item in completed)
-        protein = sum((item.protein_g for item in completed), Decimal("0"))
-        fat = sum((item.fat_g for item in completed), Decimal("0"))
-        carbs = sum((item.carbohydrate_g for item in completed), Decimal("0"))
-
-        # Merge nutrition_logs that are not already tied to a completed meal_plan_item.
-        try:
-            from app.nutrition.models import NutritionLog
-
-            logs = list(
-                (
-                    await self._session.execute(
-                        select(NutritionLog).where(
-                            NutritionLog.user_id == user_id,
-                            NutritionLog.logged_on == on_date,
-                        )
-                    )
-                ).scalars()
-            )
-            completed_item_ids = {item.id for item in completed}
-            for log in logs:
-                if (
-                    log.meal_plan_item_id is not None
-                    and log.meal_plan_item_id in completed_item_ids
-                ):
-                    continue
-                consumed_kcal += log.calories_kcal
-                protein += log.protein_g
-                fat += log.fat_g
-                carbs += log.carbohydrate_g
-        except Exception:
-            pass
-
+        target = balance.plan_calorie_target_kcal
+        if target is None and goal is not None:
+            target = goal.calorie_target_kcal
         return DailyNutritionBalanceOut(
             date=on_date,
-            target_calories_kcal=plan.calorie_target_kcal,
-            consumed_calories_kcal=consumed_kcal,
-            planned_calories_kcal=planned_kcal,
-            protein_g=protein.quantize(Decimal("0.1")),
-            fat_g=fat.quantize(Decimal("0.1")),
-            carbohydrate_g=carbs.quantize(Decimal("0.1")),
-            completed_meals=len(completed),
-            planned_meals=len(items),
+            target_calories_kcal=target,
+            consumed_calories_kcal=balance.consumed_kcal,
+            planned_calories_kcal=balance.planned_kcal,
+            protein_g=balance.protein_g.quantize(Decimal("0.1")),
+            fat_g=balance.fat_g.quantize(Decimal("0.1")),
+            carbohydrate_g=balance.carbs_g.quantize(Decimal("0.1")),
+            completed_meals=balance.completed_meals,
+            planned_meals=balance.planned_meals,
         )
 
     @staticmethod

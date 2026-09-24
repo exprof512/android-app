@@ -174,8 +174,9 @@ data class FoodAINavItem(
 )
 
 /**
- * Bottom nav with optional center elevated FAB (Ask AI / add).
- * Tabs typically: Сегодня · План · [FAB] · Прогресс · Профиль
+ * Bottom navigation. Optional [onFabClick] reserves a center slot for a docked FAB
+ * drawn by the parent [androidx.compose.material3.Scaffold] — do not overlay a
+ * clipped circle here (touches get eaten by bottomBar bounds).
  */
 @Composable
 fun FoodAINavigationBar(
@@ -185,54 +186,43 @@ fun FoodAINavigationBar(
     modifier: Modifier = Modifier,
     onFabClick: (() -> Unit)? = null,
 ) {
-    Box(modifier = modifier.fillMaxWidth()) {
-        NavigationBar(
-            containerColor = FoodAIColors.Surface,
-            tonalElevation = 0.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = FoodAIColors.Divider,
-                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                ),
-        ) {
-            val left = items.take(items.size / 2)
-            val right = items.drop(items.size / 2)
+    NavigationBar(
+        containerColor = FoodAIColors.Surface,
+        tonalElevation = 0.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = FoodAIColors.Divider,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            ),
+    ) {
+        if (onFabClick == null) {
+            items.forEach { item ->
+                NavBarSlot(item = item, currentRoute = currentRoute, onSelect = onSelect)
+            }
+        } else {
+            // Even split around the center FAB slot (e.g. 2 + FAB + 2 for 4 tabs,
+            // or 2 + FAB + 3 for 5 tabs — prefer even counts when possible).
+            val leftCount = items.size / 2
+            val left = items.take(leftCount)
+            val right = items.drop(leftCount)
             left.forEach { item ->
                 NavBarSlot(item = item, currentRoute = currentRoute, onSelect = onSelect)
             }
-            if (onFabClick != null) {
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onFabClick,
-                    icon = { Spacer(Modifier.size(40.dp)) },
-                    label = { Text("") },
-                    colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
-                    enabled = false,
-                )
-            }
+            NavigationBarItem(
+                selected = false,
+                onClick = onFabClick,
+                icon = {
+                    // Invisible placeholder; real FAB is Scaffold.floatingActionButton.
+                    Spacer(Modifier.size(48.dp))
+                },
+                label = { Text(" ") },
+                colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent),
+                enabled = true,
+            )
             right.forEach { item ->
                 NavBarSlot(item = item, currentRoute = currentRoute, onSelect = onSelect)
-            }
-        }
-        if (onFabClick != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-18).dp)
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(FoodAIColors.Primary)
-                    .clickable(onClick = onFabClick),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = "Добавить еду",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp),
-                )
             }
         }
     }

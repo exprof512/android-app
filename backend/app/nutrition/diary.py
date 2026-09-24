@@ -249,13 +249,26 @@ class NutritionDiaryService:
         row = await self._session.get(NutritionLog, log_id)
         if row is None or row.user_id != user_id:
             raise NutritionLogNotFound()
+        # Deleting a plan-linked log must uncomplete the slot so Today matches Diary.
+        item_id = row.meal_plan_item_id
         await self._session.delete(row)
+        if item_id is not None:
+            item = await self._session.get(MealPlanItem, item_id)
+            if item is not None and (item.is_completed or item.status == "completed"):
+                item.is_completed = False
+                item.completed_at = None
+                item.status = "planned"
         await self._session.commit()
 
     async def duplicate(self, user_id: UUID, log_id: UUID) -> NutritionLog:
         row = await self._session.get(NutritionLog, log_id)
         if row is None or row.user_id != user_id:
             raise NutritionLogNotFound()
+        if row.source == "meal_plan_item" or row.meal_plan_item_id is not None:
+            raise NutritionLogValidationError(
+                "Нельзя дублировать запись из плана — это удваивает калории. "
+                "Добавьте еду вручную, если съели ещё раз.",
+            )
         copy = NutritionLog(
             user_id=user_id,
             logged_on=row.logged_on,
@@ -273,7 +286,7 @@ class NutritionDiaryService:
             unit=row.unit,
             notes=row.notes,
             confidence=None,
-            source="manual" if row.source == "meal_plan_item" else row.source,
+            source=row.source if row.source in _EDITABLE_SOURCES else "manual",
         )
         self._session.add(copy)
         await self._session.commit()

@@ -184,6 +184,29 @@ class AccountService:
         except Exception:
             nutrition_logs = []
 
+        water_entries: list[dict[str, Any]] = []
+        try:
+            from app.water.models import WaterEntry
+
+            water_rows = list(
+                (
+                    await self._session.execute(
+                        select(WaterEntry).where(WaterEntry.user_id == user.id)
+                    )
+                ).scalars()
+            )
+            water_entries = [
+                {
+                    "id": str(w.id),
+                    "recorded_on": w.recorded_on.isoformat(),
+                    "amount_ml": w.amount_ml,
+                    "created_at": w.created_at.isoformat() if w.created_at else None,
+                }
+                for w in water_rows
+            ]
+        except Exception:
+            water_entries = []
+
         return {
             "exported_at": utcnow().isoformat(),
             "account": {
@@ -250,6 +273,7 @@ class AccountService:
                 for w in weights
             ],
             "nutrition_logs": nutrition_logs,
+            "water_entries": water_entries,
             "meal_plans": [
                 {
                     "id": str(p.id),

@@ -98,7 +98,11 @@ class MealPlanService:
         self._entitlements = entitlements
 
     async def generate(
-        self, user_id: UUID, payload: MealPlanGenerateRequest
+        self,
+        user_id: UUID,
+        payload: MealPlanGenerateRequest,
+        *,
+        charge_entitlement: bool = True,
     ) -> MealPlanOut:
         snapshot = await self._profiles.get_snapshot(user_id)
         if snapshot.goal is None or snapshot.profile.meals_per_day is None:
@@ -123,7 +127,8 @@ class MealPlanService:
                 user_id, start_date=payload.start_date, end_date=end_date
             )
 
-        if self._entitlements is not None:
+        # Continuity auto-generate must not burn Free daily quota on Today open.
+        if charge_entitlement and self._entitlements is not None:
             await self._entitlements.consume(
                 user_id, entitlement_constants.FEATURE_MEAL_PLAN_GENERATE
             )
@@ -302,11 +307,21 @@ class MealPlanService:
             "ensure_current_day_plan_generate",
             extra={"user_id": str(user_id), "on_date": on_date.isoformat()},
         )
-        generated = await self.generate(
-            user_id,
-            MealPlanGenerateRequest(start_date=on_date, days=7, force=False),
-        )
+        try:
+            generated = await self.generate(
+                user_id,
+                MealPlanGenerateRequest(start_date=on_date, days=7, force=False),
+                charge_entitlement=False,
+            )
+        except Exception:
+            # Concurrent GET /today may race; prefer covering plan if another won.
+            plan = await self._repository.find_covering(user_id, on_date=on_date)
+            if plan is not None:
+                return plan
+            raise
         plan = await self._repository.get_plan(generated.id)
+        if plan is None:
+            plan = await self._repository.find_covering(user_id, on_date=on_date)
         if plan is None:
             raise MealPlanNotFound()
         return plan
@@ -333,6 +348,7 @@ class MealPlanService:
             await self.generate(
                 user_id,
                 MealPlanGenerateRequest(start_date=next_start, days=7, force=False),
+                charge_entitlement=False,
             )
         except Exception:
             logger.warning(
@@ -554,12 +570,20 @@ class MealPlanService:
 
         item.recipe_id = recipe.id
         item.recipe = recipe
-        item.status = "replaced"
         item.calories_kcal = _scale_kcal(recipe.calories_kcal, item.servings)
         item.protein_g = _scale(recipe.protein_g, item.servings)
         item.fat_g = _scale(recipe.fat_g, item.servings)
         item.carbohydrate_g = _scale(recipe.carbohydrate_g, item.servings)
         item.estimated_cost_amount = _scale(recipe.estimated_cost_amount, item.servings)
+        # Keep completion semantics: replaced-but-eaten stays completed with synced diary.
+        if item.is_completed or item.status == "completed":
+            item.status = "completed"
+            item.is_completed = True
+            diary = NutritionDiaryService(self._session)
+            await diary.upsert_from_meal_plan_item(user_id, item, commit=False)
+        else:
+            item.status = "replaced"
+            item.is_completed = False
         await self._mark_shopping_stale(plan.id)
         await self._session.commit()
         await self._session.refresh(item)
