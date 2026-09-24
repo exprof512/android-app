@@ -93,7 +93,7 @@ flowchart TD
 | Механизм | Policy |
 |---|---|
 | `usage_limits` | Atomic check/increment до paid provider call; quotas раздельны для plan, replacement, chat и image |
-| `EntitlementsService` | `get_tier()`, `require_premium()`, `consume(feature)`; Free defaults: 3 plan/day, 5 replace/day, 20 chat/day; `image_regenerate` — Premium only |
+| `EntitlementsService` | `get_tier()`, `require_premium()`, `consume(feature)`; Free defaults: 10 plan/day, 15 replace/day, 40 chat/day, 15 AI recommendations/day; `image_regenerate` — Premium only |
 | `PaymentProvider` | Interface only (`NullPaymentProvider`); Google Play / RU / international adapters later |
 | `ai_text_usage` | operation/model/tokens/latency/status/estimated cost; без secrets и unnecessary raw context |
 | Redis cache | key содержит operation, schema version, normalized non-sensitive request fingerprint и model config version; TTL environment-configurable |
