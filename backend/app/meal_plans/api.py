@@ -39,7 +39,7 @@ async def meal_plan_today(
     on_date: date | None = Query(default=None, alias="date"),
     service: MealPlanService = Depends(get_meal_plan_service),
 ) -> MealPlanOut:
-    return await service.today(user.id, on_date or date.today())
+    return await service.today(user.id, on_date)
 
 
 @router.get("/meal-plans/week", response_model=MealPlanOut)
@@ -48,7 +48,7 @@ async def meal_plan_week(
     start_date: date | None = Query(default=None),
     service: MealPlanService = Depends(get_meal_plan_service),
 ) -> MealPlanOut:
-    return await service.week(user.id, start_date or date.today())
+    return await service.week(user.id, start_date)
 
 
 @router.post("/meal-plans/{meal_plan_id}/regenerate", response_model=MealPlanOut)

@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import CurrentUser
+from app.core.user_time import local_today_for_user
 from app.core.dependencies import get_db_session, get_services
 from app.core.errors import ApiError
 from app.core.services import Services
@@ -39,6 +40,10 @@ from app.recipes.models import Ingredient
 from app.recipes.repository import RecipeRepository
 
 router = APIRouter(tags=["nutrition"])
+
+
+async def _user_today(session: AsyncSession, user_id: UUID) -> date:
+    return await local_today_for_user(session, user_id)
 
 
 class NutritionLogCreate(BaseModel):
@@ -186,7 +191,7 @@ async def diary_day(
     session: AsyncSession = Depends(get_db_session),
 ) -> dict:
     return await NutritionDiaryService(session).day_summary(
-        user.id, date_ or date.today()
+        user.id, date_ or await _user_today(session, user.id)
     )
 
 
@@ -196,7 +201,9 @@ async def diary_history(
     days: int = Query(default=7, ge=1, le=31),
     session: AsyncSession = Depends(get_db_session),
 ) -> list[dict]:
-    return await NutritionDiaryService(session).history(user.id, days=days)
+    return await NutritionDiaryService(session).history(
+        user.id, days=days, end=await _user_today(session, user.id)
+    )
 
 
 @router.get("/nutrition/foods/recent")
@@ -514,7 +521,7 @@ async def apply_meal_template(
             )
         ).scalars()
     )
-    day = logged_on or date.today()
+    day = logged_on or await _user_today(session, user.id)
     diary = NutritionDiaryService(session)
     created: list[NutritionLog] = []
     for item in items:

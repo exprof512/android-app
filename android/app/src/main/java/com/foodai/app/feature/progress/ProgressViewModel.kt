@@ -54,12 +54,16 @@ class ProgressViewModel @Inject constructor(
         refresh()
     }
 
+    private var refreshGeneration = 0
+
     fun refresh() {
+        val generation = ++refreshGeneration
+        val period = _state.value.period
         viewModelScope.launch {
-            val period = _state.value.period
             _state.value = _state.value.copy(loading = true, error = null, actionError = null)
             try {
                 val summary = progress.summary(period = period)
+                if (generation != refreshGeneration) return@launch
                 _state.value = ProgressUiState(
                     loading = false,
                     summary = summary,

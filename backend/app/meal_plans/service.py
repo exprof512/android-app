@@ -122,10 +122,6 @@ class MealPlanService:
             existing = await self._repository.get_by_hash(user_id, request_hash)
             if existing is not None:
                 return await self._to_out(existing, warnings=[], reused=True)
-        else:
-            await self._archive_overlapping(
-                user_id, start_date=payload.start_date, end_date=end_date
-            )
 
         # Continuity auto-generate must not burn Free daily quota on Today open.
         if charge_entitlement and self._entitlements is not None:
@@ -261,6 +257,10 @@ class MealPlanService:
             ),
             items=[self._build_item(slot) for slot in slots],
         )
+        # Archive other ready plans that share any day, in the same commit as the insert.
+        await self._archive_overlapping(
+            user_id, start_date=payload.start_date, end_date=end_date
+        )
         await self._repository.add_plan(plan)
         await self._session.commit()
         await self._session.refresh(plan)
@@ -281,20 +281,23 @@ class MealPlanService:
                     )
         return await self._to_out(plan, warnings=warnings, reused=False)
 
-    async def today(self, user_id: UUID, on_date: date) -> MealPlanOut:
+    async def today(self, user_id: UUID, on_date: date | None = None) -> MealPlanOut:
         """Return today's plan, generating one if missing (idempotent continuity)."""
-        plan = await self.ensure_current_day_plan(user_id, on_date)
+        from app.core.user_time import local_today_for_user
+
+        day = on_date or await local_today_for_user(self._session, user_id)
+        plan = await self.ensure_current_day_plan(user_id, day)
         items = await self._repository.list_items_for_dates(
-            plan.id, from_date=on_date, to_date=on_date
+            plan.id, from_date=day, to_date=day
         )
         out = await self._to_out(
             plan,
             warnings=[],
             items_override=items,
-            day_progress_date=on_date,
+            day_progress_date=day,
             include_week_summary=False,
         )
-        await self._maybe_prepare_next_week(user_id, plan, on_date)
+        await self._maybe_prepare_next_week(user_id, plan, day)
         # Reload day items in case next-week gen archived something (should not).
         return out
 
@@ -357,8 +360,11 @@ class MealPlanService:
                 exc_info=True,
             )
 
-    async def week(self, user_id: UUID, start_date: date) -> MealPlanOut:
-        plan = await self.ensure_current_day_plan(user_id, start_date)
+    async def week(self, user_id: UUID, start_date: date | None = None) -> MealPlanOut:
+        from app.core.user_time import local_today_for_user
+
+        anchor = start_date or await local_today_for_user(self._session, user_id)
+        plan = await self.ensure_current_day_plan(user_id, anchor)
         # Always return the full active plan window (typically 7 days),
         # not only [request_date .. request_date+6] which collapses to "today"
         # when the plan ends on that day.
@@ -442,10 +448,16 @@ class MealPlanService:
         day_items = await self._repository.list_items_for_dates(
             plan.id, from_date=item.planned_date, to_date=item.planned_date
         )
-        consumed_kcal = sum(
-            i.calories_kcal for i in day_items if i.is_completed and i.id != item.id
+        from app.nutrition.day_balance import compute_day_consumed
+
+        balance = await compute_day_consumed(
+            self._session,
+            user_id=user_id,
+            on_date=item.planned_date,
+            plan=plan,
+            items=[row for row in day_items if row.id != item.id],
         )
-        remaining_kcal = max(0, plan.calorie_target_kcal - consumed_kcal)
+        remaining_kcal = max(0, plan.calorie_target_kcal - balance.consumed_kcal)
         pantry_names = [p.display_name for p in snapshot.pantry]
         context = {
             "locale": "ru-RU",
@@ -1023,39 +1035,21 @@ class MealPlanService:
         ]
         planned_meals = len(day_items)
 
-        # Invariant: only COMPLETED plan slots contribute from the plan.
-        from_plan_kcal = sum(i.calories_kcal for i in completed)
-        consumed_kcal = from_plan_kcal
-        consumed_protein = sum((i.protein_g for i in completed), Decimal("0"))
-        consumed_fat = sum((i.fat_g for i in completed), Decimal("0"))
-        consumed_carbs = sum((i.carbohydrate_g for i in completed), Decimal("0"))
+        from app.nutrition.day_balance import compute_day_consumed
 
-        completed_ids = {i.id for i in completed}
-        from app.nutrition.models import NutritionLog
-        from sqlalchemy import select
-
-        logs = list(
-            (
-                await self._session.execute(
-                    select(NutritionLog).where(
-                        NutritionLog.user_id == plan.user_id,
-                        NutritionLog.logged_on == on_date,
-                    )
-                )
-            ).scalars()
+        balance = await compute_day_consumed(
+            self._session,
+            user_id=plan.user_id,
+            on_date=on_date,
+            plan=plan,
+            items=day_items,
         )
-        from_diary_kcal = 0
-        for log in logs:
-            if (
-                log.meal_plan_item_id is not None
-                and log.meal_plan_item_id in completed_ids
-            ):
-                continue
-            from_diary_kcal += log.calories_kcal
-            consumed_kcal += log.calories_kcal
-            consumed_protein += log.protein_g
-            consumed_fat += log.fat_g
-            consumed_carbs += log.carbohydrate_g
+        from_plan_kcal = balance.from_plan_kcal
+        consumed_kcal = balance.consumed_kcal
+        consumed_protein = balance.protein_g
+        consumed_fat = balance.fat_g
+        consumed_carbs = balance.carbs_g
+        from_diary_kcal = balance.from_diary_kcal
 
         target_kcal = plan.calorie_target_kcal
         target_protein = Decimal(str(plan.protein_target_g))

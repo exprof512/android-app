@@ -11,6 +11,7 @@ import com.foodai.app.core.network.RecipeApi
 import com.foodai.app.core.network.RecipeImageDto
 import com.foodai.app.core.sync.AppStateBus
 import com.foodai.app.core.sync.DomainEvent
+import com.foodai.app.core.sync.SelectedDateStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +37,7 @@ class MealPlanRepository @Inject constructor(
     private val mealPlanApi: MealPlanApi,
     private val recipeApi: RecipeApi,
     private val bus: AppStateBus,
+    private val selectedDate: SelectedDateStore,
 ) {
     private val _weekPlan = MutableStateFlow(PlanSnapshot())
     val weekPlan: StateFlow<PlanSnapshot> = _weekPlan.asStateFlow()
@@ -107,14 +109,14 @@ class MealPlanRepository @Inject constructor(
             val plan = wrap {
                 mealPlanApi.generate(
                     MealPlanGenerateRequest(
-                        startDate = LocalDate.now().toString(),
+                        startDate = selectedDate.date.value.toString(),
                         days = days,
                         force = force,
                     ),
                 )
             }
             _weekPlan.value = PlanSnapshot(plan = plan, lastUpdatedEpochMs = System.currentTimeMillis())
-            runCatching { refreshToday(LocalDate.now()) }
+            runCatching { refreshToday(selectedDate.date.value) }
             bus.emit(DomainEvent.PlanChanged("generate"))
             bus.emit(DomainEvent.ShoppingChanged(plan.id))
             plan
@@ -139,7 +141,7 @@ class MealPlanRepository @Inject constructor(
             )
         }
         _weekPlan.value = PlanSnapshot(plan = plan, lastUpdatedEpochMs = System.currentTimeMillis())
-        runCatching { refreshToday(LocalDate.now()) }
+        runCatching { refreshToday(selectedDate.date.value) }
         bus.emit(DomainEvent.PlanChanged("replace"))
         bus.emit(DomainEvent.ShoppingChanged(plan.id))
         return plan
@@ -147,7 +149,7 @@ class MealPlanRepository @Inject constructor(
 
     suspend fun completeItem(itemId: String, completed: Boolean = true): MealPlanItemDto {
         val item = wrap { mealPlanApi.completeItem(itemId, completed) }
-        runCatching { refreshAll(LocalDate.now()) }
+        runCatching { refreshAll(selectedDate.date.value) }
         bus.emit(DomainEvent.PlanChanged("complete"))
         bus.emit(DomainEvent.NutritionLogChanged())
         return item
@@ -155,7 +157,7 @@ class MealPlanRepository @Inject constructor(
 
     suspend fun skipItem(itemId: String, skipped: Boolean = true): MealPlanItemDto {
         val item = wrap { mealPlanApi.skipItem(itemId, skipped) }
-        runCatching { refreshAll(LocalDate.now()) }
+        runCatching { refreshAll(selectedDate.date.value) }
         bus.emit(DomainEvent.PlanChanged("skip"))
         return item
     }

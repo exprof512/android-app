@@ -42,19 +42,9 @@ async def compute_day_consumed(
 ) -> DayConsumed:
     """Merge completed meal-plan slots with diary logs (dedupe by item id)."""
     if plan is None:
-        plan = (
-            await session.execute(
-                select(MealPlan)
-                .where(
-                    MealPlan.user_id == user_id,
-                    MealPlan.start_date <= on_date,
-                    MealPlan.end_date >= on_date,
-                    MealPlan.status == "ready",
-                )
-                .order_by(MealPlan.updated_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
+        from app.meal_plans.selection import find_ready_covering
+
+        plan = await find_ready_covering(session, user_id, on_date)
 
     if items is None and plan is not None:
         items = list(
@@ -67,7 +57,7 @@ async def compute_day_consumed(
                 )
             ).scalars()
         )
-    items = items or []
+    items = [i for i in (items or []) if i.planned_date == on_date]
 
     completed = [i for i in items if i.status == "completed" or i.is_completed]
     from_plan_kcal = sum(i.calories_kcal for i in completed)

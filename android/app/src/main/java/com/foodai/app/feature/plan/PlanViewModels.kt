@@ -508,6 +508,7 @@ class TodayViewModel @Inject constructor(
                     aiPreview = AiPreviewState.Idle,
                     infoMessage = "Добавлено: ${candidate.name}",
                 )
+                bus.emit(DomainEvent.NutritionLogChanged(selectedDate.date.value))
                 refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
@@ -571,6 +572,7 @@ class TodayViewModel @Inject constructor(
                     aiPreview = AiPreviewState.Idle,
                     infoMessage = "Остаток дня адаптирован",
                 )
+                bus.emit(DomainEvent.PlanChanged("adapt_day"))
                 refresh()
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
@@ -607,6 +609,7 @@ class WeekViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(WeekUiState())
     val state: StateFlow<WeekUiState> = _state.asStateFlow()
+    private var refreshGeneration = 0
 
     init {
         viewModelScope.launch {
@@ -631,6 +634,7 @@ class WeekViewModel @Inject constructor(
     }
 
     fun refresh() {
+        val generation = ++refreshGeneration
         viewModelScope.launch {
             val keep = _state.value.plan != null
             _state.value = _state.value.copy(
@@ -641,6 +645,7 @@ class WeekViewModel @Inject constructor(
             )
             try {
                 val plan = mealPlans.week(selectedDate.date.value)
+                if (generation != refreshGeneration) return@launch
                 val profile = runCatching { profiles.refreshProfile() }.getOrNull()
                 val summaryDays = plan.weekSummary?.days.orEmpty()
                 val dates = if (summaryDays.isNotEmpty()) {

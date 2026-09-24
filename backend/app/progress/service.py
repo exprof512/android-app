@@ -70,16 +70,18 @@ class ProgressService:
         on_date: date | None = None,
         period: int | None = None,
     ) -> ProgressSummaryOut:
-        today = on_date or date.today()
-        warnings: list[str] = []
-        latest = await self._repository.latest(user_id)
-        recent = await self._repository.list_entries(user_id, limit=14)
+        from app.core.user_time import user_local_date
 
         profile = (
             await self._session.execute(
                 select(UserProfile).where(UserProfile.user_id == user_id)
             )
         ).scalar_one_or_none()
+        today = on_date or user_local_date(profile.timezone if profile else None)
+        warnings: list[str] = []
+        latest = await self._repository.latest(user_id)
+        recent = await self._repository.list_entries(user_id, limit=14)
+
         goal: Goal | None = None
         if profile is not None and profile.active_goal_id is not None:
             goal = await self._session.get(Goal, profile.active_goal_id)

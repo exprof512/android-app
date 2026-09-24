@@ -62,7 +62,37 @@ async def startup(ctx: dict[str, object]) -> None:
     ctx["database"] = database
     ctx["storage"] = storage
     ctx["settings"] = settings
+    await _requeue_stale_images(ctx)
     logger.info("worker_started")
+
+
+async def _requeue_stale_images(ctx: dict[str, object]) -> None:
+    """Pending rows lose their Arq job when Redis restarts. Re-enqueue the same row."""
+    from datetime import UTC, datetime, timedelta
+    from sqlalchemy import select
+
+    from app.images.models import RecipeImage
+
+    database = ctx.get("database")
+    redis = ctx.get("redis")
+    if not isinstance(database, Database) or redis is None:
+        return
+    cutoff = datetime.now(UTC) - timedelta(minutes=2)
+    async with database.sessions() as session:
+        rows = list(
+            (
+                await session.execute(
+                    select(RecipeImage.id).where(
+                        RecipeImage.generation_status == "pending",
+                        RecipeImage.updated_at < cutoff,
+                    )
+                )
+            ).scalars()
+        )
+    for image_id in rows:
+        await redis.enqueue_job("generate_recipe_image", str(image_id))
+    if rows:
+        logger.info("image_pending_requeued", extra={"count": len(rows)})
 
 
 async def shutdown(ctx: dict[str, object]) -> None:

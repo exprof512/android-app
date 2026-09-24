@@ -153,7 +153,9 @@ class RecommendationService:
         on_date: date | None = None,
     ) -> RecommendationsOut:
         await self._consume_recommendation_quota(user_id)
-        day = on_date or date.today()
+        from app.core.user_time import local_today_for_user
+
+        day = on_date or await local_today_for_user(self._session, user_id)
         context = await self._context.build(
             user_id,
             intent=intent or "food_suggestion",
@@ -252,7 +254,9 @@ class RecommendationService:
         self, user_id: UUID, *, on_date: date | None = None
     ) -> AdaptDayOut:
         await self._consume_recommendation_quota(user_id)
-        day = on_date or date.today()
+        from app.core.user_time import local_today_for_user
+
+        day = on_date or await local_today_for_user(self._session, user_id)
         context = await self._context.build(
             user_id,
             intent="adapt_day",
@@ -658,8 +662,13 @@ class RecommendationService:
             )
         recipe_id = UUID(str(recipe_id_raw))
         meal_type = str(payload.get("meal_type") or "snack")
+        from app.core.user_time import local_today_for_user
+
         logged_on = date.fromisoformat(
-            str(payload.get("date") or date.today().isoformat())
+            str(
+                payload.get("date")
+                or (await local_today_for_user(self._session, user_id)).isoformat()
+            )
         )
         servings = Decimal(str(payload.get("servings") or 1))
         row = await NutritionDiaryService(self._session).create(

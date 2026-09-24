@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.versions import AI_CONTEXT_SCHEMA_VERSION
 from app.core.config import Settings
+from app.core.user_time import local_today_for_user
 from app.meal_plans.models import MealPlan, MealPlanItem
+from app.meal_plans.selection import find_ready_covering
+from app.nutrition.day_balance import compute_day_consumed
 from app.profiles.models import (
     AvailableProduct,
     FoodPreference,
@@ -65,7 +68,11 @@ class AIContextBuilder:
     ) -> dict[str, Any]:
         """Assemble user-scoped AI context. Never includes email/password/JWT."""
         db = session or self._session
-        day = on_date or date.today()
+        from app.core.user_time import local_today_for_user
+        from app.meal_plans.selection import find_ready_covering
+        from app.nutrition.day_balance import compute_day_consumed
+
+        day = on_date or await local_today_for_user(db, user_id)
         profile = (
             await db.execute(select(UserProfile).where(UserProfile.user_id == user_id))
         ).scalar_one_or_none()
@@ -110,7 +117,23 @@ class AIContextBuilder:
             }
 
         plan, plan_meals = await self._plan_meals_for_day(db, user_id, day)
-        consumed_remaining = self._consumed_remaining(plan, plan_meals, targets)
+        balance = await compute_day_consumed(
+            db, user_id=user_id, on_date=day, plan=plan
+        )
+        target_kcal = (
+            plan.calorie_target_kcal
+            if plan is not None
+            else (targets or {}).get("calorie_target_kcal") or 0
+        )
+        consumed_remaining = {
+            "consumed_kcal": balance.consumed_kcal,
+            "consumed_protein_g": float(balance.protein_g),
+            "consumed_fat_g": float(balance.fat_g),
+            "consumed_carbohydrate_g": float(balance.carbs_g),
+            "remaining_kcal": max(0, int(target_kcal) - balance.consumed_kcal),
+            "from_diary_kcal": balance.from_diary_kcal,
+            "from_plan_kcal": balance.from_plan_kcal,
+        }
 
         restrictions = [
             r.display_name
@@ -208,19 +231,7 @@ class AIContextBuilder:
     async def _plan_meals_for_day(
         self, db: AsyncSession, user_id: UUID, day: date
     ) -> tuple[MealPlan | None, list[dict[str, Any]]]:
-        plan = (
-            await db.execute(
-                select(MealPlan)
-                .where(
-                    MealPlan.user_id == user_id,
-                    MealPlan.start_date <= day,
-                    MealPlan.end_date >= day,
-                    MealPlan.status == "ready",
-                )
-                .order_by(MealPlan.updated_at.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
+        plan = await find_ready_covering(db, user_id, day)
         if plan is None:
             return None, []
         items = list(

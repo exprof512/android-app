@@ -103,6 +103,7 @@ class ChatViewModel @Inject constructor(
     private val mealPlans: MealPlanRepository,
     private val ai: AiRecommendationRepository,
     private val profiles: ProfileRepository,
+    private val bus: com.foodai.app.core.sync.AppStateBus,
 ) : ViewModel() {
     private val recipeId: String? = savedStateHandle["recipeId"]
     private val itemId: String? = savedStateHandle["itemId"]
@@ -295,6 +296,11 @@ class ChatViewModel @Inject constructor(
                     aiPreview = AiPreviewState.Idle,
                     infoMessage = "Добавлено: ${candidate.name}",
                 )
+                bus.emit(
+                    com.foodai.app.core.sync.DomainEvent.NutritionLogChanged(
+                        java.time.LocalDate.now(),
+                    ),
+                )
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     aiPreview = preview.copy(applying = false),
@@ -333,6 +339,7 @@ class ChatViewModel @Inject constructor(
                     aiPreview = AiPreviewState.Idle,
                     infoMessage = "День адаптирован",
                 )
+                bus.emit(com.foodai.app.core.sync.DomainEvent.PlanChanged("adapt_day"))
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     aiPreview = preview.copy(applying = false),
@@ -370,6 +377,8 @@ class ChatViewModel @Inject constructor(
                     aiPreview = AiPreviewState.Idle,
                     infoMessage = "Вариант применён: ${candidate.name}",
                 )
+                bus.emit(com.foodai.app.core.sync.DomainEvent.PlanChanged("variant"))
+                bus.emit(com.foodai.app.core.sync.DomainEvent.NutritionLogChanged())
             } catch (error: ApiException) {
                 _state.value = _state.value.copy(
                     aiPreview = preview.copy(applying = false),

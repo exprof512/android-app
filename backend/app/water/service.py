@@ -32,7 +32,9 @@ class WaterService:
         self._session = session
 
     async def today(self, user_id: UUID, on_date: date | None = None) -> WaterTodayOut:
-        day = on_date or date.today()
+        from app.core.user_time import local_today_for_user
+
+        day = on_date or await local_today_for_user(self._session, user_id)
         entries = list(
             (
                 await self._session.execute(
@@ -54,7 +56,9 @@ class WaterService:
         )
 
     async def add(self, user_id: UUID, payload: WaterEntryCreate) -> WaterEntryOut:
-        day = payload.recorded_on or date.today()
+        from app.core.user_time import local_today_for_user
+
+        day = payload.recorded_on or await local_today_for_user(self._session, user_id)
         entry = WaterEntry(
             user_id=user_id,
             recorded_on=day,

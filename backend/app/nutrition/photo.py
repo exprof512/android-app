@@ -136,6 +136,11 @@ class PhotoAnalysisService:
             ),
         )
 
+        if self._entitlements is not None:
+            await self._entitlements.ensure_available(
+                user_id, entitlement_constants.FEATURE_FOOD_PHOTO
+            )
+
         try:
             raw = await self._vision.analyze_food(
                 VisionAnalysisRequest(image_bytes=image_bytes, mime_type=mime, locale="ru")
@@ -267,6 +272,11 @@ class PhotoAnalysisService:
             if cached is not None:
                 return cached
 
+        for item in items:
+            await _reject_restricted_ingredient(
+                self._session, user_id, item.ingredient_id
+            )
+
         created = []
         for item in items:
             row = await self._diary.create(
@@ -362,6 +372,44 @@ class PhotoAnalysisService:
             )
         )
         await self._session.flush()
+
+
+async def _reject_restricted_ingredient(
+    session: AsyncSession, user_id: UUID, ingredient_id: UUID | None
+) -> None:
+    if ingredient_id is None:
+        return
+    from app.profiles.models import FoodRestriction
+    from app.profiles.normalization import normalize_food_name
+
+    ingredient = await session.get(Ingredient, ingredient_id)
+    if ingredient is None or not ingredient.is_active:
+        return
+    rows = list(
+        (
+            await session.execute(
+                select(FoodRestriction).where(
+                    FoodRestriction.user_id == user_id,
+                    FoodRestriction.restriction_type.in_(("allergy", "excluded")),
+                )
+            )
+        ).scalars()
+    )
+    blocked: set[str] = set()
+    for row in rows:
+        blocked.add(normalize_food_name(row.normalized_food_name))
+        blocked.add(normalize_food_name(row.display_name))
+    blocked.discard("")
+    names = {
+        normalize_food_name(ingredient.normalized_name),
+        normalize_food_name(ingredient.canonical_name),
+    }
+    if names & blocked:
+        raise ApiError(
+            status_code=422,
+            code="allergy_or_restriction",
+            message="Этот продукт есть в ваших ограничениях.",
+        )
 
 
 def build_vision_provider(settings: Any) -> VisionProvider:

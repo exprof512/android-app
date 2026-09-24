@@ -38,18 +38,9 @@ class MealPlanRepository:
     async def find_covering(
         self, user_id: UUID, *, on_date: date
     ) -> MealPlan | None:
-        statement = (
-            select(MealPlan)
-            .where(
-                MealPlan.user_id == user_id,
-                MealPlan.status == "ready",
-                MealPlan.start_date <= on_date,
-                MealPlan.end_date >= on_date,
-            )
-            .order_by(MealPlan.created_at.desc())
-            .limit(1)
-        )
-        return (await self._session.execute(statement)).scalar_one_or_none()
+        from app.meal_plans.selection import find_ready_covering
+
+        return await find_ready_covering(self._session, user_id, on_date)
 
     async def get_item(self, item_id: UUID) -> MealPlanItem | None:
         return await self._session.get(MealPlanItem, item_id)

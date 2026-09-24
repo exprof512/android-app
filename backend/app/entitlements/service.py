@@ -94,7 +94,7 @@ class EntitlementsService:
                 remaining=None,
             )
 
-        window_start, window_end = self._utc_day_window()
+        window_start, window_end = await self._day_window(user_id)
         row = await self._repository.get_usage_window(user_id, feature, window_start)
         if row is None:
             row = await self._repository.add_usage(
@@ -136,7 +136,7 @@ class EntitlementsService:
                 used_value=0,
                 remaining=None,
             )
-        window_start, _ = self._utc_day_window()
+        window_start, _ = await self._day_window(user_id)
         row = await self._repository.get_usage_window(user_id, feature, window_start)
         used = row.used_value if row is not None else 0
         return UsageStatus(
@@ -171,8 +171,18 @@ class EntitlementsService:
         }
         return mapping.get(feature, self._settings.entitlement_free_default_per_day)
 
-    @staticmethod
-    def _utc_day_window() -> tuple[datetime, datetime]:
-        now = utcnow()
-        start = datetime(now.year, now.month, now.day, tzinfo=UTC)
-        return start, start + timedelta(days=1)
+    async def ensure_available(self, user_id: UUID, feature: str, *, amount: int = 1) -> None:
+        """Reject when the daily quota is already spent. Does not increment."""
+        if feature in constants.PREMIUM_ONLY_FEATURES:
+            await self.require_premium(user_id, feature)
+        status = await self.usage_status(user_id, feature)
+        if status.remaining is None or status.remaining >= amount:
+            return
+        _, window_end = await self._day_window(user_id)
+        retry_after = max(1, int((as_utc(window_end) - utcnow()).total_seconds()))
+        raise UsageLimitExceeded(feature, retry_after_seconds=retry_after)
+
+    async def _day_window(self, user_id: UUID) -> tuple[datetime, datetime]:
+        from app.core.user_time import local_day_window, timezone_for_user
+
+        return local_day_window(await timezone_for_user(self._session, user_id))
