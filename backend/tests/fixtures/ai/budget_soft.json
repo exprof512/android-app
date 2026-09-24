@@ -1,0 +1,24 @@
+{
+  "recipe": {
+    "name": "Дорогой стейк",
+    "description": null,
+    "servings": 1,
+    "cooking_method": "grill",
+    "cook_time_minutes": 20,
+    "ingredients": [
+      {"name": "Куриная грудка", "quantity": 400, "unit": "g"},
+      {"name": "Рис", "quantity": 50, "unit": "g"}
+    ],
+    "steps": ["Посолите.", "Пожарьте на гриле.", "Подавайте."],
+    "rationale": null
+  },
+  "context": {
+    "restrictions": [],
+    "recent_recipe_ids": [],
+    "max_cook_time_minutes": 60,
+    "grocery_budget_weekly": 500,
+    "meals_per_day": 3
+  },
+  "expected_error_codes": ["budget_soft_exceeded"],
+  "expect_ok": true
+}

@@ -1,0 +1,22 @@
+{
+  "recipe": {
+    "name": "Курица с арахисом",
+    "description": "Нарушает аллергию",
+    "servings": 1,
+    "cooking_method": "fry",
+    "cook_time_minutes": 25,
+    "ingredients": [
+      {"name": "Куриная грудка", "quantity": 150, "unit": "g"},
+      {"name": "Арахис", "quantity": 30, "unit": "g"},
+      {"name": "Рис", "quantity": 100, "unit": "g"}
+    ],
+    "steps": ["Обжарьте курицу.", "Добавьте арахис.", "Подавайте с рисом."],
+    "rationale": null
+  },
+  "context": {
+    "restrictions": ["арахис"],
+    "recent_recipe_ids": [],
+    "max_cook_time_minutes": 60
+  },
+  "expected_error_codes": ["allergy_or_restriction"]
+}

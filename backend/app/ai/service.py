@@ -15,13 +15,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.cache import TextAICache
 from app.ai.errors import TextAIProviderError, TextAIQuotaExhausted, TextAIUnavailable, TextAIValidationFailed
 from app.ai.models import AiTextUsage
+from app.ai.operations import PROMPT_VERSION_BY_TEXT_OP
 from app.ai.prompts import system_prompt_for
 from app.ai.provider import TextGenerationProvider, TextGenerationRequest
 from app.ai.schemas import (
     ChatAnswerResponse,
+    DailyAdaptationResponse,
+    FoodSuggestionResponse,
+    IngredientSubstitutionResponse,
     MealPlanProposalResponse,
     OPERATION_SCHEMAS,
     RecipeCandidatesResponse,
+    RecipeVariantResponse,
     ReplaceMealResponse,
     json_schema_for,
 )
@@ -117,6 +122,66 @@ class TextAIService:
             use_cache=use_cache,
         )
 
+    async def food_suggestion(
+        self,
+        *,
+        context: dict[str, Any],
+        user_id: UUID | None = None,
+        use_cache: bool = True,
+    ) -> FoodSuggestionResponse:
+        return await self._run(
+            operation="food_suggestion",
+            model_type=FoodSuggestionResponse,
+            context=context,
+            user_id=user_id,
+            use_cache=use_cache,
+        )
+
+    async def daily_adaptation(
+        self,
+        *,
+        context: dict[str, Any],
+        user_id: UUID | None = None,
+        use_cache: bool = False,
+    ) -> DailyAdaptationResponse:
+        return await self._run(
+            operation="daily_adaptation",
+            model_type=DailyAdaptationResponse,
+            context=context,
+            user_id=user_id,
+            use_cache=use_cache,
+        )
+
+    async def ingredient_substitution(
+        self,
+        *,
+        context: dict[str, Any],
+        user_id: UUID | None = None,
+        use_cache: bool = False,
+    ) -> IngredientSubstitutionResponse:
+        return await self._run(
+            operation="ingredient_substitution",
+            model_type=IngredientSubstitutionResponse,
+            context=context,
+            user_id=user_id,
+            use_cache=use_cache,
+        )
+
+    async def recipe_variant(
+        self,
+        *,
+        context: dict[str, Any],
+        user_id: UUID | None = None,
+        use_cache: bool = True,
+    ) -> RecipeVariantResponse:
+        return await self._run(
+            operation="recipe_variant",
+            model_type=RecipeVariantResponse,
+            context=context,
+            user_id=user_id,
+            use_cache=use_cache,
+        )
+
     async def _run(
         self,
         *,
@@ -130,8 +195,13 @@ class TextAIService:
         if operation not in OPERATION_SCHEMAS:
             raise TextAIUnavailable()
 
+        payload_for_cache = dict(context)
+        prompt_version = PROMPT_VERSION_BY_TEXT_OP.get(operation)
+        if prompt_version and "prompt_version" not in payload_for_cache:
+            payload_for_cache["prompt_version"] = prompt_version
+
         fingerprint = self._cache.fingerprint(
-            operation=operation, model=self._model, payload=context
+            operation=operation, model=self._model, payload=payload_for_cache
         )
         if use_cache:
             cached = await self._cache.get(fingerprint)
@@ -151,6 +221,8 @@ class TextAIService:
         repair_hint: str | None = None
         for attempt in range(1, self._max_attempts + 1):
             payload = dict(context)
+            if prompt_version and "prompt_version" not in payload:
+                payload["prompt_version"] = prompt_version
             if repair_hint:
                 payload["validation_feedback"] = repair_hint
             request = TextGenerationRequest(

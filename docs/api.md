@@ -355,6 +355,19 @@ URL всегда принадлежит FoodAI CDN/Nginx/backend; raw MinIO endp
 
 Ответ содержит assistant message, optional structured `suggested_actions` (например `replace_meal_item`) и warnings. Он не исполняет mutation автоматически: Android запрашивает отдельный authenticated endpoint. Chat requests покрыты free/premium quota и сохраняют `ai_text_usage`.
 
+## Adaptive AI (Phase 20)
+
+| Method / path | Назначение |
+|---|---|
+| `POST /ai/recommendations` | 1–3 food suggestions (intent/meal_type/date); AI candidate → RecipeEngine nutrition |
+| `POST /ai/adapt-day` | preview remaining-day adaptations (confirm required) |
+| `POST /ai/ingredient-substitution` | alternatives for an ingredient in a recipe |
+| `POST /ai/recipe-variant` | high_protein / budget / quick / pantry variant |
+| `POST /ai/recommendations/{id}/apply` | apply selected recommendation (Idempotency-Key) |
+| `POST /ai/actions/execute` | execute chat suggested action after user tap |
+
+AI never writes final calories/macros/cost; engines recalculate. Quota: `ai_recommendation` (Free daily) plus existing plan/replace/chat. Details: [ai.md](ai.md), [phase-20-report.md](phase-20-report.md).
+
 ## Health
 
 `GET /health` не требует auth и возвращает ровно `200 {"status":"ok"}` только когда API готово обслуживать request. Если PostgreSQL или Redis не отвечают в течение двух секунд, endpoint возвращает `503 dependency_unavailable`, а не подвисает до таймаута клиента. `GET /health/deps` отдаёт статусы `postgres`/`redis`/`storage` без секретов (для ops/`scripts/healthcheck_all.sh`). В Phase 1 endpoint также используется Docker/Nginx healthcheck и доступен через public Nginx path `http://localhost:8080/health` в local Compose; provider OpenAI не вызывается healthcheck-ом.

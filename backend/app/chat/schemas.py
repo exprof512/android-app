@@ -20,7 +20,19 @@ class ChatMessageCreate(BaseModel):
 
 
 class SuggestedActionOut(BaseModel):
-    type: Literal["replace_meal_item", "open_shopping_list", "explain_balance", "none"]
+    type: Literal[
+        "food_suggestion",
+        "adapt_day",
+        "replace_meal_item",
+        "make_cheaper",
+        "make_faster",
+        "more_protein",
+        "pantry_cook",
+        "open_shopping_list",
+        "remember_dislike",
+        "explain_balance",
+        "none",
+    ]
     label: str
     payload: dict[str, Any] | None = None
 

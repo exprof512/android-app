@@ -650,3 +650,136 @@ data class ChatMessageResponseDto(
     val warnings: List<String> = emptyList(),
     val disclaimer: String = "",
 )
+
+// --- Phase 20 Adaptive AI ---
+
+@Serializable
+data class AiRecommendRequest(
+    val intent: String? = null,
+    @SerialName("meal_type") val mealType: String? = null,
+    val date: String? = null,
+)
+
+@Serializable
+data class AiAdaptDayRequest(
+    val date: String? = null,
+)
+
+@Serializable
+data class AiSubstitutionRequest(
+    @SerialName("recipe_id") val recipeId: String,
+    @SerialName("ingredient_name") val ingredientName: String,
+)
+
+@Serializable
+data class AiVariantRequest(
+    @SerialName("recipe_id") val recipeId: String,
+    val variant: String,
+)
+
+@Serializable
+data class AiApplyRequest(
+    @SerialName("action_type") val actionType: String,
+    val payload: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
+)
+
+@Serializable
+data class AiExecuteRequest(
+    @SerialName("action_type") val actionType: String,
+    val payload: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
+    @SerialName("recommendation_id") val recommendationId: String? = null,
+)
+
+@Serializable
+data class RecommendationCandidateDto(
+    val name: String,
+    val reason: String? = null,
+    val tags: List<String> = emptyList(),
+    @SerialName("cook_time_minutes") val cookTimeMinutes: Int = 0,
+    val servings: Int = 1,
+    @SerialName("calories_kcal") val caloriesKcal: Int = 0,
+    @SerialName("protein_g") val proteinG: Double = 0.0,
+    @SerialName("fat_g") val fatG: Double = 0.0,
+    @SerialName("carbohydrate_g") val carbohydrateG: Double = 0.0,
+    @SerialName("estimated_cost_amount") val estimatedCostAmount: Double? = null,
+    val currency: String = "RUB",
+    @SerialName("recipe_id") val recipeId: String? = null,
+    val warnings: List<String> = emptyList(),
+)
+
+@Serializable
+data class RecommendationsDto(
+    @SerialName("recommendation_id") val recommendationId: String,
+    val operation: String = "food_suggestion",
+    val candidates: List<RecommendationCandidateDto> = emptyList(),
+    val warnings: List<String> = emptyList(),
+    @SerialName("rejected_error_codes") val rejectedErrorCodes: List<String> = emptyList(),
+)
+
+@Serializable
+data class AdaptDayReplacementDto(
+    @SerialName("meal_type") val mealType: String,
+    val reason: String? = null,
+    val candidate: RecommendationCandidateDto? = null,
+)
+
+@Serializable
+data class AdaptDayDto(
+    @SerialName("recommendation_id") val recommendationId: String,
+    @SerialName("on_date") val onDate: String,
+    val replacements: List<AdaptDayReplacementDto> = emptyList(),
+    val warnings: List<String> = emptyList(),
+    val rationale: String? = null,
+    val note: String? = null,
+)
+
+@Serializable
+data class SubstitutionAlternativeDto(
+    val name: String,
+    val quantity: Double = 1.0,
+    val unit: String = "g",
+    val reason: String? = null,
+)
+
+@Serializable
+data class SubstitutionDto(
+    @SerialName("recommendation_id") val recommendationId: String,
+    @SerialName("original_name") val originalName: String,
+    val alternatives: List<SubstitutionAlternativeDto> = emptyList(),
+    val warnings: List<String> = emptyList(),
+)
+
+@Serializable
+data class VariantDto(
+    @SerialName("recommendation_id") val recommendationId: String,
+    val variant: String,
+    val candidate: RecommendationCandidateDto? = null,
+    @SerialName("changes_summary") val changesSummary: String? = null,
+    val warnings: List<String> = emptyList(),
+)
+
+@Serializable
+data class ActionExecuteDto(
+    @SerialName("action_type") val actionType: String,
+    val status: String,
+    @SerialName("recommendation_id") val recommendationId: String? = null,
+    val result: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
+)
+
+@Serializable
+data class FeatureUsageDto(
+    val feature: String,
+    @SerialName("limit_value") val limitValue: Int? = null,
+    @SerialName("used_value") val usedValue: Int = 0,
+    val remaining: Int? = null,
+)
+
+@Serializable
+data class EntitlementStatusDto(
+    val tier: String = "free",
+    val features: List<FeatureUsageDto> = emptyList(),
+    @SerialName("premium_only") val premiumOnly: List<String> = emptyList(),
+)
+
+fun EntitlementStatusDto.aiRecommendationRemaining(): Int? =
+    features.firstOrNull { it.feature == "ai_recommendation" }?.remaining

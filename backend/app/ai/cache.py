@@ -60,13 +60,21 @@ class TextAICache:
         self._schema_version = schema_version
 
     def fingerprint(self, *, operation: str, model: str, payload: dict[str, Any]) -> str:
+        body: dict[str, Any] = {
+            "operation": operation,
+            "model": model,
+            "schema_version": self._schema_version,
+            "payload": payload,
+        }
+        for key in (
+            "context_version",
+            "prompt_version",
+            "nutrition_policy_version",
+        ):
+            if key in payload and payload[key] is not None:
+                body[key] = payload[key]
         canonical = json.dumps(
-            {
-                "operation": operation,
-                "model": model,
-                "schema_version": self._schema_version,
-                "payload": payload,
-            },
+            body,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),

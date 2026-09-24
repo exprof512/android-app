@@ -3,6 +3,8 @@ package com.foodai.app.feature.plan
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.foodai.app.core.analytics.AnalyticsTracker
+import com.foodai.app.core.ai.AiRecommendationRepository
+import com.foodai.app.core.ai.aiPayload
 import com.foodai.app.core.auth.AuthRepository
 import com.foodai.app.core.auth.toUiMessage
 import com.foodai.app.core.mealplan.MealPlanRepository
@@ -22,6 +24,7 @@ import com.foodai.app.core.sync.AppStateBus
 import com.foodai.app.core.sync.DomainEvent
 import com.foodai.app.core.sync.SelectedDateStore
 import com.foodai.app.core.water.WaterRepository
+import com.foodai.app.feature.ai.AiPreviewState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +51,7 @@ data class TodayUiState(
     val missingPlan: Boolean = false,
     val actionError: String? = null,
     val infoMessage: String? = null,
+    val aiPreview: AiPreviewState = AiPreviewState.Idle,
 )
 
 @HiltViewModel
@@ -62,6 +66,7 @@ class TodayViewModel @Inject constructor(
     private val analytics: AnalyticsTracker,
     private val bus: AppStateBus,
     private val selectedDate: SelectedDateStore,
+    private val ai: AiRecommendationRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TodayUiState())
     val state: StateFlow<TodayUiState> = _state.asStateFlow()
@@ -170,6 +175,9 @@ class TodayViewModel @Inject constructor(
                     nutritionLogs = logs,
                     selectedDate = date.toString(),
                     lastUpdatedEpochMs = System.currentTimeMillis(),
+                    aiPreview = _state.value.aiPreview,
+                    actionError = _state.value.actionError,
+                    infoMessage = _state.value.infoMessage,
                 )
                 observeSteps()
                 if (!openedTracked) {
@@ -396,6 +404,160 @@ class TodayViewModel @Inject constructor(
 
     fun clearMessages() {
         _state.value = _state.value.copy(actionError = null, infoMessage = null)
+    }
+
+    fun dismissAiPreview() {
+        _state.value = _state.value.copy(aiPreview = AiPreviewState.Idle)
+    }
+
+    fun requestWhatToEat(intent: String? = null) {
+        viewModelScope.launch {
+            analytics.track(
+                "ai_recommendation_requested",
+                mapOf("intent" to (intent ?: "food_suggestion")),
+            )
+            _state.value = _state.value.copy(aiPreview = AiPreviewState.Loading, actionError = null)
+            try {
+                val nextMealType = _state.value.plan?.dayProgress?.nextMealType
+                val out = ai.recommend(
+                    intent = intent,
+                    mealType = nextMealType,
+                    date = selectedDate.date.value,
+                )
+                if (out.candidates.isEmpty()) {
+                    _state.value = _state.value.copy(
+                        aiPreview = AiPreviewState.Empty(
+                            out.warnings.firstOrNull()
+                                ?: "Не удалось подобрать варианты. Попробуйте позже.",
+                        ),
+                    )
+                    return@launch
+                }
+                analytics.track(
+                    "ai_recommendation_shown",
+                    mapOf("count" to out.candidates.size.toString()),
+                )
+                val title = when (intent) {
+                    "pantry_cook", "pantry" -> "Из продуктов"
+                    else -> "Что мне съесть?"
+                }
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Recommendations(
+                        recommendationId = out.recommendationId,
+                        candidates = out.candidates,
+                        warnings = out.warnings,
+                        title = title,
+                    ),
+                )
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Error(error.toUiMessage()),
+                )
+            }
+        }
+    }
+
+    fun selectAiCandidate(index: Int) {
+        val preview = _state.value.aiPreview as? AiPreviewState.Recommendations ?: return
+        _state.value = _state.value.copy(aiPreview = preview.copy(selectedIndex = index))
+    }
+
+    fun confirmAiRecommendation() {
+        val preview = _state.value.aiPreview as? AiPreviewState.Recommendations ?: return
+        val candidate = preview.candidates.getOrNull(preview.selectedIndex) ?: return
+        val recipeId = candidate.recipeId ?: return
+        viewModelScope.launch {
+            analytics.track(
+                "ai_recommendation_selected",
+                mapOf("recipe_id" to recipeId, "index" to preview.selectedIndex.toString()),
+            )
+            _state.value = _state.value.copy(aiPreview = preview.copy(applying = true))
+            try {
+                val mealType = _state.value.plan?.dayProgress?.nextMealType ?: "snack"
+                ai.apply(
+                    recommendationId = preview.recommendationId,
+                    actionType = "create_nutrition_log",
+                    payload = aiPayload(
+                        "recipe_id" to recipeId,
+                        "meal_type" to mealType,
+                        "date" to selectedDate.date.value.toString(),
+                    ),
+                )
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Idle,
+                    infoMessage = "Добавлено: ${candidate.name}",
+                )
+                refresh()
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = preview.copy(applying = false),
+                    actionError = error.toUiMessage(),
+                )
+            }
+        }
+    }
+
+    fun requestAdaptDay() {
+        viewModelScope.launch {
+            analytics.track("ai_day_adaptation_requested")
+            _state.value = _state.value.copy(aiPreview = AiPreviewState.Loading, actionError = null)
+            try {
+                val out = ai.adaptDay(selectedDate.date.value)
+                if (out.replacements.isEmpty()) {
+                    _state.value = _state.value.copy(
+                        aiPreview = AiPreviewState.Empty(
+                            out.warnings.firstOrNull()
+                                ?: "Нет незавершённых приёмов для адаптации.",
+                        ),
+                    )
+                    return@launch
+                }
+                _state.value = _state.value.copy(aiPreview = AiPreviewState.AdaptDay(out))
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Error(error.toUiMessage()),
+                )
+            }
+        }
+    }
+
+    fun confirmAdaptDay() {
+        val preview = _state.value.aiPreview as? AiPreviewState.AdaptDay ?: return
+        val plan = _state.value.plan ?: return
+        val day = selectedDate.date.value.toString()
+        viewModelScope.launch {
+            _state.value = _state.value.copy(aiPreview = preview.copy(applying = true))
+            try {
+                for (slot in preview.preview.replacements) {
+                    val recipeId = slot.candidate?.recipeId ?: continue
+                    val item = plan.items.firstOrNull {
+                        it.date.take(10) == day &&
+                            it.mealType == slot.mealType &&
+                            !it.isCompleted &&
+                            it.status != "skipped"
+                    } ?: continue
+                    ai.apply(
+                        recommendationId = preview.preview.recommendationId,
+                        actionType = "replace_meal_item",
+                        payload = aiPayload(
+                            "meal_plan_item_id" to item.id,
+                            "recipe_id" to recipeId,
+                        ),
+                    )
+                }
+                analytics.track("ai_day_adaptation_applied")
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Idle,
+                    infoMessage = "Остаток дня адаптирован",
+                )
+                refresh()
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = preview.copy(applying = false),
+                    actionError = error.toUiMessage(),
+                )
+            }
+        }
     }
 }
 

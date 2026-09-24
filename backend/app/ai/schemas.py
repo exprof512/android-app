@@ -19,6 +19,20 @@ CookingMethod = Literal[
 ]
 MealType = Literal["breakfast", "lunch", "dinner", "snack"]
 RecipeUnit = Literal["g", "kg", "ml", "l", "tbsp", "tsp", "piece"]
+RecipeVariantIntent = Literal["high_protein", "budget", "quick", "pantry"]
+ChatActionType = Literal[
+    "food_suggestion",
+    "adapt_day",
+    "replace_meal_item",
+    "make_cheaper",
+    "make_faster",
+    "more_protein",
+    "pantry_cook",
+    "open_shopping_list",
+    "remember_dislike",
+    "explain_balance",
+    "none",
+]
 
 
 class StrictModel(BaseModel):
@@ -84,7 +98,7 @@ class ReplaceMealResponse(StrictModel):
 
 
 class ChatSuggestedAction(StrictModel):
-    type: Literal["replace_meal_item", "open_shopping_list", "explain_balance", "none"]
+    type: ChatActionType
     label: str = Field(min_length=1, max_length=120)
     # Free-form dict is rejected by OpenAI strict schemas; keep optional JSON string.
     payload: str | None = Field(default=None, max_length=2000)
@@ -96,11 +110,54 @@ class ChatAnswerResponse(StrictModel):
     warnings: list[str] = Field(default_factory=list, max_length=5)
 
 
+class FoodSuggestionCandidate(StrictModel):
+    recipe: RecipeCandidate
+    reason: str = Field(min_length=1, max_length=1000)
+    tags: list[str] = Field(default_factory=list, max_length=8)
+
+
+class FoodSuggestionResponse(StrictModel):
+    candidates: list[FoodSuggestionCandidate] = Field(min_length=1, max_length=3)
+
+
+class DailyAdaptationSlot(StrictModel):
+    meal_type: MealType
+    recipe: RecipeCandidate
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class DailyAdaptationResponse(StrictModel):
+    replacements: list[DailyAdaptationSlot] = Field(min_length=1, max_length=6)
+    rationale: str | None = Field(default=None, max_length=2000)
+
+
+class IngredientAlternative(StrictModel):
+    name: str = Field(min_length=1, max_length=constants.NAME_MAX_LENGTH)
+    quantity: float = Field(gt=0, le=float(constants.QUANTITY_MAX))
+    unit: RecipeUnit
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class IngredientSubstitutionResponse(StrictModel):
+    original_name: str = Field(min_length=1, max_length=constants.NAME_MAX_LENGTH)
+    alternatives: list[IngredientAlternative] = Field(min_length=1, max_length=5)
+
+
+class RecipeVariantResponse(StrictModel):
+    variant: RecipeVariantIntent
+    recipe: RecipeCandidate
+    changes_summary: str = Field(min_length=1, max_length=2000)
+
+
 OPERATION_SCHEMAS: dict[str, type[BaseModel]] = {
     "generate_recipe_candidates": RecipeCandidatesResponse,
     "generate_meal_plan_proposal": MealPlanProposalResponse,
     "replace_meal_item": ReplaceMealResponse,
     "chat_answer": ChatAnswerResponse,
+    "food_suggestion": FoodSuggestionResponse,
+    "daily_adaptation": DailyAdaptationResponse,
+    "ingredient_substitution": IngredientSubstitutionResponse,
+    "recipe_variant": RecipeVariantResponse,
 }
 
 

@@ -136,3 +136,35 @@ interface ChatApi {
         @Body body: ChatMessageCreateRequest,
     ): ChatMessageResponseDto
 }
+
+interface AiApi {
+    @POST("ai/recommendations")
+    suspend fun recommendations(@Body body: AiRecommendRequest): RecommendationsDto
+
+    @POST("ai/adapt-day")
+    suspend fun adaptDay(@Body body: AiAdaptDayRequest): AdaptDayDto
+
+    @POST("ai/ingredient-substitution")
+    suspend fun ingredientSubstitution(@Body body: AiSubstitutionRequest): SubstitutionDto
+
+    @POST("ai/recipe-variant")
+    suspend fun recipeVariant(@Body body: AiVariantRequest): VariantDto
+
+    @POST("ai/recommendations/{recommendationId}/apply")
+    suspend fun apply(
+        @Path("recommendationId") recommendationId: String,
+        @Body body: AiApplyRequest,
+        @Header("Idempotency-Key") idempotencyKey: String? = null,
+    ): ActionExecuteDto
+
+    @POST("ai/actions/execute")
+    suspend fun execute(
+        @Body body: AiExecuteRequest,
+        @Header("Idempotency-Key") idempotencyKey: String? = null,
+    ): ActionExecuteDto
+}
+
+interface EntitlementsApi {
+    @GET("entitlements/me")
+    suspend fun me(): EntitlementStatusDto
+}

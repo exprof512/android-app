@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     entitlement_free_meal_plan_per_day: int = 10
     entitlement_free_meal_replace_per_day: int = 15
     entitlement_free_chat_per_day: int = 40
+    entitlement_free_ai_recommendation_per_day: int = 15
     entitlement_free_default_per_day: int = 20
     # None = unlimited for premium
     entitlement_premium_daily_limit: int | None = None

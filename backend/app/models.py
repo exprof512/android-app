@@ -1,6 +1,6 @@
 """Model registry so Alembic autogenerate sees every table in ``Base.metadata``."""
 
-from app.ai.models import AiTextUsage
+from app.ai.models import AiRecommendationRecord, AiTextUsage
 from app.analytics.models import ProductEvent
 from app.auth.models import (
     EmailVerificationToken,
@@ -35,6 +35,7 @@ __all__ = [
     "AiConversation",
     "AiImageUsage",
     "AiMessage",
+    "AiRecommendationRecord",
     "AiTextUsage",
     "AvailableProduct",
     "EmailVerificationToken",

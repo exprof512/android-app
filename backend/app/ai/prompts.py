@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from app.ai.operations import PROMPT_VERSION_BY_TEXT_OP
+
 BASE_SAFETY = (
     "Ты — AI-помощник FoodAI по питанию. Отвечай на русском. "
     "Не ставь медицинских диагнозов, не назначай лечение и не обещай гарантированное "
     "снижение веса. Не включай калории, БЖУ и цену как окончательные значения — "
     "их пересчитает backend. Не добавляй ингредиенты вне ограничений пользователя. "
     "Не выдумывай бренды. Расчёты приблизительны и не заменяют врача или диетолога."
+)
+
+_CHAT_ACTIONS = (
+    "food_suggestion, adapt_day, replace_meal_item, make_cheaper, make_faster, "
+    "more_protein, pantry_cook, open_shopping_list, remember_dislike, "
+    "explain_balance, none"
 )
 
 PROMPTS: dict[str, str] = {
@@ -30,11 +38,35 @@ PROMPTS: dict[str, str] = {
     ),
     "chat_answer": (
         f"{BASE_SAFETY} Ответь кратко и по делу. suggested_actions только из: "
-        "replace_meal_item, open_shopping_list, explain_balance, none. "
+        f"{_CHAT_ACTIONS}. "
         "При запросе диагноза или опасного ограничения — вежливо откажи и направь к врачу."
+    ),
+    "food_suggestion": (
+        f"{BASE_SAFETY} Предложи 1–3 блюда-кандидата с reason и tags. "
+        "Учти remaining_today, ограничения и pantry. "
+        "ingredients.name — только из allowed_ingredients."
+    ),
+    "daily_adaptation": (
+        f"{BASE_SAFETY} Предложи замены только для оставшихся (не завершённых) "
+        "приёмов пищи дня: meal_type + recipe candidate + reason. "
+        "Не трогай уже завершённые слоты. ingredients.name — только из allowed_ingredients."
+    ),
+    "ingredient_substitution": (
+        f"{BASE_SAFETY} Предложи 1–5 альтернатив ингредиенту: name, quantity, unit, "
+        "короткий reason. Альтернативы должны быть из allowed_ingredients и не "
+        "нарушать аллергии/исключения."
+    ),
+    "recipe_variant": (
+        f"{BASE_SAFETY} Верни вариант рецепта по intent "
+        "(high_protein|budget|quick|pantry): полный recipe candidate и "
+        "changes_summary. ingredients.name — только из allowed_ingredients."
     ),
 }
 
 
 def system_prompt_for(operation: str) -> str:
-    return PROMPTS[operation]
+    prompt = PROMPTS[operation]
+    version = PROMPT_VERSION_BY_TEXT_OP.get(operation)
+    if version:
+        return f"{prompt} [prompt_version={version}]"
+    return prompt

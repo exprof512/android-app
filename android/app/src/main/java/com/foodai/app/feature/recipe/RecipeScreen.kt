@@ -1,6 +1,7 @@
 package com.foodai.app.feature.recipe
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -30,6 +32,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import com.foodai.app.core.ai.AiRecommendationRepository
+import com.foodai.app.core.ai.aiPayload
 import com.foodai.app.core.auth.toUiMessage
 import com.foodai.app.core.mealplan.MealPlanRepository
 import com.foodai.app.core.network.ApiException
@@ -43,6 +47,8 @@ import com.foodai.app.core.ui.components.FoodAIPrimaryButton
 import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAITypography
+import com.foodai.app.feature.ai.AiPreviewSheet
+import com.foodai.app.feature.ai.AiPreviewState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,13 +64,17 @@ data class RecipeUiState(
     val image: RecipeImageDto? = null,
     val error: String? = null,
     val actionError: String? = null,
+    val infoMessage: String? = null,
     val replaced: Boolean = false,
+    val aiPreview: AiPreviewState = AiPreviewState.Idle,
+    val substituteIngredient: String? = null,
 )
 
 @HiltViewModel
 class RecipeViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val mealPlans: MealPlanRepository,
+    private val ai: AiRecommendationRepository,
 ) : ViewModel() {
     private val recipeId: String = checkNotNull(savedStateHandle["recipeId"])
     private val itemId: String? = savedStateHandle["itemId"]
@@ -85,15 +95,16 @@ class RecipeViewModel @Inject constructor(
             try {
                 val recipe = mealPlans.recipe(recipeId)
                 val image = runCatching { mealPlans.recipeImage(recipeId) }.getOrNull()
-                _state.value = RecipeUiState(
+                _state.value = _state.value.copy(
                     loading = false,
                     recipe = recipe,
                     image = image,
+                    error = null,
                 )
             } catch (error: ApiException) {
-                _state.value = RecipeUiState(loading = false, error = error.toUiMessage())
+                _state.value = _state.value.copy(loading = false, error = error.toUiMessage())
             } catch (error: Exception) {
-                _state.value = RecipeUiState(
+                _state.value = _state.value.copy(
                     loading = false,
                     error = error.message ?: "Не удалось загрузить рецепт",
                 )
@@ -151,6 +162,102 @@ class RecipeViewModel @Inject constructor(
             }
         }
     }
+
+    fun dismissAi() {
+        _state.value = _state.value.copy(aiPreview = AiPreviewState.Idle, substituteIngredient = null)
+    }
+
+    fun requestVariant(variant: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(aiPreview = AiPreviewState.Loading, actionError = null)
+            try {
+                val out = ai.recipeVariant(recipeId, variant)
+                if (out.candidate == null) {
+                    _state.value = _state.value.copy(
+                        aiPreview = AiPreviewState.Empty(
+                            out.warnings.firstOrNull() ?: "Вариант не найден.",
+                        ),
+                    )
+                    return@launch
+                }
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Variant(
+                        preview = out,
+                        mealPlanItemId = itemId,
+                    ),
+                )
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Error(error.toUiMessage()),
+                )
+            }
+        }
+    }
+
+    fun confirmVariant() {
+        val preview = _state.value.aiPreview as? AiPreviewState.Variant ?: return
+        val candidate = preview.preview.candidate ?: return
+        val newRecipeId = candidate.recipeId ?: return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(aiPreview = preview.copy(applying = true))
+            try {
+                val itemIdLocal = preview.mealPlanItemId
+                if (itemIdLocal != null) {
+                    ai.apply(
+                        recommendationId = preview.preview.recommendationId,
+                        actionType = "replace_meal_item",
+                        payload = aiPayload(
+                            "meal_plan_item_id" to itemIdLocal,
+                            "recipe_id" to newRecipeId,
+                        ),
+                    )
+                    _state.value = _state.value.copy(
+                        aiPreview = AiPreviewState.Idle,
+                        replaced = true,
+                        infoMessage = "Рецепт заменён в плане",
+                    )
+                } else {
+                    ai.apply(
+                        recommendationId = preview.preview.recommendationId,
+                        actionType = "create_nutrition_log",
+                        payload = aiPayload(
+                            "recipe_id" to newRecipeId,
+                            "meal_type" to "snack",
+                        ),
+                    )
+                    _state.value = _state.value.copy(
+                        aiPreview = AiPreviewState.Idle,
+                        infoMessage = "Вариант добавлен в дневник",
+                    )
+                }
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = preview.copy(applying = false),
+                    actionError = error.toUiMessage(),
+                )
+            }
+        }
+    }
+
+    fun requestSubstitution(ingredientName: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                aiPreview = AiPreviewState.Loading,
+                substituteIngredient = ingredientName,
+                actionError = null,
+            )
+            try {
+                val out = ai.ingredientSubstitution(recipeId, ingredientName)
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Substitution(out),
+                )
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = AiPreviewState.Error(error.toUiMessage()),
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -199,6 +306,10 @@ fun RecipeRoute(
                 onAskAi = {
                     state.recipe?.id?.let { id -> onAskAi(id, viewModel.planItemId()) }
                 },
+                onVariant = viewModel::requestVariant,
+                onSubstitute = viewModel::requestSubstitution,
+                onDismissAi = viewModel::dismissAi,
+                onConfirmVariant = viewModel::confirmVariant,
                 modifier = Modifier.padding(padding),
             )
         }
@@ -211,9 +322,22 @@ fun RecipeScreen(
     onComplete: () -> Unit,
     onReplace: () -> Unit,
     onAskAi: () -> Unit = {},
+    onVariant: (String) -> Unit = {},
+    onSubstitute: (String) -> Unit = {},
+    onDismissAi: () -> Unit = {},
+    onConfirmVariant: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val recipe = state.recipe ?: return
+
+    if (state.aiPreview !is AiPreviewState.Idle) {
+        AiPreviewSheet(
+            state = state.aiPreview,
+            onDismiss = onDismissAi,
+            onConfirmVariant = onConfirmVariant,
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -241,6 +365,9 @@ fun RecipeScreen(
         if (state.actionError != null) {
             Text(state.actionError, color = FoodAIColors.Error)
         }
+        if (state.infoMessage != null) {
+            Text(state.infoMessage, color = FoodAIColors.Primary)
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
@@ -258,9 +385,41 @@ fun RecipeScreen(
             )
         }
         FoodAIOutlinedButton(label = "Спросить AI", onClick = onAskAi)
+
+        Text("Быстрые варианты", style = FoodAITypography.titleMedium)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+        ) {
+            listOf(
+                "high_protein" to "Больше белка",
+                "budget" to "Дешевле",
+                "quick" to "Быстрее",
+                "pantry" to "Из продуктов",
+            ).forEach { (variant, label) ->
+                FilterChip(
+                    selected = false,
+                    onClick = { onVariant(variant) },
+                    label = { Text(label) },
+                )
+            }
+        }
+
         Text("Ингредиенты", style = FoodAITypography.titleLarge)
         recipe.ingredients.forEach { ing ->
-            Text("• ${ing.name} — ${ing.grams} г", style = FoodAITypography.bodyMedium)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("• ${ing.name} — ${ing.grams} г", style = FoodAITypography.bodyMedium)
+                androidx.compose.material3.TextButton(
+                    onClick = { onSubstitute(ing.name) },
+                ) {
+                    Text("Заменить", color = FoodAIColors.Primary)
+                }
+            }
         }
         Spacer(Modifier.height(FoodAIDimens.Space8))
         Text("Шаги", style = FoodAITypography.titleLarge)

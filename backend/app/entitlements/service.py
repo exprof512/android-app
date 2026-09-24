@@ -161,6 +161,9 @@ class EntitlementsService:
             constants.FEATURE_CHAT_MESSAGE: (
                 self._settings.entitlement_free_chat_per_day
             ),
+            constants.FEATURE_AI_RECOMMENDATION: (
+                self._settings.entitlement_free_ai_recommendation_per_day
+            ),
             constants.FEATURE_IMAGE_REGENERATE: 0,
         }
         return mapping.get(feature, self._settings.entitlement_free_default_per_day)

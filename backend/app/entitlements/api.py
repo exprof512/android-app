@@ -40,6 +40,7 @@ async def read_entitlements(
         constants.FEATURE_MEAL_PLAN_GENERATE,
         constants.FEATURE_MEAL_REPLACE,
         constants.FEATURE_CHAT_MESSAGE,
+        constants.FEATURE_AI_RECOMMENDATION,
         constants.FEATURE_IMAGE_REGENERATE,
     ):
         status = await service.usage_status(user.id, feature)

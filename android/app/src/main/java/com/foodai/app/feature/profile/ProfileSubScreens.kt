@@ -45,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.network.UserSummaryDto
+import com.foodai.app.core.network.aiRecommendationRemaining
 import com.foodai.app.core.ui.components.FoodAIAvatar
 import com.foodai.app.core.ui.components.FoodAICard
 import com.foodai.app.core.ui.components.FoodAIInfoCard
@@ -60,6 +61,7 @@ import com.foodai.app.core.ui.theme.FoodAITypography
 fun SettingsRoute(
     onBack: () -> Unit,
     onEditQuestionnaire: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val prefs = remember {
@@ -74,6 +76,9 @@ fun SettingsRoute(
     }
     val themeMode by themePrefs.mode.collectAsStateWithLifecycle()
     var unitsMetric by remember { mutableStateOf(prefs.getBoolean("units_metric", true)) }
+    val entitlements by viewModel.entitlements.collectAsStateWithLifecycle()
+    val pantry by viewModel.pantryNames.collectAsStateWithLifecycle()
+    val aiRemaining = entitlements?.aiRecommendationRemaining()
 
     Scaffold(
         topBar = {
@@ -100,6 +105,49 @@ fun SettingsRoute(
                 tipId = "settings_tips",
                 text = "Здесь можно отключить обучающие баннеры и сбросить скрытые подсказки.",
             )
+            if (aiRemaining != null || entitlements != null) {
+                FoodAICard {
+                    Text("AI-рекомендации", style = FoodAITypography.titleMedium)
+                    Spacer(Modifier.height(FoodAIDimens.Space8))
+                    Text(
+                        when {
+                            aiRemaining == null && entitlements?.tier != "free" ->
+                                "Без дневного лимита (${entitlements?.tier})"
+                            aiRemaining != null ->
+                                "Осталось сегодня: $aiRemaining"
+                            else -> "Лимит загружается…"
+                        },
+                        style = FoodAITypography.bodyMedium,
+                    )
+                    entitlements?.features
+                        ?.firstOrNull { it.feature == "ai_recommendation" }
+                        ?.let { usage ->
+                            Text(
+                                "Использовано ${usage.usedValue}" +
+                                    (usage.limitValue?.let { " из $it" } ?: ""),
+                                style = FoodAITypography.bodySmall,
+                                color = FoodAIColors.TextSecondary,
+                            )
+                        }
+                }
+            }
+            if (pantry.isNotEmpty()) {
+                FoodAICard {
+                    Text("Продукты в наличии", style = FoodAITypography.titleMedium)
+                    Spacer(Modifier.height(FoodAIDimens.Space8))
+                    Text(
+                        pantry.take(8).joinToString(", ") +
+                            if (pantry.size > 8) "…" else "",
+                        style = FoodAITypography.bodySmall,
+                    )
+                    Spacer(Modifier.height(FoodAIDimens.Space8))
+                    Text(
+                        "На экране «Сегодня» можно спросить: «Что приготовить из этого?»",
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
+            }
             FoodAICard {
                 Text("Приложение", style = FoodAITypography.titleMedium)
                 Spacer(Modifier.height(FoodAIDimens.Space8))

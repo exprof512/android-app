@@ -1,0 +1,21 @@
+{
+  "recipe": {
+    "name": "Суп из ксенона",
+    "description": null,
+    "servings": 2,
+    "cooking_method": "boil",
+    "cook_time_minutes": 20,
+    "ingredients": [
+      {"name": "Несуществующий ингредиент XYZ", "quantity": 100, "unit": "g"},
+      {"name": "Рис", "quantity": 80, "unit": "g"}
+    ],
+    "steps": ["Сварите воду.", "Добавьте продукт.", "Подавайте."],
+    "rationale": null
+  },
+  "context": {
+    "restrictions": [],
+    "recent_recipe_ids": [],
+    "max_cook_time_minutes": 60
+  },
+  "expected_error_codes": ["unknown_ingredient"]
+}

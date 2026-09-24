@@ -77,6 +77,8 @@ import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
+import com.foodai.app.feature.ai.AiPreviewSheet
+import com.foodai.app.feature.ai.AiPreviewState
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
@@ -144,6 +146,13 @@ fun TodayRoute(
             onOpenShopping = onOpenShopping,
             onOpenProgress = onOpenProgress,
             onOpenPlan = onOpenPlan,
+            onWhatToEat = { viewModel.requestWhatToEat() },
+            onAdaptDay = viewModel::requestAdaptDay,
+            onPantryCook = { viewModel.requestWhatToEat(intent = "pantry_cook") },
+            onDismissAi = viewModel::dismissAiPreview,
+            onSelectAiCandidate = viewModel::selectAiCandidate,
+            onConfirmAiRecommendation = viewModel::confirmAiRecommendation,
+            onConfirmAdaptDay = viewModel::confirmAdaptDay,
         )
     }
 }
@@ -166,6 +175,13 @@ fun TodayScreen(
     onOpenShopping: () -> Unit = {},
     onOpenProgress: () -> Unit = {},
     onOpenPlan: () -> Unit = {},
+    onWhatToEat: () -> Unit = {},
+    onAdaptDay: () -> Unit = {},
+    onPantryCook: () -> Unit = {},
+    onDismissAi: () -> Unit = {},
+    onSelectAiCandidate: (Int) -> Unit = {},
+    onConfirmAiRecommendation: () -> Unit = {},
+    onConfirmAdaptDay: () -> Unit = {},
 ) {
     val plan = state.plan
     val progress = plan?.dayProgress
@@ -224,6 +240,16 @@ fun TodayScreen(
         )
     }
 
+    if (state.aiPreview !is AiPreviewState.Idle) {
+        AiPreviewSheet(
+            state = state.aiPreview,
+            onDismiss = onDismissAi,
+            onSelectCandidate = onSelectAiCandidate,
+            onConfirmRecommendations = onConfirmAiRecommendation,
+            onConfirmAdaptDay = onConfirmAdaptDay,
+        )
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -269,6 +295,35 @@ fun TodayScreen(
                 tipId = "today_loop",
                 text = "Отмечай съеденное, пропускай лишнее и заменяй блюда — прогресс дня считает сервер.",
             )
+        }
+        item {
+            FoodAICard {
+                Text("AI-помощник", style = FoodAITypography.titleMedium)
+                Spacer(Modifier.height(FoodAIDimens.Space8))
+                Text(
+                    "Предложения появляются только по запросу — ничего не меняется без вашего подтверждения.",
+                    style = FoodAITypography.bodySmall,
+                    color = FoodAIColors.TextSecondary,
+                )
+                Spacer(Modifier.height(FoodAIDimens.Space12))
+                FoodAIPrimaryButton(
+                    label = "Что мне съесть?",
+                    onClick = onWhatToEat,
+                    showArrow = false,
+                )
+                Spacer(Modifier.height(FoodAIDimens.Space8))
+                FoodAIOutlinedButton(
+                    label = "Адаптировать остаток дня",
+                    onClick = onAdaptDay,
+                )
+                if (state.profile?.availableProducts?.isNotEmpty() == true) {
+                    Spacer(Modifier.height(FoodAIDimens.Space8))
+                    FoodAIOutlinedButton(
+                        label = "Что приготовить из этого?",
+                        onClick = onPantryCook,
+                    )
+                }
+            }
         }
         item {
             DayProgressCard(progress = progress, fallbackTargets = plan?.dailyTargets)

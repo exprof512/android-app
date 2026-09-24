@@ -1,0 +1,22 @@
+{
+  "recipe": {
+    "name": "Долгое рагу",
+    "description": null,
+    "servings": 2,
+    "cooking_method": "stew",
+    "cook_time_minutes": 120,
+    "ingredients": [
+      {"name": "Куриная грудка", "quantity": 200, "unit": "g"},
+      {"name": "Рис", "quantity": 150, "unit": "g"},
+      {"name": "Брокколи", "quantity": 80, "unit": "g"}
+    ],
+    "steps": ["Подготовьте продукты.", "Тушите долго.", "Подавайте."],
+    "rationale": null
+  },
+  "context": {
+    "restrictions": [],
+    "recent_recipe_ids": [],
+    "max_cook_time_minutes": 40
+  },
+  "expected_error_codes": ["cook_time_exceeded"]
+}

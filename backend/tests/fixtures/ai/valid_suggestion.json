@@ -1,0 +1,26 @@
+{
+  "candidates": [
+    {
+      "recipe": {
+        "name": "Курица с рисом и брокколи",
+        "description": "Белковый обед",
+        "servings": 1,
+        "cooking_method": "stew",
+        "cook_time_minutes": 30,
+        "ingredients": [
+          {"name": "Куриная грудка", "quantity": 180, "unit": "g"},
+          {"name": "Рис", "quantity": 120, "unit": "g"},
+          {"name": "Брокколи", "quantity": 100, "unit": "g"}
+        ],
+        "steps": [
+          "Обжарьте курицу.",
+          "Добавьте рис и воду.",
+          "Добавьте брокколи и тушите."
+        ],
+        "rationale": "Баланс белка"
+      },
+      "reason": "Закрывает оставшийся белок",
+      "tags": ["protein", "lunch"]
+    }
+  ]
+}

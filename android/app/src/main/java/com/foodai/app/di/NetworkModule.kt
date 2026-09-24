@@ -5,11 +5,13 @@ import coil.ImageLoader
 import com.foodai.app.BuildConfig
 import com.foodai.app.core.auth.SecureTokenStore
 import com.foodai.app.core.auth.TokenStore
+import com.foodai.app.core.network.AiApi
 import com.foodai.app.core.network.AnalyticsApi
 import com.foodai.app.core.network.AuthApi
 import com.foodai.app.core.network.AuthApiProvider
 import com.foodai.app.core.network.AuthInterceptor
 import com.foodai.app.core.network.ChatApi
+import com.foodai.app.core.network.EntitlementsApi
 import com.foodai.app.core.network.MealPlanApi
 import com.foodai.app.core.network.NutritionApi
 import com.foodai.app.core.network.ProfileApi
@@ -174,6 +176,16 @@ object NetworkModule {
     @Singleton
     fun provideWaterApi(retrofit: Retrofit): WaterApi =
         retrofit.create(WaterApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideAiApi(retrofit: Retrofit): AiApi =
+        retrofit.create(AiApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideEntitlementsApi(retrofit: Retrofit): EntitlementsApi =
+        retrofit.create(EntitlementsApi::class.java)
 
     private fun buildRetrofit(client: OkHttpClient, json: Json): Retrofit =
         Retrofit.Builder()

@@ -143,3 +143,17 @@ NUTRITION_MIN_DAILY_CALORIES_MALE=1500
 Meal-plan HTTP endpoints и Chat API появляются в следующих фазах и вызывают этот слой.
 
 Связанные спецификации: [architecture.md](architecture.md), [database.md](database.md), [api.md](api.md), [development.md](development.md).
+
+## Phase 20 — Adaptive AI
+
+Дополнение к Text AI: предложения еды, адаптация дня, замены ингредиентов и варианты рецептов. Принцип тот же — AI только предлагает кандидатов; `RecipeEngine` / Nutrition / MealPlan владеют финальными цифрами и ограничениями. Невалидный AI output не персистится. Raw prompts не пишутся в logs/DB.
+
+| Операция | Endpoint | Text op | Quota |
+|---|---|---|---|
+| Food suggestion | `POST /ai/recommendations` | `food_suggestion` | `ai_recommendation` (Free ~15/day) |
+| Adapt day | `POST /ai/adapt-day` | `daily_adaptation` | `ai_recommendation` |
+| Ingredient substitution | `POST /ai/ingredient-substitution` | `ingredient_substitution` | `ai_recommendation` |
+| Recipe variant | `POST /ai/recipe-variant` | `recipe_variant` | `ai_recommendation` |
+| Apply / execute | `POST /ai/recommendations/{id}/apply`, `POST /ai/actions/execute` | — | replace quota только при `replace_meal_item` |
+
+`AIContextBuilder` собирает единый context (`context_version=v2`): goal/targets, consumed/remaining, plan meals, preferences/restrictions/pantry (имена), recent recipes, cook time, budget, `allowed_ingredients`. `AIResponseValidator` проверяет schema → known ingredients → allergy → diversity → cook time → soft budget. Prompt versions (`*_PROMPT_VERSION=2`) входят в system prompt и cache fingerprint вместе с `nutrition_policy_version`. Chat `suggested_actions` расширены: `food_suggestion`, `adapt_day`, `make_cheaper`, `make_faster`, `more_protein`, `pantry_cook`, `remember_dislike`, … Мутации — только после явного apply. Audit: `ai_recommendation_records` (status, versions, model, recipe_id, error_code; без тел).

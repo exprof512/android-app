@@ -1,0 +1,25 @@
+{
+  "recipe": {
+    "name": "Курица с рисом и брокколи",
+    "description": null,
+    "servings": 1,
+    "cooking_method": "stew",
+    "cook_time_minutes": 30,
+    "ingredients": [
+      {"name": "Куриная грудка", "quantity": 180, "unit": "g"},
+      {"name": "Рис", "quantity": 120, "unit": "g"},
+      {"name": "Брокколи", "quantity": 100, "unit": "g"}
+    ],
+    "steps": ["Обжарьте курицу.", "Добавьте рис.", "Добавьте брокколи."],
+    "rationale": null
+  },
+  "context": {
+    "restrictions": [],
+    "recent_recipe_ids": [],
+    "recent_recipes": [
+      {"id": "11111111-1111-1111-1111-111111111111", "name": "Курица с рисом и брокколи"}
+    ],
+    "max_cook_time_minutes": 60
+  },
+  "expected_error_codes": ["duplicate_recent"]
+}

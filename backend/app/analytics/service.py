@@ -52,6 +52,19 @@ ALLOWED_EVENTS = frozenset(
         "water_added",
         "notification_enabled",
         "notification_disabled",
+        # Phase 20 adaptive AI
+        "ai_recommendation_requested",
+        "ai_recommendation_shown",
+        "ai_recommendation_selected",
+        "ai_recommendation_rejected",
+        "ai_day_adaptation_requested",
+        "ai_day_adaptation_applied",
+        "ai_replacement_requested",
+        "ai_replacement_applied",
+        "ai_ingredient_substitution",
+        "ai_recipe_variant_selected",
+        "ai_chat_action_clicked",
+        "ai_cache_hit",
     }
 )
 

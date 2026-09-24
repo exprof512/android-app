@@ -14,6 +14,7 @@ PostgreSQL is the authoritative source. Android repositories hold in-memory snap
 | Selected date | — | `SelectedDateStore` | memory | `SelectedDateChanged` | Today, Week |
 | Nutrition logs | `/nutrition/logs` (also upserted on complete) | NutritionApi via Today VM | none | `NutritionLogChanged` | Today, Progress |
 | Water | `/water` | `WaterRepository` | memory + prefs mirror | `WaterChanged` | Today |
+| AI recommendations | `/ai/recommendations*` | `AiRecommendationRepository` | none | apply → `PlanChanged` / `ShoppingChanged` / `NutritionLogChanged` | Today, Recipe, Chat |
 | Shopping | shopping APIs (+ stale/cost/category) | `ShoppingRepository` + VM | memory | `ShoppingChanged`, `PlanChanged` | Shopping |
 | Theme / units | — | `ThemePreferences`, `UnitPreferences` | SharedPreferences | immediate | whole app |
 | Entitlements | `/entitlements/me` | badge fetch | none | — | Profile/Premium |

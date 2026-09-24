@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.admin.ai_api import router as admin_ai_router
+from app.ai.api import router as ai_router
 from app.analytics.api import router as analytics_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.profile import router as profile_router
@@ -29,6 +30,7 @@ def create_api_router(prefix: str) -> APIRouter:
     router.include_router(shopping_router)
     router.include_router(progress_router)
     router.include_router(chat_router)
+    router.include_router(ai_router)
     router.include_router(entitlements_router)
     router.include_router(nutrition_router)
     router.include_router(analytics_router)
