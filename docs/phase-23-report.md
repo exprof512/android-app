@@ -116,5 +116,10 @@ login/logout · Today · Plan · Diary · FAB Add Food · manual + photo · eat/
 
 ## 12. Artifacts
 
-- **APK:** `/root/app-android/android-app/android/app/build/outputs/apk/debug/app-debug.apk`  
-- **Commit:** see git log after `refactor(phase-23): stabilize app and fix core bugs`
+- **Commit:** `1e8ef088759ea9bd291eabf8b212cba3cc32a62c` (`refactor(phase-23): stabilize app and fix core bugs`)
+- **APK:** `/root/app-android/android-app/android/app/build/outputs/apk/debug/app-debug.apk`
+- **Bugs found:** 27 tracked (+ 6 info)
+- **Fixed:** 15 (2 P0 + 10 P1 + 2 P2 + 1 P3)
+- **Deferred:** see inventory / Phase 24 backlog
+- **Tests:** full backend pytest green; Android unit tests + assembleDebug green
+- **Physical device:** pending user smoke
