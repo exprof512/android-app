@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.context import AIContextBuilder
 from app.ai.drafts import recipe_candidate_to_draft
 from app.ai.errors import TextAIValidationFailed
+from app.ai.fallback_plans import build_catalog_food_suggestions
 from app.ai.models import AiRecommendationRecord
 from app.ai.operations import (
     OP_DAILY_ADAPTATION,
@@ -191,8 +192,9 @@ class RecommendationService:
             if not validated.ok or validated.canonical is None:
                 rejected.extend(validated.error_codes)
                 continue
+            source = validated.repaired_candidate or item.recipe
             stored = await self._recipes.create_recipe(
-                recipe_candidate_to_draft(item.recipe, ai_model=self._ai_model)
+                recipe_candidate_to_draft(source, ai_model=self._ai_model)
             )
             recipe = stored.recipe
             if first_recipe_id is None:
@@ -208,12 +210,32 @@ class RecommendationService:
             warnings.extend(validated.warnings)
 
         if not candidates_out:
-            record.status = "failed"
-            record.error_code = rejected[0] if rejected else "no_valid_candidates"
-            await self._session.commit()
-            raise TextAIValidationFailed(
-                details=[{"field": "candidates", "reason": record.error_code}]
+            await self._text_ai.invalidate_cache(
+                operation="food_suggestion", context=context
             )
+            logger.info(
+                "food_suggestion_domain_fallback",
+                extra={
+                    "error_code": rejected[0] if rejected else "no_valid_candidates",
+                    "rejected_count": len(rejected),
+                },
+            )
+            fallback = await self._persist_catalog_suggestions(
+                catalog_count=3,
+                reason="Подобрано из каталога: AI-кандидаты не прошли проверку.",
+                tags=["fallback"],
+            )
+            if fallback:
+                candidates_out, first_recipe_id, fb_warnings = fallback
+                warnings.extend(fb_warnings)
+                warnings.append("ai_candidates_catalog_fallback")
+            else:
+                record.status = "failed"
+                record.error_code = rejected[0] if rejected else "no_valid_candidates"
+                await self._session.commit()
+                raise TextAIValidationFailed(
+                    details=[{"field": "candidates", "reason": record.error_code}]
+                )
 
         record.status = "proposed"
         record.recipe_id = first_recipe_id
@@ -284,8 +306,9 @@ class RecommendationService:
             if not validated.ok or validated.canonical is None:
                 warnings.extend(validated.error_codes)
                 continue
+            source = validated.repaired_candidate or slot.recipe
             stored = await self._recipes.create_recipe(
-                recipe_candidate_to_draft(slot.recipe, ai_model=self._ai_model)
+                recipe_candidate_to_draft(source, ai_model=self._ai_model)
             )
             out = self._candidate_out(
                 stored.recipe,
@@ -448,7 +471,10 @@ class RecommendationService:
             )
 
         stored = await self._recipes.create_recipe(
-            recipe_candidate_to_draft(response.recipe, ai_model=self._ai_model)
+            recipe_candidate_to_draft(
+                validated.repaired_candidate or response.recipe,
+                ai_model=self._ai_model,
+            )
         )
         record.status = "proposed"
         record.recipe_id = stored.recipe.id
@@ -681,6 +707,38 @@ class RecommendationService:
             )
             await self._session.flush()
         return {"disliked": name}
+
+    async def _persist_catalog_suggestions(
+        self,
+        *,
+        catalog_count: int,
+        reason: str,
+        tags: list[str],
+    ) -> tuple[list[RecommendationCandidateOut], UUID | None, list[str]] | None:
+        recipes = await build_catalog_food_suggestions(
+            self._session, count=catalog_count
+        )
+        if not recipes:
+            return None
+        out: list[RecommendationCandidateOut] = []
+        warnings: list[str] = []
+        first_id: UUID | None = None
+        for recipe_candidate in recipes:
+            stored = await self._recipes.create_recipe(
+                recipe_candidate_to_draft(recipe_candidate, ai_model="catalog-fallback")
+            )
+            if first_id is None:
+                first_id = stored.recipe.id
+            out.append(
+                self._candidate_out(
+                    stored.recipe,
+                    reason=reason,
+                    tags=tags,
+                    warnings=stored.warnings,
+                )
+            )
+            warnings.extend(stored.warnings)
+        return out, first_id, warnings
 
     async def _consume_recommendation_quota(self, user_id: UUID) -> None:
         if self._entitlements is not None:

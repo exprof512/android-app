@@ -1,0 +1,23 @@
+{
+  "recipe": {
+    "name": "Говядина с гречкой",
+    "description": null,
+    "servings": 1,
+    "cooking_method": "stew",
+    "cook_time_minutes": 40,
+    "ingredients": [
+      {"name": "Куриная грудка", "quantity": 200, "unit": "g"},
+      {"name": "Рис", "quantity": 1, "unit": "piece"},
+      {"name": "Брокколи", "quantity": 1, "unit": "tsp"}
+    ],
+    "steps": ["Подготовьте", "Приготовьте", "Подайте"],
+    "rationale": null
+  },
+  "context": {
+    "restrictions": [],
+    "max_cook_time_minutes": 60
+  },
+  "expected_error_codes": [],
+  "expect_ok": true,
+  "expect_unit_repair": true
+}

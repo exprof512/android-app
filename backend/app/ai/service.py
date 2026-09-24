@@ -301,6 +301,19 @@ class TextAIService:
             raise TextAIValidationFailed() from last_error
         raise TextAIUnavailable() from last_error
 
+    async def invalidate_cache(
+        self, *, operation: str, context: dict[str, Any]
+    ) -> None:
+        """Drop a cached structured body after domain validation rejects it."""
+        payload = dict(context)
+        prompt_version = PROMPT_VERSION_BY_TEXT_OP.get(operation)
+        if prompt_version and "prompt_version" not in payload:
+            payload["prompt_version"] = prompt_version
+        fingerprint = self._cache.fingerprint(
+            operation=operation, model=self._model, payload=payload
+        )
+        await self._cache.delete(fingerprint)
+
     async def _record_usage(
         self,
         *,

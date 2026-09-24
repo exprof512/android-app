@@ -128,6 +128,60 @@ async def build_catalog_meal_plan_proposal(
     )
 
 
+async def build_catalog_food_suggestions(
+    session: AsyncSession,
+    *,
+    count: int = 3,
+) -> list[RecipeCandidate]:
+    """Deterministic candidates when AI recipes fail domain validation."""
+    names = {item for _, _, ingredients in _TEMPLATES for item, _, _ in ingredients}
+    rows = list(
+        (
+            await session.execute(
+                select(Ingredient).where(
+                    Ingredient.canonical_name.in_(names),
+                    Ingredient.is_active.is_(True),
+                )
+            )
+        ).scalars()
+    )
+    by_name = {row.canonical_name: row for row in rows}
+    if len(by_name) < 2:
+        any_rows = list(
+            (
+                await session.execute(
+                    select(Ingredient).where(Ingredient.is_active.is_(True)).limit(8)
+                )
+            ).scalars()
+        )
+        by_name = {row.canonical_name: row for row in any_rows}
+    if len(by_name) < 2:
+        return []
+
+    out: list[RecipeCandidate] = []
+    for name, meal_type, ingredient_specs in _TEMPLATES:
+        if len(out) >= count:
+            break
+        ingredients = _ingredients_for(ingredient_specs, by_name)
+        out.append(
+            RecipeCandidate(
+                name=name,
+                description="Каталожный fallback: AI-кандидат не прошёл проверку.",
+                servings=1,
+                cooking_method="mixed",
+                cook_time_minutes=25 if meal_type != "snack" else 10,
+                ingredients=ingredients,
+                steps=[
+                    "Подготовьте ингредиенты.",
+                    "Приготовьте блюдо.",
+                    "Подайте к столу.",
+                ],
+                rationale="fallback_catalog",
+            )
+        )
+    return out
+
+
 def _ingredients_for(
     specs: list[tuple[str, float, str]],
     by_name: dict[str, Ingredient],

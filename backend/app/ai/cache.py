@@ -13,6 +13,8 @@ class TextAICacheStore(Protocol):
 
     async def set(self, key: str, value: str, *, ex: int) -> None: ...
 
+    async def delete(self, key: str) -> None: ...
+
 
 class MemoryCacheStore:
     """Process-local store for unit tests — no Redis required."""
@@ -34,6 +36,9 @@ class MemoryCacheStore:
         expires_at = time.monotonic() + ex if ex > 0 else None
         self._items[key] = (value, expires_at)
 
+    async def delete(self, key: str) -> None:
+        self._items.pop(key, None)
+
 
 class RedisCacheStore:
     """Adapter over redis.asyncio.Redis."""
@@ -49,6 +54,9 @@ class RedisCacheStore:
 
     async def set(self, key: str, value: str, *, ex: int) -> None:
         await self._redis.set(key, value, ex=ex)
+
+    async def delete(self, key: str) -> None:
+        await self._redis.delete(key)
 
 
 class TextAICache:
@@ -97,3 +105,6 @@ class TextAICache:
             json.dumps(value, ensure_ascii=False),
             ex=self._ttl,
         )
+
+    async def delete(self, fingerprint: str) -> None:
+        await self._store.delete(self._key(fingerprint))

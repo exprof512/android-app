@@ -153,6 +153,7 @@ async def test_validator_fixture_matrix(session, services):
         "cook_time.json",
         "duplicate_recent.json",
         "budget_soft.json",
+        "unit_not_convertible_repaired.json",
     ]
     for name in cases:
         fixture = _load(name)
@@ -163,12 +164,14 @@ async def test_validator_fixture_matrix(session, services):
         for code in fixture["expected_error_codes"]:
             assert code in result.error_codes, f"{name}: missing {code} in {result.error_codes}"
         if fixture.get("expect_ok"):
-            assert result.ok
+            assert result.ok, f"{name}: expected ok, got {result.error_codes}"
         else:
             hard = [c for c in result.error_codes if c != "budget_soft_exceeded"]
             if hard:
                 assert not result.ok
-
+        if fixture.get("expect_unit_repair"):
+            assert result.repaired_candidate is not None
+            assert any("unit_repaired" in w for w in result.warnings)
 
 @pytest.mark.asyncio
 async def test_valid_suggestion_passes_validator(session, services):
@@ -349,12 +352,12 @@ async def test_cache_fingerprint_includes_versions():
 
 def test_prompt_versions_wired():
     prompt = system_prompt_for("food_suggestion")
-    assert "prompt_version=2" in prompt
-    assert PROMPT_VERSION_BY_TEXT_OP["food_suggestion"] == "2"
+    assert "prompt_version=3" in prompt
+    assert PROMPT_VERSION_BY_TEXT_OP["food_suggestion"] == "3"
     schema = json_schema_for("food_suggestion")
     assert schema["type"] == "object"
     assert "candidates" in schema["properties"]
-
+    assert "предпочитай g или ml" in prompt
 
 @pytest.mark.asyncio
 async def test_no_live_network_in_phase20(session, services):

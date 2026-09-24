@@ -8,6 +8,7 @@ from typing import Any, Sequence
 
 from app.ai.drafts import recipe_candidate_to_draft
 from app.ai.schemas import RecipeCandidate
+from app.ai.unit_repair import repair_recipe_candidate_units
 from app.nutrition.engine import NutritionEngine
 from app.profiles.normalization import normalize_food_name
 from app.recipes.engine import CanonicalRecipe, RecipeEngine
@@ -46,9 +47,13 @@ class AIResponseValidator:
         warnings: list[str] = []
         canonical: CanonicalRecipe | None = None
 
+        working, repair_warnings = repair_recipe_candidate_units(candidate, catalog)
+        warnings.extend(repair_warnings)
+        repaired_candidate = working if working is not candidate else None
+
         # Stage: ingredients known + RecipeEngine canonicalize
         try:
-            draft = recipe_candidate_to_draft(candidate)
+            draft = recipe_candidate_to_draft(working)
             canonical = self._engine.canonicalize(draft, catalog)
             warnings.extend(canonical.warnings)
         except RecipeValidationError as exc:
@@ -65,7 +70,7 @@ class AIResponseValidator:
         restricted = {normalize_food_name(name) for name in restricted_names}
         restricted.discard("")
         if restricted:
-            names = [ing.name for ing in candidate.ingredients]
+            names = [ing.name for ing in working.ingredients]
             if canonical is not None:
                 names.extend(ing.display_name for ing in canonical.ingredients)
             for name in names:
@@ -75,21 +80,19 @@ class AIResponseValidator:
                     break
 
         # Stage: diversity vs recent
-        recent_ids = {str(rid) for rid in recent_recipe_ids if rid}
         recent_names = {
             normalize_food_name(name) for name in recent_recipe_names if name
         }
         recent_names.discard("")
-        cand_name = normalize_food_name(candidate.name)
+        cand_name = normalize_food_name(working.name)
         if cand_name and cand_name in recent_names:
             error_codes.append("duplicate_recent")
-        # Soft: if fingerprint matched a known recent id via name collision only above
 
         # Stage: cook time
         cook = (
             canonical.cook_time_minutes
             if canonical is not None
-            else candidate.cook_time_minutes
+            else working.cook_time_minutes
         )
         if max_cook_time_minutes is not None and cook > max_cook_time_minutes:
             error_codes.append("cook_time_exceeded")
@@ -104,11 +107,9 @@ class AIResponseValidator:
             meals = max(1, meals_per_day or 3)
             soft_per_meal = Decimal(str(grocery_budget_weekly)) / Decimal(meals * 7)
             if canonical.estimated_cost_amount > soft_per_meal * Decimal("2.5"):
-                # Soft: do not fail hard; surface warning code for clients/tests
                 warnings.append("budget_soft_exceeded")
                 error_codes.append("budget_soft_exceeded")
 
-        # Deduplicate codes while preserving order
         unique: list[str] = []
         seen: set[str] = set()
         for code in error_codes:
@@ -116,13 +117,12 @@ class AIResponseValidator:
                 seen.add(code)
                 unique.append(code)
 
-        # Soft budget alone does not fail validation
         hard = [c for c in unique if c != "budget_soft_exceeded"]
         ok = not hard
         return ValidationResult(
             ok=ok,
             error_codes=unique,
-            repaired_candidate=None,
+            repaired_candidate=repaired_candidate if ok else None,
             canonical=canonical if ok else None,
             warnings=warnings,
         )
