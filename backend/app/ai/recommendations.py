@@ -572,7 +572,6 @@ class RecommendationService:
 
         if record is not None and mutating:
             record.status = "selected"
-        await self._session.commit()
 
         out = ActionExecuteOut(
             action_type=action_type,
@@ -580,8 +579,11 @@ class RecommendationService:
             recommendation_id=recommendation_id,
             result=result,
         )
+        # Persist the mutation and its idempotency record in one transaction,
+        # otherwise a retry after a crash re-applies the action.
         if idempotency_key:
             await self._store_idempotent(user_id, idempotency_key, out)
+        await self._session.commit()
         return out
 
     async def _apply_replace(

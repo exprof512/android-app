@@ -125,14 +125,38 @@ class AIContextBuilder:
             if plan is not None
             else (targets or {}).get("calorie_target_kcal") or 0
         )
-        consumed_remaining = {
-            "consumed_kcal": balance.consumed_kcal,
-            "consumed_protein_g": float(balance.protein_g),
-            "consumed_fat_g": float(balance.fat_g),
-            "consumed_carbohydrate_g": float(balance.carbs_g),
-            "remaining_kcal": max(0, int(target_kcal) - balance.consumed_kcal),
-            "from_diary_kcal": balance.from_diary_kcal,
-            "from_plan_kcal": balance.from_plan_kcal,
+        target_protein = float(
+            plan.protein_target_g
+            if plan is not None
+            else (targets or {}).get("protein_target_g") or 0
+        )
+        target_fat = float(
+            plan.fat_target_g
+            if plan is not None
+            else (targets or {}).get("fat_target_g") or 0
+        )
+        target_carbs = float(
+            plan.carbohydrate_target_g
+            if plan is not None
+            else (targets or {}).get("carbohydrate_target_g") or 0
+        )
+        consumed_kcal = int(balance.consumed_kcal)
+        consumed_protein = float(balance.protein_g)
+        consumed_fat = float(balance.fat_g)
+        consumed_carbs = float(balance.carbs_g)
+        consumed_today = {
+            "calories_kcal": consumed_kcal,
+            "protein_g": round(consumed_protein, 2),
+            "fat_g": round(consumed_fat, 2),
+            "carbohydrate_g": round(consumed_carbs, 2),
+            "from_plan_kcal": int(balance.from_plan_kcal),
+            "from_diary_kcal": int(balance.from_diary_kcal),
+        }
+        remaining_today = {
+            "calories_kcal": max(0, int(target_kcal) - consumed_kcal),
+            "protein_g": round(max(0.0, target_protein - consumed_protein), 2),
+            "fat_g": round(max(0.0, target_fat - consumed_fat), 2),
+            "carbohydrate_g": round(max(0.0, target_carbs - consumed_carbs), 2),
         }
 
         restrictions = [
@@ -190,8 +214,8 @@ class AIContextBuilder:
                 else None
             ),
             "targets": targets,
-            "consumed_today": consumed_remaining.get("consumed"),
-            "remaining_today": consumed_remaining.get("remaining"),
+            "consumed_today": consumed_today,
+            "remaining_today": remaining_today,
             "plan_meals": [
                 {
                     "meal_type": m["meal_type"],

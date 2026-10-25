@@ -62,6 +62,13 @@ class SessionView:
     is_current: bool
 
 
+_LOGIN_EMAIL_LIMIT = 10
+_LOGIN_IP_LIMIT = 30
+_LOGIN_WINDOW_SECONDS = 900
+_REGISTER_IP_LIMIT = 10
+_REGISTER_WINDOW_SECONDS = 3600
+
+
 class AuthService:
     def __init__(
         self,
@@ -92,7 +99,14 @@ class AuthService:
         platform: str | None = None,
         app_version: str | None = None,
         device_label: str | None = None,
+        client_key: str | None = None,
     ) -> TokenPair:
+        if client_key:
+            await self._rate(
+                f"register_ip:{client_key}",
+                limit=_REGISTER_IP_LIMIT,
+                window_seconds=_REGISTER_WINDOW_SECONDS,
+            )
         role = "admin" if email.strip().lower() in self._settings.admin_email_set() else "user"
         user = await self._repository.create_user(
             email=email,
@@ -122,7 +136,20 @@ class AuthService:
         platform: str | None = None,
         app_version: str | None = None,
         device_label: str | None = None,
+        client_key: str | None = None,
     ) -> TokenPair:
+        email_key = (email or "").strip().lower()
+        if client_key:
+            await self._rate(
+                f"login_ip:{client_key}",
+                limit=_LOGIN_IP_LIMIT,
+                window_seconds=_LOGIN_WINDOW_SECONDS,
+            )
+        await self._rate(
+            f"login_email:{email_key}",
+            limit=_LOGIN_EMAIL_LIMIT,
+            window_seconds=_LOGIN_WINDOW_SECONDS,
+        )
         user = await self._repository.get_user_by_email(email)
         if user is None:
             self._passwords.spend_verification_time()

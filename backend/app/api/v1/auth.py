@@ -43,9 +43,16 @@ async def _token_pair_response(
 
 
 def _client_key(request: Request) -> str:
+    """Client address for throttling.
+
+    nginx appends the real peer address to any client-supplied header, so only
+    the last hop is trustworthy here; earlier hops are attacker-controlled.
+    """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()]
+        if hops:
+            return hops[-1]
     if request.client:
         return request.client.host
     return "unknown"
@@ -54,6 +61,7 @@ def _client_key(request: Request) -> str:
 @router.post("/register", response_model=TokenPairResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     payload: RegisterRequest,
+    request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     profile_service: ProfileService = Depends(get_profile_service),
     entitlements: EntitlementsService = Depends(get_entitlements_service),
@@ -66,6 +74,7 @@ async def register(
         platform=payload.platform,
         app_version=payload.app_version,
         device_label=payload.device_label,
+        client_key=_client_key(request),
     )
     await profile_service.ensure_profile(pair.user.id)
     return await _token_pair_response(pair, entitlements)
@@ -74,6 +83,7 @@ async def register(
 @router.post("/login", response_model=TokenPairResponse)
 async def login(
     payload: LoginRequest,
+    request: Request,
     auth_service: AuthService = Depends(get_auth_service),
     entitlements: EntitlementsService = Depends(get_entitlements_service),
 ) -> TokenPairResponse:
@@ -83,6 +93,7 @@ async def login(
         platform=payload.platform,
         app_version=payload.app_version,
         device_label=payload.device_label,
+        client_key=_client_key(request),
     )
     return await _token_pair_response(pair, entitlements)
 
