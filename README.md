@@ -38,8 +38,7 @@ Android + AI продукт FoodAI. Спецификация утвержден�
 
 ```bash
 cp .env.example .env   # заполнить пустые secrets
-docker compose up -d --wait
-docker compose exec backend alembic upgrade head
+docker compose up -d --wait   # сервис migrate применит миграции автоматически
 curl http://localhost:8080/health
 ```
 

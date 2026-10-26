@@ -105,7 +105,7 @@ Since Phase 2 the backend refuses to start with an empty `JWT_SECRET` in any env
 
 ## Local services
 
-`compose.yaml` содержит ровно эти services:
+`compose.yaml` содержит эти services (плюс one-shot `migrate`, который применяет Alembic до старта backend/worker):
 
 | Service | Role | Persistent data | Healthcheck intent |
 |---|---|---|---|
@@ -115,6 +115,7 @@ Since Phase 2 the backend refuses to start with an empty `JWT_SECRET` in any env
 | `worker` | Arq text/image jobs | no local state | worker startup/dependency readiness |
 | `nginx` | public reverse proxy/media delivery | config only | backend upstream reachable |
 | `minio` | S3-compatible private image bucket | named `minio_data` volume | MinIO readiness endpoint |
+| `migrate` | one-shot `alembic upgrade head` перед backend/worker | none | контейнер завершается с кодом 0 |
 
 MinIO образ тянется с `quay.io/minio/minio`: Docker Hub отвечает `401 UNAUTHORIZED` на анонимный pull `minio/minio`, поэтому `docker compose up` с Hub-образом падает до старта стека.
 

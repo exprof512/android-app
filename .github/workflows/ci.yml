@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (pytest + migrations)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: foodai
+          POSTGRES_PASSWORD: foodai
+          POSTGRES_DB: foodai
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U foodai"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+asyncpg://foodai:foodai@localhost:5432/foodai
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-signing-key-with-more-than-32-characters
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Migrations against Postgres
+        run: alembic upgrade head
+      - name: Tests
+        run: python -m pytest -q
+      # Known reflection noise (DESC indexes, JSON variants) is tracked in
+      # docs/phase-17-report.md; keep it visible without blocking the build.
+      - name: Schema drift (informational)
+        continue-on-error: true
+        run: alembic check
+
+  android:
+    name: Android (unit tests + APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon

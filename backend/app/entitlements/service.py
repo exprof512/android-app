@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -97,33 +99,72 @@ class EntitlementsService:
         window_start, window_end = await self._day_window(user_id)
         row = await self._repository.get_usage_window(user_id, feature, window_start)
         if row is None:
-            row = await self._repository.add_usage(
-                UsageLimit(
-                    user_id=user_id,
-                    feature=feature,
-                    window_start=window_start,
-                    window_end=window_end,
-                    limit_value=limit,
-                    used_value=0,
-                )
+            row = await self._create_window(
+                user_id=user_id,
+                feature=feature,
+                window_start=window_start,
+                window_end=window_end,
+                limit=limit,
             )
 
-        if row.used_value + amount > row.limit_value:
+        # Atomic guard: a plain read-modify-write lets parallel requests
+        # overshoot the daily window.
+        result = await self._session.execute(
+            update(UsageLimit)
+            .where(
+                UsageLimit.id == row.id,
+                UsageLimit.used_value + amount <= UsageLimit.limit_value,
+            )
+            .values(used_value=UsageLimit.used_value + amount)
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount == 0:
             retry_after = max(
                 1, int((as_utc(row.window_end) - utcnow()).total_seconds())
             )
             raise UsageLimitExceeded(feature, retry_after_seconds=retry_after)
 
-        row.used_value += amount
-        await self._session.flush()
-        remaining = max(0, row.limit_value - row.used_value)
+        await self._session.refresh(row)
         return UsageStatus(
             feature=feature,
             tier=tier,
             limit_value=row.limit_value,
             used_value=row.used_value,
-            remaining=remaining,
+            remaining=max(0, row.limit_value - row.used_value),
         )
+
+    async def _create_window(
+        self,
+        *,
+        user_id: UUID,
+        feature: str,
+        window_start: datetime,
+        window_end: datetime,
+        limit: int,
+    ) -> UsageLimit:
+        """Create the daily window; tolerate a parallel first request."""
+        row = UsageLimit(
+            user_id=user_id,
+            feature=feature,
+            window_start=window_start,
+            window_end=window_end,
+            limit_value=limit,
+            used_value=0,
+        )
+        try:
+            async with self._session.begin_nested():
+                self._session.add(row)
+                await self._session.flush()
+        except IntegrityError:
+            if row in self._session:
+                self._session.expunge(row)
+            existing = await self._repository.get_usage_window(
+                user_id, feature, window_start
+            )
+            if existing is None:
+                raise
+            return existing
+        return row
 
     async def usage_status(self, user_id: UUID, feature: str) -> UsageStatus:
         tier = await self.get_tier(user_id)

@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.drafts import recipe_candidate_to_draft
@@ -261,8 +262,22 @@ class MealPlanService:
         await self._archive_overlapping(
             user_id, start_date=payload.start_date, end_date=end_date
         )
-        await self._repository.add_plan(plan)
-        await self._session.commit()
+        try:
+            await self._repository.add_plan(plan)
+            await self._session.commit()
+        except IntegrityError:
+            # A parallel request won the race (same generation hash, or the
+            # one-ready-plan exclusion constraint). Reuse its plan instead of 500.
+            await self._session.rollback()
+            existing = await self._repository.get_by_hash(user_id, request_hash)
+            if existing is not None:
+                return await self._to_out(existing, warnings=warnings, reused=True)
+            covering = await self._repository.find_covering(
+                user_id, on_date=payload.start_date
+            )
+            if covering is not None:
+                return await self._to_out(covering, warnings=warnings, reused=True)
+            raise
         await self._session.refresh(plan)
         if self._images is not None:
             seen: set = set()
