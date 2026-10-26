@@ -128,7 +128,7 @@ Nginx разрешает адрес backend через Docker DNS на кажд�
 ```bash
 cp .env.example .env
 python3 -c "import secrets; print(secrets.token_urlsafe(48))"   # значение для JWT_SECRET
-# заполнить JWT_SECRET, POSTGRES_PASSWORD, MINIO_ROOT_*, S3_* в .env
+# заполнить JWT_SECRET, POSTGRES_PASSWORD, MINIO_ROOT_*, S3_*, REDIS_PASSWORD в .env
 docker compose up -d --wait
 docker compose exec backend alembic upgrade head
 curl http://localhost:8080/health
