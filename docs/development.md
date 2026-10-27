@@ -121,6 +121,17 @@ MinIO образ тянется с `quay.io/minio/minio`: Docker Hub отвеч�
 
 Nginx разрешает адрес backend через Docker DNS на каждый request, поэтому пересборка backend (`docker compose up -d --build backend`) не требует перезапуска nginx и не приводит к `502`.
 
+### Публичный HTTPS через Cloudflare Quick Tunnel
+
+Сервис `tunnel` в `compose.yaml` публикует nginx через `*.trycloudflare.com` без домена и аккаунта:
+
+```bash
+docker compose up -d tunnel
+docker compose logs tunnel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1
+```
+
+URL выдаётся Cloudflare, меняется при каждом пересоздании контейнера `tunnel` и не имеет SLA — это временный стенд, не production. Порт nginx опубликован только на `127.0.0.1`, поэтому снаружи доступен исключительно HTTPS-туннель. Для постоянного домена нужен named tunnel Cloudflare или обычный TLS на nginx.
+
 ### Локальный запуск на macOS
 
 Все образы стека (`postgres:17-alpine`, `redis:7-alpine`, `nginx:1.27-alpine`, `python:3.12-slim`, `quay.io/minio/minio`) публикуются для `linux/arm64`, поэтому на Apple Silicon они запускаются нативно, без Rosetta и без `--platform`.
@@ -213,7 +224,7 @@ PostgreSQL uses logical `pg_dump`; MinIO is mirrored with `mc` into `backups/` (
 
 ## Android build policy
 
-Android (`android/`) — Kotlin/Compose, Hilt, Retrofit/OkHttp, Kotlinx Serialization. В BuildConfig попадает только `API_BASE_URL` (debug default `http://193.32.179.108:8080/api/v1/` для физического телефона). Override: `FOODAI_API_BASE_URL=... ./scripts/build_android.sh`. OpenAI, database, Redis, MinIO keys и JWT secret на устройство не попадают. Access/refresh хранятся в EncryptedSharedPreferences (Android Keystore master key); refresh выполняется single-flight через `TokenAuthenticator`. Онбординг Phase 9: 7 resumable screens + local draft + `calculate-target` preview + first plan generate.
+Android (`android/`) — Kotlin/Compose, Hilt, Retrofit/OkHttp, Kotlinx Serialization. В BuildConfig попадает только `API_BASE_URL` (debug default `http://10.0.2.2:8080/api/v1/` для эмулятора; для телефона передайте `FOODAI_API_BASE_URL=https://<host>/api/v1/`). Override: `FOODAI_API_BASE_URL=... ./scripts/build_android.sh`. OpenAI, database, Redis, MinIO keys и JWT secret на устройство не попадают. Access/refresh хранятся в EncryptedSharedPreferences (Android Keystore master key); refresh выполняется single-flight через `TokenAuthenticator`. Онбординг Phase 9: 7 resumable screens + local draft + `calculate-target` preview + first plan generate.
 
 ```text
 scripts/build_android.sh
