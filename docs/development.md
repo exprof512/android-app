@@ -121,16 +121,16 @@ MinIO образ тянется с `quay.io/minio/minio`: Docker Hub отвеч�
 
 Nginx разрешает адрес backend через Docker DNS на каждый request, поэтому пересборка backend (`docker compose up -d --build backend`) не требует перезапуска nginx и не приводит к `502`.
 
-### Публичный HTTPS через Cloudflare Quick Tunnel
+### Публичный HTTPS без домена (sslip.io + Let's Encrypt)
 
-Сервис `tunnel` в `compose.yaml` публикует nginx через `*.trycloudflare.com` без домена и аккаунта:
+`sslip.io` — публичный wildcard DNS: имя `193-32-179-108.sslip.io` резолвится в `193.32.179.108`, поэтому отдельный домен не нужен. Nginx публикует 80/443, HTTP отдаёт ACME-challenge и редиректит на HTTPS, а 8080 остаётся только на localhost для healthcheck.
 
 ```bash
-docker compose up -d tunnel
-docker compose logs tunnel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1
+certbot certonly --webroot -w ./certbot/www -d 193-32-179-108.sslip.io
+docker compose restart nginx
 ```
 
-URL выдаётся Cloudflare, меняется при каждом пересоздании контейнера `tunnel` и не имеет SLA — это временный стенд, не production. Порт nginx опубликован только на `127.0.0.1`, поэтому снаружи доступен исключительно HTTPS-туннель. Для постоянного домена нужен named tunnel Cloudflare или обычный TLS на nginx.
+Продление: `certbot renew` (webroot) и reload nginx. Для постоянного продукта нужен собственный домен и обычный TLS-контур; Cloudflare Quick Tunnel для российских клиентов не подходит — он блокируется без VPN.
 
 ### Локальный запуск на macOS
 

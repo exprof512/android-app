@@ -39,3 +39,6 @@ captures/
 
 # Kotlin incremental caches
 android/.kotlin/
+
+# TLS webroot
+certbot/
