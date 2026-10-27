@@ -1,6 +1,9 @@
 package com.foodai.app.core.network
 
 import com.foodai.app.core.auth.TokenStore
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -70,6 +73,8 @@ class RefreshCoordinator @Inject constructor(
 ) {
     private val mutex = Mutex()
     @Volatile private var sessionEpoch: Long = 0L
+    private val _sessionExpired = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val sessionExpired: SharedFlow<Unit> = _sessionExpired.asSharedFlow()
 
     /** Call under logout so an in-flight refresh cannot resurrect the session. */
     fun bumpSessionEpoch() {
@@ -92,6 +97,7 @@ class RefreshCoordinator @Inject constructor(
             if (status == 401 || status == 403) {
                 if (epochAtStart == sessionEpoch) {
                     tokenStore.clear()
+                    _sessionExpired.tryEmit(Unit)
                 }
             }
             null

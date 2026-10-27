@@ -23,6 +23,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -245,10 +247,12 @@ class AddFoodViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null, photoReview = emptyList())
             try {
-                val raw = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: error("Не удалось прочитать фото")
-                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-                val (bytes, outMime) = downscaleForUpload(raw, mime)
+                val (bytes, outMime) = withContext(Dispatchers.IO) {
+                    val raw = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?: error("Не удалось прочитать фото")
+                    val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                    downscaleForUpload(raw, mime)
+                }
                 val body = bytes.toRequestBody(outMime.toMediaTypeOrNull())
                 val part = MultipartBody.Part.createFormData("file", "meal.jpg", body)
                 val result: PhotoAnalyzeDto = nutritionApi.analyzePhoto(part)

@@ -710,7 +710,7 @@ class WeekViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     generating = false,
                     error = error.toUiMessage(),
-                    missingPlan = error.httpStatus == 404 || error.httpStatus == 429,
+                    missingPlan = error.httpStatus == 404 || error.code == "meal_plan_not_found",
                 )
             }
         }

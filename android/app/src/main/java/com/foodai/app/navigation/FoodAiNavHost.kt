@@ -1,6 +1,7 @@
 package com.foodai.app.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavType
@@ -9,6 +10,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.foodai.app.core.auth.AuthRepository
+import com.foodai.app.core.network.RefreshCoordinator
 import com.foodai.app.feature.auth.AuthRoute
 import com.foodai.app.feature.boot.BootRoute
 import com.foodai.app.feature.onboarding.OnboardingRoute
@@ -40,6 +42,12 @@ interface AuthRepositoryEntryPoint {
     fun authRepository(): AuthRepository
 }
 
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface SessionEntryPoint {
+    fun refreshCoordinator(): RefreshCoordinator
+}
+
 @Composable
 fun FoodAiNavHost() {
     val navController = rememberNavController()
@@ -50,6 +58,23 @@ fun FoodAiNavHost() {
             AuthRepositoryEntryPoint::class.java,
         ).authRepository()
         if (repo.hasSession()) Routes.Boot else Routes.Welcome
+    }
+    val sessionExpired = remember {
+        EntryPointAccessors.fromApplication(
+            context,
+            SessionEntryPoint::class.java,
+        ).refreshCoordinator().sessionExpired
+    }
+
+    LaunchedEffect(sessionExpired) {
+        sessionExpired.collect {
+            if (navController.currentDestination?.route != Routes.Welcome) {
+                navController.navigate(Routes.Welcome) {
+                    popUpTo(navController.graph.id) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        }
     }
 
     NavHost(navController = navController, startDestination = start) {
