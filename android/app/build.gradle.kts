@@ -19,10 +19,10 @@ android {
         versionName = "0.1.0-rc1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Physical phone → public Nginx on this VM. Override: -Pfoodai.apiBaseUrl=...
-        // Emulator would use http://10.0.2.2:8080/api/v1/
+        // Emulator default. For a physical phone pass an explicit HTTPS URL:
+        // -Pfoodai.apiBaseUrl=https://<host>/api/v1/
         val apiBaseUrl = (project.findProperty("foodai.apiBaseUrl") as String?)
-            ?: "http://193.32.179.108:8080/api/v1/"
+            ?: "http://10.0.2.2:8080/api/v1/"
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 

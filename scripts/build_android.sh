@@ -22,7 +22,7 @@ if [[ ! -f "$ANDROID_DIR/local.properties" ]]; then
 fi
 
 cd "$ANDROID_DIR"
-API_BASE_URL="${FOODAI_API_BASE_URL:-http://193.32.179.108:8080/api/v1/}"
+API_BASE_URL="${FOODAI_API_BASE_URL:-http://10.0.2.2:8080/api/v1/}"
 ./gradlew :app:assembleDebug --no-daemon --max-workers=1 -Pfoodai.apiBaseUrl="$API_BASE_URL"
 APK="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk"
 if [[ ! -f "$APK" ]]; then
