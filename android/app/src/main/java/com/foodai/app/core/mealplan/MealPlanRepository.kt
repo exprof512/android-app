@@ -1,6 +1,7 @@
 package com.foodai.app.core.mealplan
 
 import android.content.Context
+import com.foodai.app.core.auth.AuthRepository
 import com.foodai.app.core.network.ApiErrorParser
 import com.foodai.app.core.network.ApplySubstitutionRequest
 import com.foodai.app.core.network.DishCardDto
@@ -42,6 +43,7 @@ class MealPlanRepository @Inject constructor(
     private val recipeApi: RecipeApi,
     private val bus: AppStateBus,
     private val selectedDate: SelectedDateStore,
+    private val auth: AuthRepository,
     @ApplicationContext private val context: Context,
 ) {
     private val cacheJson = Json {
@@ -225,7 +227,8 @@ class MealPlanRepository @Inject constructor(
             ?.let { cacheJson.decodeFromString(MealPlanDto.serializer(), it) }
     }.getOrNull()
 
-    private fun cacheKey(date: LocalDate) = "plan_$date"
+    private fun cacheKey(date: LocalDate) =
+        "${auth.currentUser()?.id ?: "anon"}:plan_$date"
 
     private companion object {
         const val CACHE_PREFS = "foodai_plan_cache"

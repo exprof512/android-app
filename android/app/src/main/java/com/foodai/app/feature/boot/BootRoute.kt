@@ -56,14 +56,16 @@ class BootViewModel @Inject constructor(
             try {
                 val profile = profileRepository.getProfile()
                 val complete = profile.isComplete()
-                prefs.edit().putBoolean("profile_complete", complete).apply()
+                val flagKey = "profile_complete_${authRepository.currentUser()?.id ?: "anon"}"
+                prefs.edit().putBoolean(flagKey, complete).apply()
                 _destination.value = if (complete) {
                     BootDestination.Main
                 } else {
                     BootDestination.Onboarding
                 }
             } catch (error: Exception) {
-                if (prefs.getBoolean("profile_complete", false)) {
+                val flagKey = "profile_complete_${authRepository.currentUser()?.id ?: "anon"}"
+                if (prefs.getBoolean(flagKey, false)) {
                     // Offline cold start: profile was complete on the last sync.
                     _destination.value = BootDestination.Main
                 } else {

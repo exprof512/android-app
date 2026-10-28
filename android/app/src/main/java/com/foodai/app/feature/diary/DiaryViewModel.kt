@@ -2,6 +2,7 @@ package com.foodai.app.feature.diary
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.foodai.app.core.auth.AuthRepository
 import com.foodai.app.core.auth.toUiMessage
 import com.foodai.app.core.diary.DiaryCacheStore
 import com.foodai.app.core.network.ApiErrorParser
@@ -37,6 +38,7 @@ data class DiaryUiState(
 class DiaryViewModel @Inject constructor(
     private val nutritionApi: NutritionApi,
     private val cache: DiaryCacheStore,
+    private val auth: AuthRepository,
     private val bus: AppStateBus,
     private val selectedDate: SelectedDateStore,
 ) : ViewModel() {
@@ -71,7 +73,7 @@ class DiaryViewModel @Inject constructor(
             try {
                 val logs = nutritionApi.listLogs(date.toString())
                 if (generation != refreshGeneration) return@launch
-                cache.save(date.toString(), logs)
+                cache.save(auth.currentUser()?.id, date.toString(), logs)
                 _state.value = DiaryUiState(
                     loading = false,
                     date = date.toString(),
@@ -83,7 +85,7 @@ class DiaryViewModel @Inject constructor(
                 )
             } catch (error: Throwable) {
                 if (generation != refreshGeneration) return@launch
-                val cached = cache.load(date.toString())
+                val cached = cache.load(auth.currentUser()?.id, date.toString())
                 if (cached != null) {
                     _state.value = DiaryUiState(
                         loading = false,

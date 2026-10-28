@@ -18,20 +18,20 @@ class DiaryCacheStore @Inject constructor(
         encodeDefaults = true
     }
 
-    fun save(date: String, logs: List<NutritionLogDto>) {
+    fun save(userId: String?, date: String, logs: List<NutritionLogDto>) {
         runCatching {
             prefs.edit()
-                .putString(key(date), json.encodeToString(ListSerializer, logs))
+                .putString(key(userId, date), json.encodeToString(ListSerializer, logs))
                 .apply()
         }
     }
 
-    fun load(date: String): List<NutritionLogDto>? = runCatching {
-        prefs.getString(key(date), null)
+    fun load(userId: String?, date: String): List<NutritionLogDto>? = runCatching {
+        prefs.getString(key(userId, date), null)
             ?.let { json.decodeFromString(ListSerializer, it) }
     }.getOrNull()
 
-    private fun key(date: String) = "day_$date"
+    private fun key(userId: String?, date: String) = "${userId ?: "anon"}:day_$date"
 
     private companion object {
         val ListSerializer = kotlinx.serialization.builtins.ListSerializer(
