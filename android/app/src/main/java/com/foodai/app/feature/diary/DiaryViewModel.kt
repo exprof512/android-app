@@ -3,6 +3,7 @@ package com.foodai.app.feature.diary
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.foodai.app.core.auth.toUiMessage
+import com.foodai.app.core.diary.DiaryCacheStore
 import com.foodai.app.core.network.ApiErrorParser
 import com.foodai.app.core.network.ApiException
 import com.foodai.app.core.network.NutritionApi
@@ -29,11 +30,13 @@ data class DiaryUiState(
     val fatG: Double = 0.0,
     val carbsG: Double = 0.0,
     val error: String? = null,
+    val offline: Boolean = false,
 )
 
 @HiltViewModel
 class DiaryViewModel @Inject constructor(
     private val nutritionApi: NutritionApi,
+    private val cache: DiaryCacheStore,
     private val bus: AppStateBus,
     private val selectedDate: SelectedDateStore,
 ) : ViewModel() {
@@ -68,6 +71,7 @@ class DiaryViewModel @Inject constructor(
             try {
                 val logs = nutritionApi.listLogs(date.toString())
                 if (generation != refreshGeneration) return@launch
+                cache.save(date.toString(), logs)
                 _state.value = DiaryUiState(
                     loading = false,
                     date = date.toString(),
@@ -79,11 +83,25 @@ class DiaryViewModel @Inject constructor(
                 )
             } catch (error: Throwable) {
                 if (generation != refreshGeneration) return@launch
-                val parsed = ApiErrorParser.fromThrowable(error)
-                _state.value = _state.value.copy(
-                    loading = false,
-                    error = parsed.toUiMessage(),
-                )
+                val cached = cache.load(date.toString())
+                if (cached != null) {
+                    _state.value = DiaryUiState(
+                        loading = false,
+                        date = date.toString(),
+                        logs = cached,
+                        totalsKcal = cached.sumOf { it.caloriesKcal },
+                        proteinG = cached.sumOf { it.proteinG },
+                        fatG = cached.sumOf { it.fatG },
+                        carbsG = cached.sumOf { it.carbohydrateG },
+                        offline = true,
+                    )
+                } else {
+                    val parsed = ApiErrorParser.fromThrowable(error)
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        error = parsed.toUiMessage(),
+                    )
+                }
             }
         }
     }

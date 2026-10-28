@@ -136,6 +136,15 @@ fun DiaryScreen(
                 }
             }
         }
+        if (state.offline) {
+            item {
+                Text(
+                    "Офлайн: показаны сохранённые записи за этот день.",
+                    style = FoodAITypography.labelSmall,
+                    color = FoodAIColors.Warning,
+                )
+            }
+        }
         item {
             Column(
                 modifier = Modifier
