@@ -3,9 +3,11 @@ package com.foodai.app.feature.progress
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -38,9 +41,12 @@ import com.foodai.app.core.network.ProgressSeriesPointDto
 import com.foodai.app.core.network.WeightEntryDto
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
+import com.foodai.app.core.ui.formatKcal
 import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
+import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
+import java.util.Locale
 
 @Composable
 fun ProgressRoute(
@@ -74,12 +80,16 @@ fun ProgressScreen(
     val summary = state.summary
     val entries = summary?.recentEntries.orEmpty().sortedBy { it.measuredAt }
     val series = summary?.series.orEmpty()
+    val progress = ((summary?.progressPercent ?: 0.0) / 100.0).coerceIn(0.0, 1.0)
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(FoodAIColors.Background)
-            .padding(FoodAIDimens.ScreenPadding),
-        verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space16),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = FoodAIDimens.ScreenPadding,
+            end = FoodAIDimens.ScreenPadding,
+            top = FoodAIDimens.Space16,
+            bottom = FoodAIDimens.Space32,
+        ),
+        verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12),
     ) {
         item {
             Row(
@@ -90,7 +100,7 @@ fun ProgressScreen(
                 Column(Modifier.weight(1f)) {
                     Text("Прогресс", style = FoodAITypography.headlineMedium)
                     Text(
-                        "Ты делаешь это отлично! Маленькие шаги приводят к большим результатам.",
+                        "Вес, калории и путь к цели — без гонки за цифрами.",
                         style = FoodAITypography.bodyMedium,
                         color = FoodAIColors.TextSecondary,
                     )
@@ -98,7 +108,7 @@ fun ProgressScreen(
                 IconButton(onClick = onRefresh) {
                     Icon(
                         imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "Синхронизировать вес и калории с сервера",
+                        contentDescription = "Обновить прогресс",
                         tint = FoodAIColors.Primary,
                     )
                 }
@@ -112,98 +122,218 @@ fun ProgressScreen(
                         onClick = { onPeriod(days) },
                         label = { Text("$days дн.") },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = FoodAIColors.PrimarySoft,
+                            selectedContainerColor = FoodAIColors.PrimaryLight,
                         ),
                     )
                 }
             }
         }
         item {
-            Text(
-                "Текущий вес: ${summary?.currentWeightKg?.let { "$it кг" } ?: "—"}",
-                style = FoodAITypography.titleLarge,
-            )
-            if (summary?.startWeightKg != null || summary?.targetWeightKg != null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.CardLarge)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
                 Text(
-                    "Старт ${summary.startWeightKg ?: "—"} → цель ${summary.targetWeightKg ?: "—"} кг",
-                    style = FoodAITypography.bodyMedium,
+                    "Текущий вес",
+                    style = FoodAITypography.labelMedium,
                     color = FoodAIColors.TextSecondary,
                 )
-            }
-            summary?.progressPercent?.let {
-                Text("Прогресс к цели: ${"%.0f".format(it)}%", style = FoodAITypography.bodyMedium)
-            }
-            summary?.trend7dKg?.let {
-                val sign = if (it > 0) "+" else ""
-                Text("Тренд 7 дней: $sign$it кг", style = FoodAITypography.bodyMedium)
-            }
-            summary?.weightDeltaKg?.let {
-                val sign = if (it > 0) "+" else ""
-                Text("Изменение с старта: $sign$it кг", style = FoodAITypography.bodyMedium)
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        formatWeight(summary?.currentWeightKg),
+                        style = FoodAITypography.displayMedium,
+                    )
+                    Spacer(Modifier.height(0.dp))
+                    Text(
+                        "  кг",
+                        style = FoodAITypography.titleMedium,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
+                val delta = summary?.weightDeltaKg
+                Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
+                    if (delta != null) {
+                        val sign = if (delta > 0) "+" else ""
+                        Text(
+                            "$sign${formatWeightValue(delta)} кг с начала",
+                            style = FoodAITypography.bodySmall,
+                            color = FoodAIColors.Primary,
+                        )
+                    }
+                    Text(
+                        "${(progress * 100).toInt()}% к цели",
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
+                Spacer(Modifier.height(FoodAIDimens.Space4))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(FoodAIShapes.Pill)
+                        .background(FoodAIColors.SurfaceMuted),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress.toFloat())
+                            .fillMaxHeight()
+                            .clip(FoodAIShapes.Pill)
+                            .background(FoodAIColors.Primary),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        "Старт ${formatWeightValue(summary?.startWeightKg)} кг",
+                        style = FoodAITypography.labelSmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                    Text(
+                        "Цель ${formatWeightValue(summary?.targetWeightKg)} кг",
+                        style = FoodAITypography.labelSmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
             }
         }
         item {
-            Text("Динамика за ${state.period} дн.", style = FoodAITypography.titleLarge)
-            when {
-                series.size >= 2 -> SeriesChart(
-                    points = series,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                )
-                entries.size >= 2 -> WeightChart(
-                    entries = entries,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                )
-                else -> Text(
-                    "Добавьте минимум две записи — появится график.",
-                    color = FoodAIColors.TextSecondary,
-                    style = FoodAITypography.bodyMedium,
-                )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.CardLarge)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
+                Text("Динамика за ${state.period} дн.", style = FoodAITypography.titleMedium)
+                when {
+                    series.size >= 2 -> SeriesChart(
+                        points = series,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(170.dp),
+                    )
+                    entries.size >= 2 -> WeightChart(
+                        entries = entries,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(170.dp),
+                    )
+                    else -> Text(
+                        "Добавьте минимум две записи веса — появится график.",
+                        color = FoodAIColors.TextSecondary,
+                        style = FoodAITypography.bodySmall,
+                    )
+                }
+                summary?.trend7dKg?.let {
+                    val sign = if (it > 0) "+" else ""
+                    Text(
+                        "Тренд 7 дней: $sign${formatWeightValue(it)} кг",
+                        style = FoodAITypography.labelSmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
             }
         }
         item {
             val today = summary?.today
             val goalKcal = summary?.calorieTargetKcal ?: today?.targetCaloriesKcal
-            Text("Сегодня", style = FoodAITypography.titleLarge)
-            if (today != null) {
-                Text(
-                    "Съедено ${today.consumedCaloriesKcal} ккал · цель ${goalKcal ?: "—"}",
-                    style = FoodAITypography.bodyMedium,
-                )
-                Text(
-                    "Б ${today.proteinG} / Ж ${today.fatG} / У ${today.carbohydrateG} · " +
-                        "${today.completedMeals}/${today.plannedMeals} приёмов",
-                    color = FoodAIColors.TextSecondary,
-                    style = FoodAITypography.bodySmall,
-                )
-            } else {
-                Text("Нет данных по плану на сегодня", color = FoodAIColors.TextSecondary)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.CardLarge)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
+                Text("Сегодня", style = FoodAITypography.titleMedium)
+                if (today != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        ProgressStat("Съедено", "${formatKcal(today.consumedCaloriesKcal)}")
+                        ProgressStat("Цель", goalKcal?.let { formatKcal(it) } ?: "—")
+                        ProgressStat("Приёмы", "${today.completedMeals}/${today.plannedMeals}")
+                    }
+                    Text(
+                        "Б ${today.proteinG.toInt()} · Ж ${today.fatG.toInt()} · У ${today.carbohydrateG.toInt()} г",
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                } else {
+                    Text(
+                        "Нет данных по плану на сегодня",
+                        color = FoodAIColors.TextSecondary,
+                        style = FoodAITypography.bodySmall,
+                    )
+                }
             }
         }
         item {
-            Text("Записать вес", style = FoodAITypography.titleLarge)
-            OutlinedTextField(
-                value = state.weightInput,
-                onValueChange = onWeightInput,
-                label = { Text("кг") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                shape = com.foodai.app.core.ui.theme.FoodAIShapes.Input,
-            )
-            if (state.actionError != null) {
-                Text(state.actionError, color = FoodAIColors.Error)
-            }
-            Button(
-                onClick = onSave,
-                enabled = !state.saving,
-                colors = ButtonDefaults.buttonColors(containerColor = FoodAIColors.Primary),
-                shape = com.foodai.app.core.ui.theme.FoodAIShapes.Button,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.CardLarge)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12),
             ) {
-                Text(if (state.saving) "Сохраняем…" else "Сохранить")
+                Text("Записать вес", style = FoodAITypography.titleMedium)
+                OutlinedTextField(
+                    value = state.weightInput,
+                    onValueChange = onWeightInput,
+                    label = { Text("кг") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    shape = FoodAIShapes.Input,
+                )
+                if (state.actionError != null) {
+                    Text(state.actionError, color = FoodAIColors.Error)
+                }
+                Button(
+                    onClick = onSave,
+                    enabled = !state.saving,
+                    modifier = Modifier.fillMaxWidth().height(FoodAIDimens.ButtonHeight),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = FoodAIColors.Primary,
+                        contentColor = FoodAIColors.TextOnPrimary,
+                    ),
+                    shape = FoodAIShapes.Button,
+                ) {
+                    Text(if (state.saving) "Сохраняем…" else "Сохранить")
+                }
+            }
+        }
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.CardLarge)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
+                Text("История", style = FoodAITypography.titleMedium)
+                if (entries.isEmpty()) {
+                    Text(
+                        "Пока нет записей веса",
+                        color = FoodAIColors.TextSecondary,
+                        style = FoodAITypography.bodySmall,
+                    )
+                } else {
+                    entries.asReversed().forEach { entry ->
+                        WeightRow(entry)
+                    }
+                }
             }
         }
         item {
@@ -211,20 +341,27 @@ fun ProgressScreen(
                 Text(it, style = FoodAITypography.bodySmall, color = FoodAIColors.TextSecondary)
             }
             summary?.warnings.orEmpty().forEach { warning ->
-                Text(warning, color = FoodAIColors.TextSecondary)
+                Text(warning, color = FoodAIColors.TextSecondary, style = FoodAITypography.bodySmall)
             }
         }
-        item {
-            Text("История", style = FoodAITypography.titleLarge)
-            if (entries.isEmpty()) {
-                Text("Пока нет записей веса", color = FoodAIColors.TextSecondary)
-            } else {
-                entries.asReversed().forEach { entry ->
-                    Spacer(Modifier.height(8.dp))
-                    WeightRow(entry)
-                }
-            }
-        }
+    }
+}
+
+private fun formatWeightValue(value: Double?): String =
+    value?.let { String.format(Locale("ru"), "%.1f", it) } ?: "—"
+
+private fun formatWeight(value: Double?): String =
+    value?.let { String.format(Locale("ru"), "%.1f", it) } ?: "—"
+
+@Composable
+private fun ProgressStat(label: String, value: String) {
+    Column {
+        Text(value, style = FoodAITypography.titleMedium)
+        Text(
+            label,
+            style = FoodAITypography.labelSmall,
+            color = FoodAIColors.TextSecondary,
+        )
     }
 }
 
@@ -307,14 +444,21 @@ private fun WeightChart(
 @Composable
 private fun WeightRow(entry: WeightEntryDto) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("${entry.weightKg} кг", style = FoodAITypography.titleMedium)
+        Text(
+            "${formatWeight(entry.weightKg)} кг",
+            style = FoodAITypography.titleSmall,
+        )
         Text(
             entry.measuredAt.take(16).replace('T', ' '),
-            style = FoodAITypography.bodySmall,
+            style = FoodAITypography.labelSmall,
             color = FoodAIColors.TextSecondary,
         )
         entry.note?.takeIf { it.isNotBlank() }?.let {
-            Text(it, color = FoodAIColors.TextSecondary, style = FoodAITypography.bodySmall)
+            Text(
+                it,
+                color = FoodAIColors.TextSecondary,
+                style = FoodAITypography.bodySmall,
+            )
         }
     }
 }

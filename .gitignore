@@ -42,3 +42,6 @@ android/.kotlin/
 
 # TLS webroot
 certbot/
+
+# Local screenshot/QA artifacts
+shots/

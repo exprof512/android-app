@@ -34,6 +34,7 @@ import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.components.FoodAIPrimaryButton
 import com.foodai.app.core.ui.displayRecipeName
+import com.foodai.app.core.ui.formatKcal
 import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAIShapes
@@ -94,6 +95,7 @@ fun DiaryScreen(
             meal to state.logs.filter { it.mealType == meal }
         }
     }
+    val emptyMeals = grouped.filter { it.second.isEmpty() }.map { mealTypeLabel(it.first) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -149,7 +151,7 @@ fun DiaryScreen(
                     color = FoodAIColors.TextSecondary,
                 )
                 Text(
-                    "%,d ккал".format(state.totalsKcal),
+                    "${formatKcal(state.totalsKcal)} ккал",
                     style = FoodAITypography.headlineLarge,
                 )
                 Row(
@@ -173,7 +175,7 @@ fun DiaryScreen(
                 style = FoodAITypography.titleLarge,
             )
         }
-        for ((meal, rows) in grouped) {
+        for ((meal, rows) in grouped.filter { it.second.isNotEmpty() }) {
             item {
                 Column(
                     modifier = Modifier
@@ -195,17 +197,33 @@ fun DiaryScreen(
                             color = FoodAIColors.TextSecondary,
                         )
                     }
-                    if (rows.isEmpty()) {
-                        Text(
-                            "Нет записей",
-                            style = FoodAITypography.bodySmall,
-                            color = FoodAIColors.TextMuted,
-                        )
-                    } else {
-                        rows.forEach { log ->
-                            DiaryEntryRow(log = log, onDelete = { onDelete(log.id) })
-                        }
+                    rows.forEach { log ->
+                        DiaryEntryRow(log = log, onDelete = { onDelete(log.id) })
                     }
+                }
+            }
+        }
+        if (emptyMeals.isNotEmpty()) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(FoodAIShapes.Card)
+                        .background(FoodAIColors.Surface)
+                        .padding(FoodAIDimens.Space16),
+                    verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space4),
+                ) {
+                    Text("Пока не записано", style = FoodAITypography.titleMedium)
+                    Text(
+                        emptyMeals.joinToString(" · "),
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                    Text(
+                        "Добавьте еду, чтобы день считался полностью.",
+                        style = FoodAITypography.labelSmall,
+                        color = FoodAIColors.TextMuted,
+                    )
                 }
             }
         }

@@ -73,6 +73,8 @@ import com.foodai.app.core.ui.RecipeImagePane
 import com.foodai.app.core.ui.displayRecipeName
 import com.foodai.app.core.ui.components.FoodAICard
 import com.foodai.app.core.ui.components.FoodAIEmptyState
+import com.foodai.app.core.ui.formatKcal
+import com.foodai.app.core.ui.formatMoney
 import com.foodai.app.core.ui.components.FoodAIMacroBar
 import com.foodai.app.core.ui.components.FoodAIOutlinedButton
 import com.foodai.app.core.ui.components.FoodAIPrimaryButton
@@ -341,18 +343,6 @@ fun TodayScreen(
         if (state.infoMessage != null) {
             item { Text(state.infoMessage, color = FoodAIColors.Primary) }
         }
-        if (nextMeal != null) {
-            item {
-                Text("Следующий приём", style = FoodAITypography.titleLarge)
-                NextMealCard(
-                    item = nextMeal,
-                    onOpen = { onOpenRecipe(nextMeal.recipe.id, nextMeal.id) },
-                    onComplete = { onComplete(nextMeal) },
-                    onSkip = { onSkip(nextMeal) },
-                    onReplace = { replaceTarget = nextMeal },
-                )
-            }
-        }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Приёмы пищи", style = FoodAITypography.titleLarge)
@@ -466,8 +456,8 @@ private fun DayProgressCard(
     val carbs = progress?.carbs
     val headline = when {
         target <= 0 -> "Цель не задана"
-        overTarget > 0 -> "+$overTarget ккал сверх цели"
-        else -> "$remaining ккал осталось"
+        overTarget > 0 -> "+${formatKcal(overTarget)} ккал сверх цели"
+        else -> "${formatKcal(remaining)} ккал осталось"
     }
     Column(
         modifier = Modifier
@@ -477,7 +467,7 @@ private fun DayProgressCard(
             .padding(FoodAIDimens.Space16),
     ) {
         Text(
-            if (target > 0) "Цель · %,d ккал".format(target) else "Калории",
+            if (target > 0) "Цель · ${formatKcal(target)} ккал" else "Калории",
             style = FoodAITypography.labelMedium,
             color = FoodAIColors.TextSecondary,
         )
@@ -488,7 +478,7 @@ private fun DayProgressCard(
             Column(Modifier.weight(1f)) {
                 Text("Съедено", style = FoodAITypography.labelSmall, color = FoodAIColors.TextSecondary)
                 Text(
-                    "%,d / %,d ккал".format(consumed, target),
+                    "${formatKcal(consumed)} / ${formatKcal(target)} ккал",
                     style = FoodAITypography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = if (overTarget > 0) FoodAIColors.Warning else FoodAIColors.TextPrimary,
@@ -500,14 +490,14 @@ private fun DayProgressCard(
                 )
                 if (fromDiary > 0) {
                     Text(
-                        "Вне плана: %,d ккал".format(fromDiary),
+                        "Вне плана: ${formatKcal(fromDiary)} ккал",
                         style = FoodAITypography.bodySmall,
                         color = FoodAIColors.TextSecondary,
                     )
                 }
                 if (plannedRemaining > 0) {
                     Text(
-                        "В плане ещё %,d ккал — не съедено".format(plannedRemaining),
+                        "В плане ещё ${formatKcal(plannedRemaining)} ккал — не съедено",
                         style = FoodAITypography.bodySmall,
                         color = FoodAIColors.TextSecondary,
                     )
@@ -602,7 +592,7 @@ private fun NextMealCard(
                 )
                 Text(title, style = FoodAITypography.titleMedium, maxLines = 2)
                 Text(
-                    "${item.recipe.caloriesKcal} ккал · ${item.recipe.cookTimeMinutes} мин",
+                    "${formatKcal(item.recipe.caloriesKcal)} ккал · ${item.recipe.cookTimeMinutes} мин",
                     style = FoodAITypography.bodySmall,
                     color = FoodAIColors.TextSecondary,
                 )
@@ -642,7 +632,7 @@ private fun MealTimelineCard(
         item.status == "skipped" -> FoodAIColors.TextMuted
         item.status == "replaced" -> FoodAIColors.Warning
         highlighted -> FoodAIColors.Primary
-        else -> FoodAIColors.Divider
+        else -> FoodAIColors.TextMuted
     }
     Column(
         modifier = Modifier
@@ -800,12 +790,12 @@ private fun CalorieRing(progress: Float, eaten: Int, target: Int) {
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                if (target > 0) "$eaten" else "—",
+                if (target > 0) formatKcal(eaten) else "—",
                 style = FoodAITypography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                if (target > 0) "из $target" else "ккал",
+                if (target > 0) "из ${formatKcal(target)}" else "ккал",
                 style = FoodAITypography.labelSmall,
             )
         }
@@ -925,7 +915,7 @@ fun WeekScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (goalKcal != null) "Цель $goalKcal ккал/день · ${dates.size} дн." else "${dates.size} дн.",
+                        if (goalKcal != null) "Цель ${formatKcal(goalKcal)} ккал/день · ${dates.size} дн." else "${dates.size} дн.",
                         style = FoodAITypography.bodySmall,
                         color = FoodAIColors.TextSecondary,
                     )
@@ -1023,12 +1013,12 @@ fun WeekScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         WeekStat("Запланировано", "$plannedDays из ${summaryDays.size}")
-                        WeekStat("В среднем", "$avgKcal ккал")
+                        WeekStat("В среднем", "${formatKcal(avgKcal)} ккал")
                         WeekStat("Съедено", "$completed")
                     }
                     if (weekCost > 0) {
                         Text(
-                            "≈ ${"%.0f".format(weekCost)} ₽ на неделю",
+                            "≈ ${formatMoney(weekCost)} ₽ на неделю",
                             style = FoodAITypography.bodySmall,
                             color = FoodAIColors.TextSecondary,
                         )
@@ -1059,7 +1049,7 @@ fun WeekScreen(
                             style = FoodAITypography.labelMedium,
                             color = FoodAIColors.TextSecondary,
                         )
-                        Text("${selectedSummary.caloriesKcal} ккал", style = FoodAITypography.titleLarge)
+                        Text("${formatKcal(selectedSummary.caloriesKcal)} ккал", style = FoodAITypography.titleLarge)
                         Text(
                             "Б ${selectedSummary.proteinG.toInt()} г",
                             style = FoodAITypography.bodySmall,
@@ -1078,7 +1068,7 @@ fun WeekScreen(
                         )
                         selectedSummary.estimatedCostAmount?.let { cost ->
                             Text(
-                                "≈ ${"%.0f".format(cost)} ₽",
+                                "≈ ${formatMoney(cost)} ₽",
                                 style = FoodAITypography.bodySmall,
                                 color = FoodAIColors.TextSecondary,
                             )
@@ -1122,7 +1112,7 @@ private fun WeekStat(label: String, value: String) {
 
 private fun weekChipSubtitle(day: WeekDayDto?, status: String): String {
     if (day != null && day.caloriesKcal > 0) {
-        return "${day.caloriesKcal} ккал"
+        return "${formatKcal(day.caloriesKcal)} ккал"
     }
     return when (status) {
         "planned" -> "есть"
@@ -1158,8 +1148,10 @@ fun MealItemCard(
                     .clip(FoodAIShapes.Tile),
                 enforceAspect = false,
             )
-            Box(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                FoodAIStatusDot(complete = item.isCompleted)
+            if (item.isCompleted) {
+                Box(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
+                    FoodAIStatusDot(complete = true)
+                }
             }
         }
         Spacer(Modifier.width(FoodAIDimens.Space12))
@@ -1171,7 +1163,7 @@ fun MealItemCard(
             )
             Text(recipe.name, style = FoodAITypography.titleMedium, maxLines = 2)
             Text(
-                "${recipe.caloriesKcal} ккал · ${recipe.cookTimeMinutes} мин",
+                "${formatKcal(recipe.caloriesKcal)} ккал · ${recipe.cookTimeMinutes} мин",
                 style = FoodAITypography.bodySmall,
             )
             Spacer(Modifier.height(FoodAIDimens.Space8))

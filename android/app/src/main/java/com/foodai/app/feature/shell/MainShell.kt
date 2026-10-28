@@ -58,6 +58,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.ui.ErrorPane
+import com.foodai.app.core.ui.activityLabel
+import com.foodai.app.core.ui.formatKcal
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.components.FoodAIAvatar
 import com.foodai.app.core.ui.components.FoodAICard
@@ -456,7 +458,7 @@ private fun ProfileHomeRoute(
                     Column(Modifier.weight(1f)) {
                         Text("Моя цель", style = FoodAITypography.titleMedium)
                         Text(
-                            "${goal.calorieTargetKcal} ккал/день",
+                            "${formatKcal(goal.calorieTargetKcal)} ккал/день",
                             style = FoodAITypography.bodySmall,
                         )
                     }
@@ -497,7 +499,7 @@ private fun ProfileHomeRoute(
 
         Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
             MetricMini("Ккал", "${goal?.calorieTargetKcal ?: "—"}", Icons.Outlined.LocalFireDepartment, Modifier.weight(1f))
-            MetricMini("Активность", p?.activityLevel ?: "—", Icons.Outlined.FitnessCenter, Modifier.weight(1f))
+            MetricMini("Активность", activityLabel(p?.activityLevel), Icons.Outlined.FitnessCenter, Modifier.weight(1f))
             MetricMini("Вода", waterLabel, Icons.Outlined.WaterDrop, Modifier.weight(1f))
         }
 

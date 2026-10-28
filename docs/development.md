@@ -226,6 +226,22 @@ PostgreSQL uses logical `pg_dump`; MinIO is mirrored with `mc` into `backups/` (
 
 Android (`android/`) — Kotlin/Compose, Hilt, Retrofit/OkHttp, Kotlinx Serialization. В BuildConfig попадает только `API_BASE_URL` (debug default `http://10.0.2.2:8080/api/v1/` для эмулятора; для телефона передайте `FOODAI_API_BASE_URL=https://<host>/api/v1/`). Override: `FOODAI_API_BASE_URL=... ./scripts/build_android.sh`. OpenAI, database, Redis, MinIO keys и JWT secret на устройство не попадают. Access/refresh хранятся в EncryptedSharedPreferences (Android Keystore master key); refresh выполняется single-flight через `TokenAuthenticator`. Онбординг Phase 9: 7 resumable screens + local draft + `calculate-target` preview + first plan generate.
 
+### Эмулятор и проверка скриншотами
+
+Для визуальной проверки без физического телефона используется AVD и `adb`:
+
+```bash
+sdkmanager "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
+avdmanager create avd -n foodai -k "system-images;android-35;google_apis;x86_64" -d pixel_6
+emulator -avd foodai -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
+adb wait-for-device
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.foodai.app.debug/com.foodai.app.MainActivity
+adb shell screencap -p /sdcard/shot.png && adb pull /sdcard/shot.png
+```
+
+`adb shell input tap/text` и `adb shell uiautomator dump` позволяют проходить сценарии и проверять UI; `adb logcat` — сетевые и runtime-ошибки. Смена темы: Профиль → Настройки → Тема.
+
 ```text
 scripts/build_android.sh
 scripts/install_android.sh

@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.network.ProfileResponse
 import com.foodai.app.core.network.UserSummaryDto
 import com.foodai.app.core.network.aiRecommendationRemaining
+import com.foodai.app.core.ui.activityLabel
 import com.foodai.app.core.ui.components.FoodAIAvatar
 import com.foodai.app.core.ui.components.FoodAICard
 import com.foodai.app.core.ui.components.FoodAIInfoCard
@@ -504,7 +505,7 @@ fun ProfileDetailsRoute(
                 DetailRow("Возраст", p?.ageYears?.let { "$it лет" } ?: "—")
                 DetailRow("Рост", p?.heightCm?.let { "${it.toInt()} см" } ?: "—")
                 DetailRow("Вес", p?.currentWeightKg?.let { "${it.toInt()} кг" } ?: "—")
-                DetailRow("Активность", p?.activityLevel ?: "—")
+                DetailRow("Активность", activityLabel(p?.activityLevel))
                 DetailRow("Приёмов пищи", p?.mealsPerDay?.toString() ?: "—")
             }
             FoodAIPrimaryButton(
