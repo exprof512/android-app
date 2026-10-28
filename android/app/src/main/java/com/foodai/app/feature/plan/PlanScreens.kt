@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.automirrored.outlined.ShowChart
 import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ShoppingCart
@@ -290,12 +291,28 @@ fun TodayScreen(
                         color = FoodAIColors.TextSecondary,
                     )
                 }
-                IconButton(onClick = onRefresh) {
-                    Icon(
-                        Icons.Outlined.Refresh,
-                        contentDescription = "Обновить",
-                        tint = FoodAIColors.Primary,
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenDiary) {
+                        Icon(
+                            Icons.Outlined.MenuBook,
+                            contentDescription = "Дневник",
+                            tint = FoodAIColors.TextSecondary,
+                        )
+                    }
+                    IconButton(onClick = onOpenShopping) {
+                        Icon(
+                            Icons.Outlined.ShoppingCart,
+                            contentDescription = "Покупки",
+                            tint = FoodAIColors.TextSecondary,
+                        )
+                    }
+                    IconButton(onClick = onRefresh) {
+                        Icon(
+                            Icons.Outlined.Refresh,
+                            contentDescription = "Обновить",
+                            tint = FoodAIColors.Primary,
+                        )
+                    }
                 }
             }
         }
@@ -309,32 +326,14 @@ fun TodayScreen(
             }
         }
         item {
-            FoodAITipBanner(
-                tipId = "today_loop",
-                text = "Отмечай съеденное, пропускай лишнее и заменяй блюда — прогресс дня считает сервер.",
-            )
-        }
-        item {
             DayProgressCard(progress = progress, fallbackTargets = plan?.dailyTargets)
         }
-        if (progress?.suggestions?.isNotEmpty() == true) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Подсказки", style = FoodAITypography.labelMedium, color = FoodAIColors.TextSecondary)
-                    progress.suggestions.take(2).forEach { tip ->
-                        Text("• $tip", style = FoodAITypography.bodySmall, color = FoodAIColors.TextSecondary)
-                    }
-                }
-            }
-        }
-        progress?.dailyEstimatedCostAmount?.let { cost ->
-            item {
-                Text(
-                    "≈ ${"%.0f".format(cost)} ₽ · ориентировочно на день",
-                    style = FoodAITypography.bodySmall,
-                    color = FoodAIColors.TextSecondary,
-                )
-            }
+        item {
+            Text(
+                "План не считается съеденным, пока вы не нажмёте «Съел».",
+                style = FoodAITypography.bodySmall,
+                color = FoodAIColors.TextSecondary,
+            )
         }
         if (state.actionError != null) {
             item { Text(state.actionError, color = FoodAIColors.Error) }
@@ -355,7 +354,14 @@ fun TodayScreen(
             }
         }
         item {
-            Text("Приёмы пищи", style = FoodAITypography.titleLarge)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Приёмы пищи", style = FoodAITypography.titleLarge)
+                Text(
+                    "Отмечай съеденное — калории, БЖУ и остаток дня посчитает сервер.",
+                    style = FoodAITypography.bodySmall,
+                    color = FoodAIColors.TextSecondary,
+                )
+            }
         }
         if (todayItems.isEmpty()) {
             item {
@@ -379,43 +385,27 @@ fun TodayScreen(
         }
         item {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space16),
-            ) {
-                TextButton(onClick = onOpenDiary) {
-                    Text("Дневник", color = FoodAIColors.Primary)
-                }
-                TextButton(onClick = onOpenPlan) {
-                    Text("План", color = FoodAIColors.TextSecondary)
-                }
-                TextButton(onClick = onOpenShopping) {
-                    Text("Покупки", color = FoodAIColors.TextSecondary)
-                }
-            }
-        }
-        item {
-            val hasWater = waterTotal > 0
-            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(FoodAIShapes.Card)
                     .background(FoodAIColors.Surface)
-                    .padding(FoodAIDimens.Space16),
+                    .padding(horizontal = FoodAIDimens.Space16, vertical = FoodAIDimens.Space12),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Вода", style = FoodAITypography.titleMedium)
-                Text(
-                    String.format("%.1f / %.1f л", waterTotal / 1000f, waterGoal / 1000f),
-                    style = FoodAITypography.headlineMedium,
-                )
-                Spacer(Modifier.height(FoodAIDimens.Space8))
+                Column {
+                    Text("Вода", style = FoodAITypography.titleMedium)
+                    Text(
+                        String.format("%.1f из %.1f л", waterTotal / 1000f, waterGoal / 1000f),
+                        style = FoodAITypography.bodyMedium,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8)) {
                     TextButton(onClick = { onAddWater(250) }) {
                         Text("+250 мл", color = FoodAIColors.Primary)
                     }
-                    TextButton(onClick = { onAddWater(500) }) {
-                        Text("+500 мл", color = FoodAIColors.Primary)
-                    }
-                    if (hasWater) {
+                    if (waterTotal > 0) {
                         TextButton(onClick = onUndoWater) {
                             Text("Отменить", color = FoodAIColors.TextSecondary)
                         }
