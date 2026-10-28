@@ -43,7 +43,7 @@ OPENAI_VISION_MAX_IMAGE_BYTES=5242880
 OPENAI_IMAGE_MODEL=gpt-image-2
 ```
 
-`OPENAI_TEXT_MODEL` is retained for legacy config compatibility but is **not** used for product text operations when DeepSeek is configured.
+`OPENAI_TEXT_MODEL` is retained for legacy config compatibility. Product text prefers DeepSeek; if the DeepSeek key is rejected (`ai_auth_error`), rate-limited, or the provider is unavailable, `FallbackTextProvider` retries the same structured request on OpenAI Responses (`OPENAI_TEXT_MODEL`, default `gpt-4.1-mini`). An auth failure disables that provider for the process, so a revoked key costs one failed attempt, not one per request. Fix the DeepSeek key and restart backend/worker to return to the primary provider.
 
 ## Selection code
 

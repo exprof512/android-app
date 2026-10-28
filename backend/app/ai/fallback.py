@@ -32,10 +32,14 @@ class FallbackTextProvider:
         if not providers:
             raise ValueError("FallbackTextProvider requires at least one provider")
         self._providers = providers
+        # A revoked key fails every call; stop paying the 401 round-trip.
+        self._disabled: set[str] = set()
 
     async def generate(self, request: TextGenerationRequest) -> TextGenerationResult:
         last_error: TextAIProviderError | None = None
         for name, provider in self._providers:
+            if name in self._disabled:
+                continue
             try:
                 result = await provider.generate(request)
                 if name != self._providers[0][0]:
@@ -54,8 +58,15 @@ class FallbackTextProvider:
                         "operation": request.operation,
                     },
                 )
+                if exc.code == "ai_auth_error":
+                    self._disabled.add(name)
                 if exc.code not in _FALLBACK_CODES:
                     raise
                 continue
-        assert last_error is not None
+        if last_error is None:
+            raise TextAIProviderError(
+                code="ai_provider_error",
+                message="All text AI providers are disabled.",
+                retryable=False,
+            )
         raise last_error

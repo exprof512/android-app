@@ -11,6 +11,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.cache import MemoryCacheStore, RedisCacheStore, TextAICache
+from app.ai.fallback import FallbackTextProvider
 from app.ai.mock import MockTextProvider
 from app.ai.provider import TextGenerationProvider
 from app.ai.service import TextAIService
@@ -18,19 +19,47 @@ from app.core.config import Settings
 from app.core.dependencies import get_db_session, get_redis, get_services
 from app.core.services import Services
 from app.integrations.deepseek.text import DeepSeekChatProvider
+from app.integrations.openai.text import OpenAIResponsesProvider
 
 
 def build_text_provider(settings: Settings) -> TextGenerationProvider:
-    """DeepSeek-only text AI. OpenAI Responses is not in this chain."""
+    """DeepSeek first; OpenAI Responses only as an explicit fallback.
+
+    A revoked DeepSeek key used to disable chat and live plan generation while
+    the OpenAI key was still valid. Keep DeepSeek as the primary provider and
+    fall back on auth/quota/provider errors instead of failing the product.
+    """
+    providers: list[tuple[str, TextGenerationProvider]] = []
     if settings.deepseek_api_key.strip():
-        return DeepSeekChatProvider(
-            api_key=settings.deepseek_api_key,
-            model=settings.deepseek_text_model or "deepseek-chat",
-            timeout_seconds=settings.deepseek_text_timeout_seconds,
-            base_url=settings.deepseek_base_url or "https://api.deepseek.com",
+        providers.append(
+            (
+                "deepseek",
+                DeepSeekChatProvider(
+                    api_key=settings.deepseek_api_key,
+                    model=settings.deepseek_text_model or "deepseek-chat",
+                    timeout_seconds=settings.deepseek_text_timeout_seconds,
+                    base_url=settings.deepseek_base_url or "https://api.deepseek.com",
+                ),
+            )
         )
-    # No DeepSeek key → mock (never silently route product text to OpenAI).
-    return MockTextProvider(model=settings.deepseek_text_model or "mock-text-model")
+    if settings.openai_api_key.strip():
+        providers.append(
+            (
+                "openai",
+                OpenAIResponsesProvider(
+                    api_key=settings.openai_api_key,
+                    model=settings.openai_text_model.strip() or "gpt-4.1-mini",
+                    timeout_seconds=settings.openai_text_timeout_seconds,
+                ),
+            )
+        )
+    if not providers:
+        return MockTextProvider(
+            model=settings.deepseek_text_model or "mock-text-model"
+        )
+    if len(providers) == 1:
+        return providers[0][1]
+    return FallbackTextProvider(providers)
 
 
 def get_text_provider(

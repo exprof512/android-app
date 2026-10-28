@@ -1,17 +1,19 @@
-"""Prove Phase 21 AI provider routing — mocks only, no network."""
+"""Prove AI provider routing — mocks only, no network."""
 
 from __future__ import annotations
 
 from app.ai.dependencies import build_text_provider
+from app.ai.fallback import FallbackTextProvider
 from app.ai.mock import MockTextProvider
 from app.core.config import Settings
 from app.integrations.deepseek.text import DeepSeekChatProvider
 from app.integrations.openai.images import OpenAIImageProvider
+from app.integrations.openai.text import OpenAIResponsesProvider
 from app.integrations.openai.vision import MockOpenAIVisionProvider, OpenAIVisionProvider
 from app.nutrition.photo import build_vision_provider
 
 
-def test_chat_and_text_ops_use_deepseek_when_keyed():
+def test_text_provider_prefers_deepseek_and_falls_back_to_openai():
     settings = Settings(
         app_env="development",
         deepseek_api_key="sk-deepseek-test",
@@ -20,30 +22,26 @@ def test_chat_and_text_ops_use_deepseek_when_keyed():
         openai_text_model="gpt-4.1-mini",
     )
     provider = build_text_provider(settings)
-    assert isinstance(provider, DeepSeekChatProvider)
+    assert isinstance(provider, FallbackTextProvider)
+    assert provider._providers[0][0] == "deepseek"
+    assert provider._providers[1][0] == "openai"
+    assert isinstance(provider._providers[1][1], OpenAIResponsesProvider)
 
 
-def test_text_does_not_use_openai_even_when_openai_keyed():
+def test_single_deepseek_key_uses_deepseek_directly():
     settings = Settings(
         app_env="development",
         deepseek_api_key="sk-deepseek-test",
-        openai_api_key="sk-openai-test",
+        openai_api_key="",
     )
-    provider = build_text_provider(settings)
-    assert not isinstance(provider, type("OpenAI", (), {}))
-    assert isinstance(provider, DeepSeekChatProvider)
-    # OpenAI Responses must not be selected for product text.
-    from app.integrations.openai.text import OpenAIResponsesProvider
-
-    assert not isinstance(provider, OpenAIResponsesProvider)
+    assert isinstance(build_text_provider(settings), DeepSeekChatProvider)
 
 
 def test_recipe_meal_plan_suggestion_adaptation_route_to_deepseek():
     """Same text provider serves all DeepSeek text operations."""
-    settings = Settings(app_env="development", deepseek_api_key="sk-ds")
+    settings = Settings(app_env="development", deepseek_api_key="sk-ds", openai_api_key="")
     provider = build_text_provider(settings)
     assert isinstance(provider, DeepSeekChatProvider)
-    # Operations are dispatch keys on TextAIService; provider identity is shared.
     for _op in (
         "chat_answer",
         "generate_recipe_candidates",
@@ -54,15 +52,19 @@ def test_recipe_meal_plan_suggestion_adaptation_route_to_deepseek():
         assert isinstance(provider, DeepSeekChatProvider)
 
 
-def test_no_deepseek_key_does_not_fall_back_to_openai_text():
+def test_openai_text_serves_when_deepseek_key_is_missing():
     settings = Settings(
         app_env="development",
         deepseek_api_key="",
         openai_api_key="sk-openai-test",
         openai_text_model="gpt-4.1-mini",
     )
-    provider = build_text_provider(settings)
-    assert isinstance(provider, MockTextProvider)
+    assert isinstance(build_text_provider(settings), OpenAIResponsesProvider)
+
+
+def test_no_keys_keeps_the_mock_provider():
+    settings = Settings(app_env="development", deepseek_api_key="", openai_api_key="")
+    assert isinstance(build_text_provider(settings), MockTextProvider)
 
 
 def test_food_photo_uses_openai_vision():

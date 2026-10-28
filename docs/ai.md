@@ -126,7 +126,7 @@ NUTRITION_MIN_DAILY_CALORIES_MALE=1500
 
 ## Тестируемость
 
-`TextGenerationProvider` для product text — только `DeepSeekChatProvider` (или `MockTextProvider` в test / без DeepSeek-ключа). OpenAI Responses **не** используется для chat/plan/recipe/suggestion. Food photo → `OpenAIVisionProvider`. Image generation → `OpenAIImageProvider`. Матрица: [ai-provider-routing.md](ai-provider-routing.md).
+`TextGenerationProvider` для product text — `DeepSeekChatProvider`, а при его недоступности (auth/quota/timeout) — `OpenAIResponsesProvider` через `FallbackTextProvider`; в test или без ключей — `MockTextProvider`. После `ai_auth_error` провайдер отключается до перезапуска процесса. Food photo → `OpenAIVisionProvider`. Image generation → `OpenAIImageProvider`. Матрица: [ai-provider-routing.md](ai-provider-routing.md).
 
 pytest не выполняет сетевых вызовов к OpenAI/DeepSeek. Обязательные tests: provider routing, JSON schema failure/retry, unknown ingredients, nutrition override, allergy/exclusion, plan mismatch, ownership, cache/idempotency, quota, food photo mock vision, safe chat. Image contract — `MockImageProvider`.
 
