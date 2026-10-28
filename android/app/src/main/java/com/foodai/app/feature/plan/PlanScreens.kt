@@ -897,39 +897,48 @@ fun WeekScreen(
         contentPadding = PaddingValues(top = FoodAIDimens.Space16, bottom = FoodAIDimens.Space32),
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text("План на неделю", style = FoodAITypography.headlineMedium)
-                    Text(
-                        "Запланировано. В калории дня попадёт только после «Съел».",
-                        style = FoodAITypography.bodyMedium,
-                        color = FoodAIColors.TextSecondary,
-                    )
-                    if (goalKcal != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space4)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("План на неделю", style = FoodAITypography.headlineMedium)
                         Text(
-                            "Цель: $goalKcal ккал/день · ${dates.size} дн.",
-                            style = FoodAITypography.bodySmall,
+                            "Блюда на каждый день. В калории дня попадает только съеденное.",
+                            style = FoodAITypography.bodyMedium,
+                            color = FoodAIColors.TextSecondary,
+                        )
+                    }
+                    IconButton(onClick = onRefresh) {
+                        Icon(
+                            Icons.Outlined.Refresh,
+                            contentDescription = "Обновить план на неделю",
+                            tint = FoodAIColors.Primary,
                         )
                     }
                 }
-                IconButton(onClick = onRefresh) {
-                    Icon(
-                        Icons.Outlined.Refresh,
-                        contentDescription = "Обновить план на неделю",
-                        tint = FoodAIColors.Primary,
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        if (goalKcal != null) "Цель $goalKcal ккал/день · ${dates.size} дн." else "${dates.size} дн.",
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
                     )
+                    TextButton(onClick = onRebuild) {
+                        Text("Пересобрать", color = FoodAIColors.Primary)
+                    }
                 }
-            }
-            TextButton(onClick = onRebuild) { Text("Пересобрать", color = FoodAIColors.Primary) }
-            if (state.actionError != null) {
-                Text(state.actionError, color = FoodAIColors.Error)
-            }
-            if (state.infoMessage != null) {
-                Text(state.infoMessage, color = FoodAIColors.Primary)
+                if (state.actionError != null) {
+                    Text(state.actionError, color = FoodAIColors.Error)
+                }
+                if (state.infoMessage != null) {
+                    Text(state.infoMessage, color = FoodAIColors.Primary)
+                }
             }
         }
         item {
@@ -950,14 +959,23 @@ fun WeekScreen(
                     val status = day?.status ?: state.dayStatuses[date] ?: state.dayStatuses[dayKey] ?: "missing"
                     Box(
                         modifier = Modifier
-                            .widthIn(min = 64.dp)
+                            .widthIn(min = 68.dp)
                             .clip(FoodAIShapes.Card)
                             .background(
                                 when {
-                                    selected -> FoodAIColors.Primary
+                                    selected -> FoodAIColors.PrimaryLight
                                     isToday -> FoodAIColors.PrimarySoft
                                     else -> FoodAIColors.Surface
                                 },
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isToday && !selected) {
+                                    FoodAIColors.Primary
+                                } else {
+                                    FoodAIColors.Divider
+                                },
+                                shape = FoodAIShapes.Card,
                             )
                             .clickable { onSelectDate(dayKey) }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -966,18 +984,18 @@ fun WeekScreen(
                             if (isToday) {
                                 Text(
                                     "Сегодня",
-                                    color = if (selected) FoodAIColors.TextOnPrimary else FoodAIColors.Primary,
+                                    color = FoodAIColors.Primary,
                                     style = FoodAITypography.labelSmall,
                                 )
                             }
                             Text(
                                 dayLabel,
-                                color = if (selected) FoodAIColors.TextOnPrimary else FoodAIColors.TextPrimary,
+                                color = if (selected) FoodAIColors.PrimaryDark else FoodAIColors.TextPrimary,
                                 style = FoodAITypography.labelLarge,
                             )
                             Text(
                                 weekChipSubtitle(day, status),
-                                color = if (selected) FoodAIColors.TextOnPrimary else FoodAIColors.TextMuted,
+                                color = FoodAIColors.TextSecondary,
                                 style = FoodAITypography.labelSmall,
                             )
                         }
@@ -986,34 +1004,87 @@ fun WeekScreen(
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.Card)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12),
+            ) {
                 Text("Итоги недели", style = FoodAITypography.titleMedium)
                 if (summaryDays.isNotEmpty()) {
                     val plannedDays = summaryDays.count { it.status != "missing" }
                     val avgKcal = summaryDays.map { it.caloriesKcal }.average().toInt()
-                    val avgProtein = summaryDays.map { it.proteinG }.average().toInt()
                     val completed = summaryDays.sumOf { it.completedMeals }
                     val weekCost = summaryDays.mapNotNull { it.estimatedCostAmount }.sum()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        WeekStat("Запланировано", "$plannedDays из ${summaryDays.size}")
+                        WeekStat("В среднем", "$avgKcal ккал")
+                        WeekStat("Съедено", "$completed")
+                    }
+                    if (weekCost > 0) {
+                        Text(
+                            "≈ ${"%.0f".format(weekCost)} ₽ на неделю",
+                            style = FoodAITypography.bodySmall,
+                            color = FoodAIColors.TextSecondary,
+                        )
+                    }
+                } else {
                     Text(
-                        "$plannedDays/${summaryDays.size} дней · ~$avgKcal ккал · Б ~$avgProtein г · $completed приёмов" +
-                            if (weekCost > 0) " · ≈ ${"%.0f".format(weekCost)} ₽" else "",
+                        "Нет данных за неделю",
                         style = FoodAITypography.bodySmall,
                         color = FoodAIColors.TextSecondary,
                     )
-                } else {
-                    Text("Нет данных за неделю", style = FoodAITypography.bodySmall)
                 }
             }
         }
         if (selectedSummary != null) {
             item {
-                Text(
-                    "День: ${selectedSummary.caloriesKcal} ккал · Б ${selectedSummary.proteinG.toInt()} г · " +
-                        "${selectedSummary.completedMeals}/${selectedSummary.plannedMeals}" +
-                        (selectedSummary.estimatedCostAmount?.let { " · ≈ ${"%.0f".format(it)} ₽" } ?: ""),
-                    style = FoodAITypography.bodyMedium,
-                    color = FoodAIColors.TextSecondary,
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(FoodAIShapes.Card)
+                        .background(FoodAIColors.Surface)
+                        .padding(FoodAIDimens.Space16),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text(
+                            "Выбранный день",
+                            style = FoodAITypography.labelMedium,
+                            color = FoodAIColors.TextSecondary,
+                        )
+                        Text("${selectedSummary.caloriesKcal} ккал", style = FoodAITypography.titleLarge)
+                        Text(
+                            "Б ${selectedSummary.proteinG.toInt()} г",
+                            style = FoodAITypography.bodySmall,
+                            color = FoodAIColors.TextSecondary,
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            "${selectedSummary.completedMeals} из ${selectedSummary.plannedMeals}",
+                            style = FoodAITypography.titleMedium,
+                        )
+                        Text(
+                            "приёмов съедено",
+                            style = FoodAITypography.labelSmall,
+                            color = FoodAIColors.TextSecondary,
+                        )
+                        selectedSummary.estimatedCostAmount?.let { cost ->
+                            Text(
+                                "≈ ${"%.0f".format(cost)} ₽",
+                                style = FoodAITypography.bodySmall,
+                                color = FoodAIColors.TextSecondary,
+                            )
+                        }
+                    }
+                }
             }
         }
         if (dayItems.isEmpty()) {
@@ -1038,6 +1109,14 @@ fun WeekScreen(
                 onClick = onOpenShopping,
             )
         }
+    }
+}
+
+@Composable
+private fun WeekStat(label: String, value: String) {
+    Column {
+        Text(value, style = FoodAITypography.titleMedium)
+        Text(label, style = FoodAITypography.labelSmall, color = FoodAIColors.TextSecondary)
     }
 }
 

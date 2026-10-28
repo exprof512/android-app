@@ -1,6 +1,6 @@
 package com.foodai.app.feature.diary
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,10 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -25,15 +25,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.network.NutritionLogDto
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
+import com.foodai.app.core.ui.components.FoodAIPrimaryButton
 import com.foodai.app.core.ui.displayRecipeName
 import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
+import com.foodai.app.core.ui.theme.FoodAIShapes
 import com.foodai.app.core.ui.theme.FoodAITypography
 import com.foodai.app.feature.plan.mealTypeLabel
 import java.time.LocalDate
@@ -92,10 +95,13 @@ fun DiaryScreen(
         }
     }
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = FoodAIDimens.ScreenPadding),
-        contentPadding = PaddingValues(vertical = FoodAIDimens.Space16),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = FoodAIDimens.ScreenPadding,
+            end = FoodAIDimens.ScreenPadding,
+            top = FoodAIDimens.Space16,
+            bottom = FoodAIDimens.Space32,
+        ),
         verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space12),
     ) {
         item {
@@ -108,10 +114,11 @@ fun DiaryScreen(
                     Icon(
                         Icons.AutoMirrored.Outlined.ArrowBack,
                         contentDescription = "Предыдущий день",
+                        tint = FoodAIColors.TextSecondary,
                     )
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Дневник", style = FoodAITypography.titleLarge)
+                    Text("Дневник", style = FoodAITypography.headlineSmall)
                     Text(
                         headline,
                         style = FoodAITypography.bodyMedium,
@@ -122,54 +129,106 @@ fun DiaryScreen(
                     Icon(
                         Icons.AutoMirrored.Outlined.ArrowForward,
                         contentDescription = "Следующий день",
+                        tint = FoodAIColors.TextSecondary,
                     )
                 }
             }
         }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.CardLarge)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
                 Text(
-                    "%,d ккал".format(state.totalsKcal),
-                    style = FoodAITypography.headlineMedium,
-                )
-                Text(
-                    "Б ${state.proteinG.toInt()} · Ж ${state.fatG.toInt()} · У ${state.carbsG.toInt()} г",
-                    style = FoodAITypography.bodyMedium,
+                    "Съедено за день",
+                    style = FoodAITypography.labelMedium,
                     color = FoodAIColors.TextSecondary,
                 )
                 Text(
-                    "Фактически съеденное — без запланированных приёмов.",
+                    "%,d ккал".format(state.totalsKcal),
+                    style = FoodAITypography.headlineLarge,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    DiaryMacro("Белки", state.proteinG.toInt())
+                    DiaryMacro("Жиры", state.fatG.toInt())
+                    DiaryMacro("Углеводы", state.carbsG.toInt())
+                }
+                Text(
+                    "Только фактически съеденное — план сюда не входит.",
                     style = FoodAITypography.labelSmall,
                     color = FoodAIColors.TextMuted,
                 )
             }
         }
         item {
-            val eatenTitle = if (state.date == LocalDate.now().toString()) "Сегодня съедено" else "Съедено"
-            Text(eatenTitle, style = FoodAITypography.titleMedium)
+            Text(
+                if (state.date == LocalDate.now().toString()) "Сегодня по приёмам" else "По приёмам",
+                style = FoodAITypography.titleLarge,
+            )
         }
         for ((meal, rows) in grouped) {
             item {
-                Text(mealTypeLabel(meal), style = FoodAITypography.titleSmall, color = FoodAIColors.TextSecondary)
-            }
-            if (rows.isEmpty()) {
-                item {
-                    Text("Нет записей", style = FoodAITypography.bodySmall, color = FoodAIColors.TextMuted)
-                }
-            } else {
-                items(rows, key = { it.id }) { log ->
-                    DiaryEntryRow(log = log, onDelete = { onDelete(log.id) })
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(FoodAIShapes.Card)
+                        .background(FoodAIColors.Surface)
+                        .padding(FoodAIDimens.Space16),
+                    verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(mealTypeLabel(meal), style = FoodAITypography.titleMedium)
+                        Text(
+                            "${rows.sumOf { it.caloriesKcal }} ккал",
+                            style = FoodAITypography.labelMedium,
+                            color = FoodAIColors.TextSecondary,
+                        )
+                    }
+                    if (rows.isEmpty()) {
+                        Text(
+                            "Нет записей",
+                            style = FoodAITypography.bodySmall,
+                            color = FoodAIColors.TextMuted,
+                        )
+                    } else {
+                        rows.forEach { log ->
+                            DiaryEntryRow(log = log, onDelete = { onDelete(log.id) })
+                        }
+                    }
                 }
             }
         }
         item {
-            com.foodai.app.core.ui.components.FoodAIPrimaryButton(
+            FoodAIPrimaryButton(
                 label = "Добавить еду",
                 onClick = onAdd,
                 showArrow = false,
             )
         }
-        item { Spacer(Modifier.height(FoodAIDimens.Space32)) }
+        item { Spacer(Modifier.height(FoodAIDimens.Space16)) }
+    }
+}
+
+@Composable
+private fun DiaryMacro(label: String, grams: Int) {
+    Column {
+        Text("$grams г", style = FoodAITypography.titleMedium)
+        Text(
+            label,
+            style = FoodAITypography.labelSmall,
+            color = FoodAIColors.TextSecondary,
+        )
     }
 }
 
@@ -178,13 +237,13 @@ private fun DiaryEntryRow(log: NutritionLogDto, onDelete: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = FoodAIDimens.Space8),
+            .padding(vertical = FoodAIDimens.Space4),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(
                 displayRecipeName(log.description),
-                style = FoodAITypography.titleMedium,
+                style = FoodAITypography.titleSmall,
                 maxLines = 2,
             )
             Text(
@@ -193,11 +252,12 @@ private fun DiaryEntryRow(log: NutritionLogDto, onDelete: () -> Unit) {
                 color = FoodAIColors.TextSecondary,
             )
         }
-        Text(
-            "Удалить",
-            color = FoodAIColors.Error,
-            style = FoodAITypography.labelMedium,
-            modifier = Modifier.clickable(onClick = onDelete),
-        )
+        IconButton(onClick = onDelete) {
+            Icon(
+                Icons.Outlined.DeleteOutline,
+                contentDescription = "Удалить запись",
+                tint = FoodAIColors.TextMuted,
+            )
+        }
     }
 }
