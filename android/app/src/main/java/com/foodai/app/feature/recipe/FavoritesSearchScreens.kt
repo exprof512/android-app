@@ -2,6 +2,7 @@ package com.foodai.app.feature.recipe
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -137,6 +138,7 @@ fun FavoritesRoute(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Избранное") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -189,6 +191,7 @@ fun RecipeSearchRoute(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Поиск рецептов") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

@@ -2,6 +2,7 @@ package com.foodai.app.feature.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -504,6 +505,7 @@ fun ChatRoute(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("AI-помощник") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

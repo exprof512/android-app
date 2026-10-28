@@ -5,6 +5,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,6 +84,7 @@ fun SettingsRoute(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Настройки") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -287,6 +289,7 @@ fun NotificationsRoute(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Уведомления") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -403,6 +406,7 @@ fun ProfileDetailsRoute(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Мои данные") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

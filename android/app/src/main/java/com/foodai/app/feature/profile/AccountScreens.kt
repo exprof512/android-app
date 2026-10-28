@@ -3,6 +3,7 @@ package com.foodai.app.feature.profile
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -150,6 +151,7 @@ fun AccountRoute(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Аккаунт") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

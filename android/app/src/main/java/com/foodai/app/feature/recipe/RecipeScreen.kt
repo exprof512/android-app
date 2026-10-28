@@ -2,6 +2,7 @@ package com.foodai.app.feature.recipe
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +45,8 @@ import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.RecipeImagePane
 import com.foodai.app.core.ui.components.FoodAIOutlinedButton
 import com.foodai.app.core.ui.components.FoodAIPrimaryButton
+import com.foodai.app.core.ui.formatGrams
+import com.foodai.app.core.ui.formatMoney
 import com.foodai.app.core.ui.theme.FoodAIColors
 import com.foodai.app.core.ui.theme.FoodAIDimens
 import com.foodai.app.core.ui.theme.FoodAITypography
@@ -274,7 +277,8 @@ fun RecipeRoute(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(state.recipe?.name ?: "Рецепт") },
+                windowInsets = WindowInsets(0, 0, 0, 0),
+                title = {},
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -354,11 +358,11 @@ fun RecipeScreen(
         Text(recipe.name, style = FoodAITypography.headlineMedium)
         val n = recipe.nutritionPerServing
         Text(
-            "${n.caloriesKcal} ккал · Б ${n.proteinG} / Ж ${n.fatG} / У ${n.carbohydrateG}",
+            "${n.caloriesKcal} ккал · Б ${n.proteinG.toInt()} · Ж ${n.fatG.toInt()} · У ${n.carbohydrateG.toInt()} г",
             style = FoodAITypography.titleMedium,
         )
         Text(
-            "${recipe.cookTimeMinutes} мин · ${recipe.estimatedCostPerServing.amount} ${recipe.estimatedCostPerServing.currency}",
+            "${recipe.cookTimeMinutes} мин · ${formatMoney(recipe.estimatedCostPerServing.amount)} ₽",
             style = FoodAITypography.bodyMedium,
             color = FoodAIColors.TextSecondary,
         )
@@ -378,7 +382,7 @@ fun RecipeScreen(
                 modifier = Modifier.weight(1f),
             )
             FoodAIPrimaryButton(
-                label = "Съедено",
+                label = "Я съел",
                 onClick = onComplete,
                 showArrow = false,
                 modifier = Modifier.weight(1f),
@@ -413,7 +417,10 @@ fun RecipeScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("• ${ing.name} — ${ing.grams} г", style = FoodAITypography.bodyMedium)
+                Text(
+                    "• ${ing.name} — ${formatGrams(ing.grams.toInt())}",
+                    style = FoodAITypography.bodyMedium,
+                )
                 androidx.compose.material3.TextButton(
                     onClick = { onSubstitute(ing.name) },
                 ) {

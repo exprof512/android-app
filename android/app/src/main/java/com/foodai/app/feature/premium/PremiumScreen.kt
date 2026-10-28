@@ -2,6 +2,7 @@ package com.foodai.app.feature.premium
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,6 +46,7 @@ fun PremiumRoute(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Premium") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
