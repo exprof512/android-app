@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
@@ -26,7 +26,8 @@ from app.profiles.models import (
     UserProfile,
 )
 from app.progress.models import WeightEntry
-from app.recipes.models import UserRecipeFavorite
+from app.meal_plans.models import MealPlan, MealPlanItem
+from app.recipes.models import Recipe, UserRecipeFavorite
 from app.shopping.models import ShoppingList, ShoppingListItem
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,7 @@ class AccountService:
         )
 
         # Optional nutrition logs if table exists in metadata
+        warnings: list[str] = []
         nutrition_logs: list[dict[str, Any]] = []
         try:
             from app.nutrition.models import NutritionLog
@@ -183,6 +185,7 @@ class AccountService:
             ]
         except Exception:
             nutrition_logs = []
+            warnings.append("nutrition_logs_unavailable")
 
         water_entries: list[dict[str, Any]] = []
         try:
@@ -206,9 +209,11 @@ class AccountService:
             ]
         except Exception:
             water_entries = []
+            warnings.append("water_entries_unavailable")
 
         return {
             "exported_at": utcnow().isoformat(),
+            "warnings": warnings,
             "account": {
                 "id": str(user.id),
                 "email": user.email,
@@ -337,7 +342,23 @@ class AccountService:
             raise DeleteConfirmationRequired()
         user_id = user.id
         await self._auth.revoke_all_for_user(user_id, at=utcnow())
-        # Cascade deletes user-owned rows; shared recipes/ingredients remain.
+        plan_ids = select(MealPlan.id).where(MealPlan.user_id == user_id)
+        await self._session.execute(
+            delete(MealPlanItem).where(MealPlanItem.meal_plan_id.in_(plan_ids))
+        )
+        await self._session.execute(
+            delete(MealPlan).where(MealPlan.user_id == user_id)
+        )
+        recipe_ids = select(Recipe.id).where(Recipe.created_by_user_id == user_id)
+        await self._session.execute(
+            delete(UserRecipeFavorite).where(
+                UserRecipeFavorite.recipe_id.in_(recipe_ids)
+            )
+        )
+        await self._session.execute(
+            delete(Recipe).where(Recipe.created_by_user_id == user_id)
+        )
+        # Cascade deletes remaining user-owned rows; shared originals remain.
         await self._auth.delete_user(user)
         await self._session.commit()
         logger.info("account_deleted", extra={"user_id": str(user_id)})

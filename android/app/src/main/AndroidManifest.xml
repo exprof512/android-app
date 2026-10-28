@@ -33,7 +33,7 @@
 
         <receiver
             android:name=".core.notifications.FoodAiAlarmReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.foodai.app.action.REMIND" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
