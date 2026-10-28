@@ -212,27 +212,97 @@ class ProgressService:
             if start_date <= measured <= end_date and measured not in weight_by_day:
                 weight_by_day[measured] = Decimal(str(entry.weight_kg))
 
-        points: list[ProgressSeriesPointOut] = []
-        cursor = start_date
-        while cursor <= end_date:
-            balance = await self._daily_balance(user_id, cursor, goal)
-            weight = weight_by_day.get(cursor)
-            has_activity = (
-                balance.consumed_calories_kcal > 0 or balance.completed_meals > 0
-            )
-            if not has_activity and weight is None:
+        day_count = (end_date - start_date).days + 1
+        days = [start_date + timedelta(days=offset) for offset in range(day_count)]
+
+        # One batched fetch per source instead of compute_day_consumed per day.
+        plan_rows = list(
+            (
+                await self._session.execute(
+                    select(MealPlan).where(
+                        MealPlan.user_id == user_id,
+                        MealPlan.status == "ready",
+                        MealPlan.start_date <= end_date,
+                        MealPlan.end_date >= start_date,
+                    )
+                )
+            ).scalars()
+        )
+        plan_by_day: dict[date, MealPlan] = {}
+        for plan in plan_rows:
+            cursor = max(plan.start_date, start_date)
+            last = min(plan.end_date, end_date)
+            while cursor <= last:
+                plan_by_day.setdefault(cursor, plan)
                 cursor = cursor + timedelta(days=1)
+
+        item_rows = list(
+            (
+                await self._session.execute(
+                    select(MealPlanItem)
+                    .join(MealPlan, MealPlan.id == MealPlanItem.meal_plan_id)
+                    .where(
+                        MealPlan.user_id == user_id,
+                        MealPlan.status == "ready",
+                        MealPlanItem.planned_date >= start_date,
+                        MealPlanItem.planned_date <= end_date,
+                    )
+                )
+            ).scalars()
+        )
+        items_by_day: dict[date, list[MealPlanItem]] = {}
+        for item in item_rows:
+            items_by_day.setdefault(item.planned_date, []).append(item)
+
+        log_rows = list(
+            (
+                await self._session.execute(
+                    select(NutritionLog).where(
+                        NutritionLog.user_id == user_id,
+                        NutritionLog.logged_on >= start_date,
+                        NutritionLog.logged_on <= end_date,
+                    )
+                )
+            ).scalars()
+        )
+        logs_by_day: dict[date, list[NutritionLog]] = {}
+        for row in log_rows:
+            logs_by_day.setdefault(row.logged_on, []).append(row)
+
+        points: list[ProgressSeriesPointOut] = []
+        for day in days:
+            items = items_by_day.get(day, [])
+            completed = [
+                item for item in items
+                if item.status == "completed" or item.is_completed
+            ]
+            consumed = sum(item.calories_kcal for item in completed)
+            protein = sum((item.protein_g for item in completed), Decimal("0"))
+            fat = sum((item.fat_g for item in completed), Decimal("0"))
+            carbs = sum((item.carbohydrate_g for item in completed), Decimal("0"))
+            completed_ids = {item.id for item in completed}
+            for log in logs_by_day.get(day, []):
+                if (
+                    log.meal_plan_item_id is not None
+                    and log.meal_plan_item_id in completed_ids
+                ):
+                    continue
+                consumed += log.calories_kcal
+                protein += log.protein_g
+                fat += log.fat_g
+                carbs += log.carbohydrate_g
+            weight = weight_by_day.get(day)
+            if consumed == 0 and not completed and weight is None:
                 continue
             points.append(
                 ProgressSeriesPointOut(
-                    date=cursor,
-                    consumed_kcal=balance.consumed_calories_kcal,
-                    protein_g=balance.protein_g,
-                    completed_meals=balance.completed_meals,
+                    date=day,
+                    consumed_kcal=int(consumed),
+                    protein_g=protein.quantize(Decimal("0.1")),
+                    completed_meals=len(completed),
                     weight_kg=weight,
                 )
             )
-            cursor = cursor + timedelta(days=1)
         return points
 
     async def _daily_balance(
