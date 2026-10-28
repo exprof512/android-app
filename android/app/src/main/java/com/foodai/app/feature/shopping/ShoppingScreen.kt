@@ -2,6 +2,9 @@ package com.foodai.app.feature.shopping
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,10 +19,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -32,12 +39,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foodai.app.core.network.ShoppingListItemDto
+import com.foodai.app.core.prices.ManualPrice
+import com.foodai.app.core.prices.PriceBookStore
 import com.foodai.app.core.ui.ErrorPane
+import com.foodai.app.core.ui.formatMoney
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.foodEmojiFor
 import com.foodai.app.core.ui.components.FoodAIEmptyState
@@ -84,6 +96,22 @@ fun ShoppingScreen(
     val list = state.list
     var inStore by remember { mutableStateOf(false) }
     val allItems = list?.items.orEmpty()
+    val context = LocalContext.current
+    val priceBook = remember { PriceBookStore(context) }
+    var priceVersion by remember { mutableStateOf(0) }
+    val stores = remember(priceVersion) { priceBook.stores() }
+    val manualPrices = remember(priceVersion) { priceBook.prices() }
+    val activeStore = stores.firstOrNull()
+    var showPrices by remember { mutableStateOf(false) }
+    val manualCount = allItems.count { manualItemCost(it, activeStore, manualPrices) != null }
+    val manualTotal = allItems.sumOf { manualItemCost(it, activeStore, manualPrices) ?: 0.0 }
+    val estimatedTotal = list?.estimatedTotalAmount ?: 0.0
+    val computedTotal = if (manualCount > 0) {
+        val remainingShare = (allItems.size - manualCount).toDouble() / allItems.size.coerceAtLeast(1)
+        manualTotal + estimatedTotal * remainingShare
+    } else {
+        estimatedTotal
+    }
     val visibleItems = if (inStore) allItems.filter { !it.isCompleted } else allItems
     val bought = allItems.count { it.isCompleted }
     val grouped = visibleItems
@@ -108,25 +136,31 @@ fun ShoppingScreen(
             }
             Text("Список покупок", style = FoodAITypography.headlineMedium)
             Text(
-                "Все ингредиенты для твоего плана. Отмечай купленное — и ничего не забудешь!",
+                "Ингредиенты на неделю. Отмечайте купленное.",
                 style = FoodAITypography.bodyMedium,
                 color = FoodAIColors.TextSecondary,
-            )
-            Spacer(Modifier.size(FoodAIDimens.Space8))
-            FoodAITipBanner(
-                tipId = "shopping_check",
-                text = "Отмечай купленное галочкой. Включи «Уже есть дома», чтобы скрыть продукты из кладовой.",
             )
             if (list != null) {
                 Text(
                     "${list.fromDate} — ${list.toDate}",
                     style = FoodAITypography.bodySmall,
+                    color = FoodAIColors.TextSecondary,
                 )
-                list.estimatedTotalAmount?.let { total ->
-                    Text(
-                        "Ориентировочно: ${"%.0f".format(total)} ${currencySymbol(list.currency)}",
-                        style = FoodAITypography.titleMedium,
-                    )
+                Text(
+                    "Итого: ${formatMoney(computedTotal)} ${currencySymbol(list.currency)}",
+                    style = FoodAITypography.titleMedium,
+                )
+                Text(
+                    if (manualCount > 0) {
+                        "Ваши цены · ${activeStore ?: "без магазина"}"
+                    } else {
+                        "Оценка · добавьте свои цены, чтобы точнее"
+                    },
+                    style = FoodAITypography.labelSmall,
+                    color = FoodAIColors.TextSecondary,
+                )
+                TextButton(onClick = { showPrices = true }) {
+                    Text("Мои цены", color = FoodAIColors.Primary)
                 }
             }
             if (list?.stale == true) {
@@ -161,11 +195,6 @@ fun ShoppingScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text("Уже есть дома", style = FoodAITypography.titleSmall)
-                    Text(
-                        "Скрыть из списка продукты, которые ты отметил в кладовой",
-                        style = FoodAITypography.bodySmall,
-                        color = FoodAIColors.TextSecondary,
-                    )
                 }
                 Switch(
                     checked = state.excludePantry,
@@ -249,6 +278,116 @@ fun ShoppingScreen(
             }
         }
     }
+
+    if (showPrices) {
+        PriceBookDialog(
+            stores = stores.ifEmpty {
+                listOf("Пятёрочка", "Магнит", "Лента", "Перекрёсток", "ВкусВилл", "Рынок")
+            },
+            prices = manualPrices,
+            defaultStore = activeStore,
+            onSave = { store, product, price ->
+                priceBook.upsert(store, product, price)
+                priceVersion++
+            },
+            onDelete = { store, product ->
+                priceBook.remove(store, product)
+                priceVersion++
+            },
+            onDismiss = { showPrices = false },
+        )
+    }
+}
+
+@Composable
+private fun PriceBookDialog(
+    stores: List<String>,
+    prices: List<ManualPrice>,
+    defaultStore: String?,
+    onSave: (String, String, Double) -> Unit,
+    onDelete: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var store by remember { mutableStateOf(defaultStore ?: stores.first()) }
+    var product by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Мои цены") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "Цена за 100 г/мл или за штуку — список покупок посчитается по вашим данным.",
+                    style = FoodAITypography.bodySmall,
+                    color = FoodAIColors.TextSecondary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    stores.take(3).forEach { name ->
+                        FilterChip(
+                            selected = store == name,
+                            onClick = { store = name },
+                            label = { Text(name) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FoodAIColors.PrimaryLight,
+                            ),
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = product,
+                    onValueChange = { product = it },
+                    label = { Text("Продукт") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = { price = it },
+                    label = { Text("Цена, ₽") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    onClick = {
+                        val value = price.replace(',', '.').toDoubleOrNull()
+                        if (value != null && value > 0 && product.isNotBlank()) {
+                            onSave(store, product, value)
+                            product = ""
+                            price = ""
+                        }
+                    },
+                ) {
+                    Text("Сохранить", color = FoodAIColors.Primary)
+                }
+                val forStore = prices.filter { it.store == store }
+                if (forStore.isNotEmpty()) {
+                    Text("Сохранённые", style = FoodAITypography.titleSmall)
+                    forStore.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "${row.product} — ${formatMoney(row.price)} ₽",
+                                style = FoodAITypography.bodySmall,
+                            )
+                            TextButton(onClick = { onDelete(row.store, row.product) }) {
+                                Text("Удалить", color = FoodAIColors.TextSecondary)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Готово") }
+        },
+    )
 }
 
 @Composable
@@ -292,6 +431,24 @@ private fun ShoppingRow(
             onCheckedChange = { onToggle() },
             colors = CheckboxDefaults.colors(checkedColor = FoodAIColors.Primary),
         )
+    }
+}
+
+private fun manualItemCost(
+    item: ShoppingListItemDto,
+    store: String?,
+    prices: List<ManualPrice>,
+): Double? {
+    if (store == null) return null
+    val normalized = item.displayName.trim().lowercase()
+    val price = prices.firstOrNull {
+        it.store == store && it.product == normalized
+    }?.price ?: return null
+    return when (item.unit.lowercase()) {
+        "g", "ml" -> price * item.quantityValue / 100.0
+        "kg", "l" -> price * item.quantityValue * 10.0
+        "pcs", "pc", "piece", "pieces" -> price * item.quantityValue
+        else -> null
     }
 }
 

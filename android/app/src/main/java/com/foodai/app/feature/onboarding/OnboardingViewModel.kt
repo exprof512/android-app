@@ -7,6 +7,7 @@ import com.foodai.app.core.auth.toUiMessage
 import com.foodai.app.core.network.ApiException
 import com.foodai.app.core.network.TargetPreviewResponse
 import com.foodai.app.core.network.isComplete
+import com.foodai.app.core.prices.PriceBookStore
 import com.foodai.app.core.profile.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,7 @@ data class OnboardingUiState(
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     private val draftStore: OnboardingDraftStore,
+    private val priceBook: PriceBookStore,
     private val profileRepository: ProfileRepository,
     private val authRepository: AuthRepository,
 ) : ViewModel() {
@@ -56,12 +58,17 @@ class OnboardingViewModel @Inject constructor(
                 profile != null -> profile.toOnboardingDraft(local.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2))
                 else -> local
             }
-            baselineFingerprint = importantFingerprint(draft)
+            val mergedDraft = if (draft.preferredStores.isBlank() && priceBook.stores().isNotEmpty()) {
+                draft.copy(preferredStores = priceBook.stores().joinToString(", "))
+            } else {
+                draft
+            }
+            baselineFingerprint = importantFingerprint(mergedDraft)
             val step = OnboardingStep.formSteps
-                .getOrElse(draft.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2)) { OnboardingStep.Goal }
-            draftStore.save(userId, draft)
+                .getOrElse(mergedDraft.stepIndex.coerceIn(0, OnboardingStep.TOTAL - 2)) { OnboardingStep.Goal }
+            draftStore.save(userId, mergedDraft)
             _state.value = OnboardingUiState(
-                draft = draft,
+                draft = mergedDraft,
                 step = step,
                 hydrating = false,
             )
@@ -168,6 +175,9 @@ class OnboardingViewModel @Inject constructor(
             try {
                 val userId = authRepository.currentUser()?.id
                 val body = _state.value.draft.toUpdateRequest()
+                priceBook.saveStores(
+                    _state.value.draft.splitCsv(_state.value.draft.preferredStores).toSet(),
+                )
                 profileRepository.updateProfile(body)
                 if (shouldGenerate) {
                     profileRepository.generateFirstPlan(days = 7, force = true)
