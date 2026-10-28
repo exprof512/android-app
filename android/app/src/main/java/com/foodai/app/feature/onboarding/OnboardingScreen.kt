@@ -68,6 +68,7 @@ private const val DISCLAIMER =
 fun OnboardingRoute(
     generatePlan: Boolean = true,
     onFinished: () -> Unit,
+    onCancel: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -108,6 +109,7 @@ fun OnboardingRoute(
         onBack = viewModel::back,
         onNext = viewModel::next,
         onRefreshPreview = viewModel::refreshPreview,
+        onCancel = onCancel,
     )
 }
 
@@ -118,16 +120,27 @@ fun OnboardingScreen(
     onBack: () -> Unit,
     onNext: () -> Unit,
     onRefreshPreview: () -> Unit,
+    onCancel: () -> Unit,
 ) {
+    val editMode = !state.generatePlan
     val stepNumber = state.step.index + 1
     OnboardingScaffold(
         step = stepNumber,
         total = OnboardingStep.TOTAL,
-        title = state.step.title,
-        subtitle = state.step.subtitle,
-        onBack = if (state.step == OnboardingStep.Goal || state.isSubmitting) null else onBack,
-        primaryLabel = when (state.step) {
-            OnboardingStep.Pantry -> "Создать план"
+        title = if (editMode) "Анкета питания" else state.step.title,
+        subtitle = if (editMode) {
+            "Обновите данные — цель и план пересчитаются."
+        } else {
+            state.step.subtitle
+        },
+        onBack = when {
+            state.isSubmitting -> null
+            state.step == OnboardingStep.Goal -> if (editMode) onCancel else null
+            else -> onBack
+        },
+        primaryLabel = when {
+            state.step == OnboardingStep.Pantry && editMode -> "Сохранить"
+            state.step == OnboardingStep.Pantry -> "Создать план"
             else -> "Далее"
         },
         onPrimary = onNext,
@@ -196,7 +209,7 @@ private fun GoalStep(
             },
         )
     }
-    FoodAIInfoCard(text = "Ты всегда можешь изменить цель в настройках профиля")
+    FoodAIInfoCard(text = "Цель можно изменить позже: Профиль → Мои данные → анкета питания")
 }
 
 @Composable

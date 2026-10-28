@@ -132,9 +132,14 @@ fun FoodAiNavHost() {
             val generatePlan = entry.arguments?.getBoolean("generatePlan") ?: true
             OnboardingRoute(
                 generatePlan = generatePlan,
+                onCancel = { navController.popBackStack() },
                 onFinished = {
-                    navController.navigate(Routes.Main) {
-                        popUpTo(Routes.OnboardingRoute) { inclusive = true }
+                    if (generatePlan) {
+                        navController.navigate(Routes.Main) {
+                            popUpTo(Routes.OnboardingRoute) { inclusive = true }
+                        }
+                    } else {
+                        navController.popBackStack()
                     }
                 },
             )

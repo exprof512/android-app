@@ -61,7 +61,6 @@ import com.foodai.app.core.ui.theme.FoodAITypography
 @Composable
 fun SettingsRoute(
     onBack: () -> Unit,
-    onEditQuestionnaire: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -208,13 +207,8 @@ fun SettingsRoute(
                     }
                 }
             }
-            FoodAIPrimaryButton(
-                label = "Изменить анкету питания",
-                onClick = onEditQuestionnaire,
-                showArrow = true,
-            )
             FoodAIInfoCard(
-                text = "Анкету можно обновить в любой момент — план пересчитается при следующем «Пересобрать».",
+                text = "Анкета питания и цель меняются в разделе «Мои данные».",
             )
         }
     }
@@ -409,7 +403,7 @@ fun ProfileDetailsRoute(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Редактировать профиль") },
+                title = { Text("Мои данные") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -430,7 +424,7 @@ fun ProfileDetailsRoute(
         ) {
             FoodAITipBanner(
                 tipId = "profile_edit",
-                text = "Имя и фото хранятся на устройстве. Анкета питания (вес, цели) — отдельно в «Мои данные».",
+                text = "Имя и фото хранятся на устройстве. Параметры питания и цель меняются в анкете ниже.",
             )
             Box(contentAlignment = Alignment.BottomEnd) {
                 FoodAIAvatar(

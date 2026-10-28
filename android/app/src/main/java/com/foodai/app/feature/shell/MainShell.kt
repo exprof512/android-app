@@ -266,7 +266,6 @@ fun MainShell(
             composable("settings") {
                 com.foodai.app.feature.profile.SettingsRoute(
                     onBack = { navController.popBackStack() },
-                    onEditQuestionnaire = onEditQuestionnaire,
                 )
             }
             composable("notifications") {
@@ -451,7 +450,7 @@ private fun ProfileHomeRoute(
         }
 
         if (goal != null) {
-            FoodAICard {
+            FoodAICard(onClick = onOpenDetails) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.TrackChanges, null, tint = FoodAIColors.Primary)
                     Spacer(Modifier.size(FoodAIDimens.Space8))
@@ -462,12 +461,7 @@ private fun ProfileHomeRoute(
                             style = FoodAITypography.bodySmall,
                         )
                     }
-                    Text(
-                        "Изменить",
-                        color = FoodAIColors.Primary,
-                        style = FoodAITypography.labelMedium,
-                        modifier = Modifier.clickable(onClick = onEditQuestionnaire),
-                    )
+                    Icon(Icons.Outlined.ChevronRight, null, tint = FoodAIColors.TextMuted)
                 }
                 Spacer(Modifier.height(FoodAIDimens.Space12))
                 FoodAILinearProgress(
@@ -549,9 +543,9 @@ private fun ProfileHomeRoute(
         )
         ProfileMenuItem(
             "Мои данные",
-            "Возраст, рост, вес, цели — анкета питания",
+            "Возраст, рост, вес и анкета питания",
             Icons.Outlined.Person,
-            onEditQuestionnaire,
+            onOpenDetails,
         )
         ProfileMenuItem(
             "Уведомления",
