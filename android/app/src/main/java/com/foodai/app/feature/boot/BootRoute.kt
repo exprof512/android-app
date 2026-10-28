@@ -1,5 +1,6 @@
 package com.foodai.app.feature.boot
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,6 +14,7 @@ import com.foodai.app.core.profile.ProfileRepository
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,7 +32,9 @@ sealed interface BootDestination {
 class BootViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
+    private val prefs = context.getSharedPreferences("foodai_boot", Context.MODE_PRIVATE)
     private val _destination = MutableStateFlow<BootDestination>(BootDestination.Loading)
     val destination: StateFlow<BootDestination> = _destination.asStateFlow()
 
@@ -51,13 +55,20 @@ class BootViewModel @Inject constructor(
             }
             try {
                 val profile = profileRepository.getProfile()
-                _destination.value = if (profile.isComplete()) {
+                val complete = profile.isComplete()
+                prefs.edit().putBoolean("profile_complete", complete).apply()
+                _destination.value = if (complete) {
                     BootDestination.Main
                 } else {
                     BootDestination.Onboarding
                 }
             } catch (error: Exception) {
-                _destination.value = BootDestination.Error(error.message ?: "Ошибка профиля")
+                if (prefs.getBoolean("profile_complete", false)) {
+                    // Offline cold start: profile was complete on the last sync.
+                    _destination.value = BootDestination.Main
+                } else {
+                    _destination.value = BootDestination.Error(error.message ?: "Ошибка профиля")
+                }
             }
         }
     }
