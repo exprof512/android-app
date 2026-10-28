@@ -350,23 +350,31 @@ async def test_substitution_copy_is_reused_between_users(
     await register(client, "sub-a@example.com")
     await register(client, "sub-b@example.com")
     user_a = await _user_by_email(session, "sub-a@example.com")
+    user_a_id = user_a.id
     user_b = await _user_by_email(session, "sub-b@example.com")
+    user_b_id = user_b.id
+    recipe_id = recipe.id
 
-    session.add(UserRecipeFavorite(user_id=user_a.id, recipe_id=recipe.id))
+    session.add(UserRecipeFavorite(user_id=user_a_id, recipe_id=recipe_id))
     await session.commit()
 
     payload = IngredientSubstitutionApplyRequest(
         original_name="Рис", replacement_name="Куриная грудка"
     )
-    first = await recipe_service.apply_substitution(user_a.id, recipe.id, payload)
-    assert first.id != recipe.id
-    assert first.created_by_user_id == user_a.id
+    first = await recipe_service.apply_substitution(user_a_id, recipe_id, payload)
+    assert first.id != recipe_id
+    assert first.created_by_user_id == user_a_id
     assert any(
         item.display_name == "Куриная грудка" for item in first.ingredients
     )
 
-    session.add(UserRecipeFavorite(user_id=user_b.id, recipe_id=recipe.id))
+    session.add(UserRecipeFavorite(user_id=user_b_id, recipe_id=recipe_id))
     await session.commit()
-    second = await recipe_service.apply_substitution(user_b.id, recipe.id, payload)
+    session.add(UserRecipeFavorite(user_id=user_a_id, recipe_id=recipe_id))
+    await session.commit()
+    again = await recipe_service.apply_substitution(user_a_id, recipe_id, payload)
+    assert again.id == first.id
 
-    assert second.id == first.id
+    second = await recipe_service.apply_substitution(user_b_id, recipe_id, payload)
+    assert second.id != first.id
+    assert second.created_by_user_id == user_b_id

@@ -8,7 +8,7 @@ from uuid import UUID
 
 from decimal import Decimal
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -183,13 +183,19 @@ class RecipeService:
             if ingredients_copy.cost_amount is not None:
                 cost += ingredients_copy.cost_amount
 
+        suffix = " · ваш вариант"
+        new_name = source.name if source.name.endswith(suffix) else f"{source.name}{suffix}"
+        new_steps = [
+            step.replace(target.display_name, replacement.canonical_name)
+            for step in source.steps
+        ]
         servings = Decimal(source.servings)
         recipe = Recipe(
             created_by_user_id=user_id,
-            name=source.name,
+            name=new_name,
             description=source.description,
             recipe_fingerprint=recipe_fingerprint(
-                name=source.name,
+                name=f"{new_name}#{user_id}",
                 cooking_method=source.cooking_method,
                 servings=source.servings,
                 ingredients=[(row.ingredient_id, row.quantity_g) for row in rows],
@@ -203,7 +209,7 @@ class RecipeService:
             carbohydrate_g=(carbs / servings).quantize(Decimal("0.01")),
             estimated_cost_amount=(cost / servings).quantize(Decimal("0.01")),
             currency=source.currency,
-            steps=list(source.steps),
+            steps=new_steps,
             status="ready",
             ai_model=source.ai_model,
             ingredients=rows,
@@ -243,14 +249,31 @@ class RecipeService:
                 recipe.estimated_cost_amount * servings
             ).quantize(Decimal("0.01"))
 
-        await self._session.execute(
-            update(UserRecipeFavorite)
-            .where(
-                UserRecipeFavorite.user_id == user_id,
-                UserRecipeFavorite.recipe_id == recipe_id,
-            )
-            .values(recipe_id=recipe.id)
-        )
+        if recipe.id != recipe_id:
+            already_favorite = (
+                await self._session.execute(
+                    select(UserRecipeFavorite.recipe_id).where(
+                        UserRecipeFavorite.user_id == user_id,
+                        UserRecipeFavorite.recipe_id == recipe.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if already_favorite is not None:
+                await self._session.execute(
+                    delete(UserRecipeFavorite).where(
+                        UserRecipeFavorite.user_id == user_id,
+                        UserRecipeFavorite.recipe_id == recipe_id,
+                    )
+                )
+            else:
+                await self._session.execute(
+                    update(UserRecipeFavorite)
+                    .where(
+                        UserRecipeFavorite.user_id == user_id,
+                        UserRecipeFavorite.recipe_id == recipe_id,
+                    )
+                    .values(recipe_id=recipe.id)
+                )
         await self._session.execute(
             update(ShoppingList)
             .where(
