@@ -199,6 +199,9 @@ class ShoppingService:
                     quantity_value=bucket["quantity_value"].quantize(Decimal("0.01")),
                     unit=bucket["unit"],
                     source_recipe_count=bucket["source_recipe_count"],
+                    estimated_cost_amount=bucket["estimated_cost"].quantize(
+                        Decimal("0.01")
+                    ),
                 )
                 for bucket in sorted(
                     aggregated.values(), key=lambda row: row["display_name"].lower()
@@ -287,13 +290,19 @@ class ShoppingService:
                 estimated_cost=(
                     cost_map.get((item.normalized_name, item.unit))
                     if cost_map is not None
-                    else None
+                    else item.estimated_cost_amount
                 ),
             )
             for item in shopping_list.items
         ]
         estimated_total = shopping_list.estimated_total_amount
-        if estimated_total is None and cost_map:
+        if estimated_total is None:
+            estimated_total = sum(
+                (item.estimated_cost_amount or Decimal("0")
+                 for item in shopping_list.items),
+                Decimal("0"),
+            ).quantize(Decimal("0.01"))
+        if estimated_total == 0 and cost_map:
             estimated_total = sum(cost_map.values(), Decimal("0")).quantize(
                 Decimal("0.01")
             )

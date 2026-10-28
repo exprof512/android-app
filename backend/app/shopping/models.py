@@ -91,5 +91,6 @@ class ShoppingListItem(UuidPrimaryKeyMixin, TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     source_recipe_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    estimated_cost_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
 
     shopping_list: Mapped[ShoppingList] = relationship(back_populates="items")

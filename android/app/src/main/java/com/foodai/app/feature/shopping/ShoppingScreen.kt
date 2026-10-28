@@ -106,12 +106,10 @@ fun ShoppingScreen(
     val manualCount = allItems.count { manualItemCost(it, activeStore, manualPrices) != null }
     val manualTotal = allItems.sumOf { manualItemCost(it, activeStore, manualPrices) ?: 0.0 }
     val estimatedTotal = list?.estimatedTotalAmount ?: 0.0
-    val computedTotal = if (manualCount > 0) {
-        val remainingShare = (allItems.size - manualCount).toDouble() / allItems.size.coerceAtLeast(1)
-        manualTotal + estimatedTotal * remainingShare
-    } else {
-        estimatedTotal
+    val itemTotal = allItems.sumOf {
+        manualItemCost(it, activeStore, manualPrices) ?: it.estimatedCostAmount ?: 0.0
     }
+    val computedTotal = if (itemTotal > 0) itemTotal else estimatedTotal
     val visibleItems = if (inStore) allItems.filter { !it.isCompleted } else allItems
     val bought = allItems.count { it.isCompleted }
     val grouped = visibleItems
