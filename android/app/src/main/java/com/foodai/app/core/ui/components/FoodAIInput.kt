@@ -267,7 +267,7 @@ fun FoodAIChip(
                 Icon(
                     Icons.Filled.Check,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = FoodAIColors.TextOnPrimary,
                     modifier = Modifier.size(12.dp),
                 )
             }

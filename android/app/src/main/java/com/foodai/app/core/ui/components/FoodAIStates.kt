@@ -47,15 +47,15 @@ fun FoodAIToast(
     onDismiss: (() -> Unit)? = null,
 ) {
     val bg = when (kind) {
-        FoodAIToastKind.Success -> FoodAIColors.PrimarySoft
-        FoodAIToastKind.Info -> Color(0xFFE8F1FF)
-        FoodAIToastKind.Warning -> Color(0xFFFFF4E5)
-        FoodAIToastKind.Error -> Color(0xFFFEECEC)
+        FoodAIToastKind.Success -> FoodAIColors.PrimaryLight
+        FoodAIToastKind.Info -> FoodAIColors.SurfaceMuted
+        FoodAIToastKind.Warning -> FoodAIColors.Warning.copy(alpha = 0.16f)
+        FoodAIToastKind.Error -> FoodAIColors.Error.copy(alpha = 0.12f)
     }
     val fg = when (kind) {
-        FoodAIToastKind.Success -> FoodAIColors.PrimaryDark
-        FoodAIToastKind.Info -> Color(0xFF1D4ED8)
-        FoodAIToastKind.Warning -> Color(0xFFB45309)
+        FoodAIToastKind.Success -> FoodAIColors.Primary
+        FoodAIToastKind.Info -> FoodAIColors.TextSecondary
+        FoodAIToastKind.Warning -> FoodAIColors.Warning
         FoodAIToastKind.Error -> FoodAIColors.Error
     }
     val icon: ImageVector = when (kind) {
@@ -97,7 +97,7 @@ fun FoodAIDangerButton(
             shape = FoodAIShapes.Button,
             colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                 containerColor = FoodAIColors.Error,
-                contentColor = Color.White,
+                contentColor = FoodAIColors.TextOnPrimary,
             ),
         ) {
             Text(label, style = FoodAITypography.labelLarge)
@@ -131,7 +131,7 @@ fun FoodAILoadingButton(
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(
-            color = Color.White,
+            color = FoodAIColors.TextOnPrimary,
             strokeWidth = 2.dp,
             modifier = Modifier.size(22.dp),
         )
@@ -152,7 +152,7 @@ fun FoodAIStatusDot(
         contentAlignment = Alignment.Center,
     ) {
         when {
-            complete -> Icon(Icons.Filled.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+            complete -> Icon(Icons.Filled.Check, null, tint = FoodAIColors.TextOnPrimary, modifier = Modifier.size(14.dp))
             loading -> CircularProgressIndicator(
                 modifier = Modifier.size(14.dp),
                 strokeWidth = 2.dp,

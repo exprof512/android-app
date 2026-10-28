@@ -215,7 +215,7 @@ fun SelectionIndicator(selected: Boolean) {
             Icon(
                 imageVector = Icons.Filled.Check,
                 contentDescription = "Выбрано",
-                tint = Color.White,
+                tint = FoodAIColors.TextOnPrimary,
                 modifier = Modifier.size(14.dp),
             )
         }

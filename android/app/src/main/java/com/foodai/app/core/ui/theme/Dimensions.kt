@@ -16,7 +16,7 @@ object FoodAIDimens {
     val Space48: Dp = 48.dp
 
     /** Horizontal screen padding used on onboarding / welcome. */
-    val ScreenPadding: Dp = 20.dp
+    val ScreenPadding: Dp = 22.dp
 
     val Radius12: Dp = 12.dp
     val Radius16: Dp = 16.dp

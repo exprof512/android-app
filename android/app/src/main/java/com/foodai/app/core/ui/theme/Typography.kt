@@ -6,105 +6,102 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+/**
+ * Sans-serif type scale with clear weight hierarchy. Colors are intentionally
+ * omitted so MaterialTheme's onSurface / onSurfaceVariant drive contrast in
+ * both light and dark modes.
+ */
 private val Sans = FontFamily.SansSerif
 
 val FoodAITypography = Typography(
     displayLarge = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
-        color = FoodAIColors.TextPrimary,
+        fontSize = 36.sp,
+        lineHeight = 42.sp,
+        letterSpacing = (-0.5).sp,
     ),
     displayMedium = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Bold,
-        fontSize = 30.sp,
-        lineHeight = 36.sp,
-        color = FoodAIColors.TextPrimary,
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
+        letterSpacing = (-0.4).sp,
     ),
     headlineLarge = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Bold,
         fontSize = 28.sp,
         lineHeight = 34.sp,
-        color = FoodAIColors.TextPrimary,
+        letterSpacing = (-0.3).sp,
     ),
     headlineMedium = TextStyle(
         fontFamily = Sans,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp,
         lineHeight = 30.sp,
-        color = FoodAIColors.TextPrimary,
+        letterSpacing = (-0.2).sp,
     ),
     headlineSmall = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.SemiBold,
         fontSize = 20.sp,
         lineHeight = 26.sp,
-        color = FoodAIColors.TextPrimary,
     ),
     titleLarge = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp,
-        lineHeight = 24.sp,
-        color = FoodAIColors.TextPrimary,
+        fontSize = 19.sp,
+        lineHeight = 26.sp,
     ),
     titleMedium = TextStyle(
         fontFamily = Sans,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Medium,
         fontSize = 16.sp,
         lineHeight = 22.sp,
-        color = FoodAIColors.TextPrimary,
     ),
     titleSmall = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
-        color = FoodAIColors.TextPrimary,
     ),
     bodyLarge = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
-        color = FoodAIColors.TextPrimary,
     ),
     bodyMedium = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp,
-        color = FoodAIColors.TextSecondary,
+        lineHeight = 21.sp,
     ),
     bodySmall = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        color = FoodAIColors.TextSecondary,
+        fontSize = 12.5.sp,
+        lineHeight = 18.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
+        fontSize = 15.sp,
         lineHeight = 20.sp,
-        color = FoodAIColors.TextPrimary,
     ),
     labelMedium = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
-        color = FoodAIColors.TextSecondary,
+        letterSpacing = 0.2.sp,
     ),
     labelSmall = TextStyle(
         fontFamily = Sans,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
-        lineHeight = 14.sp,
-        color = FoodAIColors.TextMuted,
+        lineHeight = 15.sp,
+        letterSpacing = 0.2.sp,
     ),
 )

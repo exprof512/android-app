@@ -533,7 +533,7 @@ private fun DayProgressCard(
             label = "Углеводы",
             current = (carbs?.consumedG ?: 0.0).toInt(),
             target = (carbs?.targetG ?: fallbackTargets?.carbohydrateG ?: 0.0).toInt(),
-            color = androidx.compose.ui.graphics.Color(0xFF8B7CF6),
+            color = FoodAIColors.Gold,
         )
     }
 }
@@ -778,18 +778,20 @@ private fun WeightDialog(
 
 @Composable
 private fun CalorieRing(progress: Float, eaten: Int, target: Int) {
+    val trackColor = FoodAIColors.Divider
+    val activeColor = FoodAIColors.Primary
     Box(contentAlignment = Alignment.Center, modifier = Modifier.size(96.dp)) {
         androidx.compose.foundation.Canvas(modifier = Modifier.size(96.dp)) {
             val stroke = 10.dp.toPx()
             drawArc(
-                color = FoodAIColors.Divider,
+                color = trackColor,
                 startAngle = -90f,
                 sweepAngle = 360f,
                 useCenter = false,
                 style = Stroke(width = stroke, cap = StrokeCap.Round),
             )
             drawArc(
-                color = FoodAIColors.Primary,
+                color = activeColor,
                 startAngle = -90f,
                 sweepAngle = 360f * progress.coerceIn(0f, 1f),
                 useCenter = false,

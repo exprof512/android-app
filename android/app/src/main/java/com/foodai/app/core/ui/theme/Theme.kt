@@ -1,15 +1,19 @@
 package com.foodai.app.core.ui.theme
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -35,7 +39,6 @@ class ThemePreferences @Inject constructor(
         if (raw != null) {
             return runCatching { ThemeMode.valueOf(raw) }.getOrDefault(ThemeMode.SYSTEM)
         }
-        // Migrate legacy prefer_system_theme boolean.
         return if (prefs.getBoolean("prefer_system_theme", true)) ThemeMode.SYSTEM else ThemeMode.LIGHT
     }
 
@@ -66,8 +69,7 @@ class UnitPreferences @Inject constructor(
         return if (_metric.value) {
             "${kg.toInt()} кг"
         } else {
-            val lb = kg * 2.2046226218
-            String.format("%.1f lb", lb)
+            String.format("%.1f lb", kg * 2.2046226218)
         }
     }
 
@@ -77,41 +79,56 @@ class UnitPreferences @Inject constructor(
     }
 }
 
-private val LightColors = lightColorScheme(
-    primary = FoodAIColors.Primary,
-    onPrimary = FoodAIColors.TextOnPrimary,
-    primaryContainer = FoodAIColors.PrimaryLight,
-    onPrimaryContainer = FoodAIColors.PrimaryDark,
-    secondary = FoodAIColors.PrimaryDark,
-    onSecondary = FoodAIColors.TextOnPrimary,
-    background = FoodAIColors.Background,
-    onBackground = FoodAIColors.TextPrimary,
-    surface = FoodAIColors.Surface,
-    onSurface = FoodAIColors.TextPrimary,
-    surfaceVariant = FoodAIColors.PrimarySoft,
-    onSurfaceVariant = FoodAIColors.TextSecondary,
-    outline = FoodAIColors.Divider,
-    error = FoodAIColors.Error,
-    onError = FoodAIColors.TextOnPrimary,
+private val LightScheme = lightColorScheme(
+    primary = LightPalette.primary,
+    onPrimary = LightPalette.onPrimary,
+    primaryContainer = LightPalette.primaryLight,
+    onPrimaryContainer = LightPalette.primaryDark,
+    secondary = LightPalette.primaryDark,
+    onSecondary = LightPalette.onPrimary,
+    tertiary = LightPalette.warning,
+    onTertiary = LightPalette.onPrimary,
+    background = LightPalette.background,
+    onBackground = LightPalette.textPrimary,
+    surface = LightPalette.surface,
+    onSurface = LightPalette.textPrimary,
+    surfaceVariant = LightPalette.surfaceMuted,
+    onSurfaceVariant = LightPalette.textSecondary,
+    outline = LightPalette.divider,
+    outlineVariant = LightPalette.divider,
+    error = LightPalette.error,
+    onError = LightPalette.onPrimary,
 )
 
-private val DarkColors = darkColorScheme(
-    primary = FoodAIColors.Primary,
-    onPrimary = Color.White,
-    primaryContainer = FoodAIColors.PrimaryDark,
-    onPrimaryContainer = FoodAIColors.PrimaryLight,
-    secondary = FoodAIColors.PrimaryLight,
-    onSecondary = FoodAIColors.PrimaryDark,
-    background = Color(0xFF0F1412),
-    onBackground = FoodAIColors.Background,
-    surface = Color(0xFF171C1A),
-    onSurface = FoodAIColors.Background,
-    surfaceVariant = Color(0xFF1E2622),
-    onSurfaceVariant = FoodAIColors.PrimaryLight,
-    outline = Color(0xFF3A4440),
-    error = Color(0xFFF97066),
-    onError = FoodAIColors.PrimaryDark,
+private val DarkScheme = darkColorScheme(
+    primary = DarkPalette.primary,
+    onPrimary = DarkPalette.onPrimary,
+    primaryContainer = DarkPalette.primaryLight,
+    onPrimaryContainer = DarkPalette.primary,
+    secondary = DarkPalette.primary,
+    onSecondary = DarkPalette.onPrimary,
+    tertiary = DarkPalette.warning,
+    onTertiary = DarkPalette.background,
+    background = DarkPalette.background,
+    onBackground = DarkPalette.textPrimary,
+    surface = DarkPalette.surface,
+    onSurface = DarkPalette.textPrimary,
+    surfaceVariant = DarkPalette.surfaceMuted,
+    onSurfaceVariant = DarkPalette.textSecondary,
+    outline = DarkPalette.divider,
+    outlineVariant = DarkPalette.divider,
+    error = DarkPalette.error,
+    onError = DarkPalette.onPrimary,
 )
+
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return current as? Activity
+}
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -120,10 +137,8 @@ interface ThemePreferencesEntryPoint {
 }
 
 @Composable
-fun FoodAiTheme(
-    content: @Composable () -> Unit,
-) {
-    val context = LocalContext.current
+fun FoodAiTheme(content: @Composable () -> Unit) {
+    val context = LocalView.current.context
     val prefs = EntryPointAccessors.fromApplication(
         context.applicationContext,
         ThemePreferencesEntryPoint::class.java,
@@ -135,10 +150,22 @@ fun FoodAiTheme(
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
-    MaterialTheme(
-        colorScheme = if (useDark) DarkColors else LightColors,
-        typography = FoodAITypography,
-        shapes = FoodAIMaterialShapes,
-        content = content,
-    )
+    val palette = if (useDark) DarkPalette else LightPalette
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = context.findActivity()?.window ?: return@SideEffect
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !useDark
+            controller.isAppearanceLightNavigationBars = !useDark
+        }
+    }
+    CompositionLocalProvider(LocalFoodAPalette provides palette) {
+        MaterialTheme(
+            colorScheme = if (useDark) DarkScheme else LightScheme,
+            typography = FoodAITypography,
+            shapes = FoodAIMaterialShapes,
+            content = content,
+        )
+    }
 }

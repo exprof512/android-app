@@ -1,5 +1,7 @@
 package com.foodai.app.core.ui.components
 
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -235,7 +237,7 @@ fun FoodAINavigationBar(
                     Icon(
                         imageVector = Icons.Outlined.AutoAwesome,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = FoodAIColors.TextOnPrimary,
                         modifier = Modifier.size(24.dp),
                     )
                 }
@@ -262,6 +264,14 @@ private fun androidx.compose.foundation.layout.RowScope.NavBarSlot(
     onSelect: (String) -> Unit,
 ) {
     val selected = currentRoute == item.route
+    val tint by animateColorAsState(
+        targetValue = if (selected) FoodAIColors.Primary else FoodAIColors.TextMuted,
+        label = "navTint",
+    )
+    val pill by animateColorAsState(
+        targetValue = if (selected) FoodAIColors.NavSelected else Color.Transparent,
+        label = "navPill",
+    )
     Column(
         modifier = Modifier
             .weight(1f)
@@ -274,15 +284,24 @@ private fun androidx.compose.foundation.layout.RowScope.NavBarSlot(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            item.icon,
-            contentDescription = null,
-            tint = if (selected) FoodAIColors.Primary else FoodAIColors.TextMuted,
-            modifier = Modifier.size(22.dp),
-        )
+        Box(
+            modifier = Modifier
+                .clip(FoodAIShapes.Pill)
+                .background(pill)
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                item.icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Spacer(Modifier.height(2.dp))
         Text(
             item.label,
-            color = if (selected) FoodAIColors.Primary else FoodAIColors.TextMuted,
+            color = tint,
             style = FoodAITypography.labelSmall,
             maxLines = 1,
             softWrap = false,
@@ -337,7 +356,7 @@ fun FoodAIFoodTile(
                 Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = FoodAIColors.TextOnPrimary,
                     modifier = Modifier.size(12.dp),
                 )
             }
