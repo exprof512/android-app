@@ -26,6 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,7 +82,11 @@ fun ShoppingScreen(
     onBack: (() -> Unit)? = null,
 ) {
     val list = state.list
-    val grouped = list?.items.orEmpty()
+    var inStore by remember { mutableStateOf(false) }
+    val allItems = list?.items.orEmpty()
+    val visibleItems = if (inStore) allItems.filter { !it.isCompleted } else allItems
+    val bought = allItems.count { it.isCompleted }
+    val grouped = visibleItems
         .groupBy { categoryLabel(it.category, it.displayName) }
         .toSortedMap()
     LazyColumn(
@@ -171,6 +178,29 @@ fun ShoppingScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Режим магазина", style = FoodAITypography.titleSmall)
+                    Text(
+                        if (inStore) {
+                            "Осталось купить: ${allItems.size - bought} из ${allItems.size}"
+                        } else {
+                            "Скрыть купленное и идти по списку"
+                        },
+                        style = FoodAITypography.bodySmall,
+                        color = FoodAIColors.TextSecondary,
+                    )
+                }
+                Switch(
+                    checked = inStore,
+                    onCheckedChange = { inStore = it },
+                    colors = SwitchDefaults.colors(checkedTrackColor = FoodAIColors.Primary),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TextButton(onClick = onRegenerate, enabled = !state.regenerating) {
                     Text(
                         if (state.regenerating) "Собираем…" else "Пересобрать список",
@@ -252,7 +282,7 @@ private fun ShoppingRow(
                 color = if (item.isCompleted) FoodAIColors.TextSecondary else FoodAIColors.TextPrimary,
             )
             Text(
-                "${formatQty(item.quantityValue)} ${item.unit}" +
+                "${formatQty(item.quantityValue)} ${unitLabel(item.unit)}" +
                     if (item.sourceRecipeCount > 1) " · ${item.sourceRecipeCount} рецепта" else "",
                 style = FoodAITypography.bodySmall,
             )
@@ -267,6 +297,17 @@ private fun ShoppingRow(
 
 private fun formatQty(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
+
+private fun unitLabel(unit: String): String = when (unit.lowercase()) {
+    "g", "gr", "gram" -> "г"
+    "kg" -> "кг"
+    "ml" -> "мл"
+    "l" -> "л"
+    "pcs", "pc", "piece", "pieces" -> "шт"
+    "tbsp" -> "ст. л."
+    "tsp" -> "ч. л."
+    else -> unit
+}
 
 private fun currencySymbol(code: String): String = when (code.uppercase()) {
     "RUB", "RUR" -> "₽"

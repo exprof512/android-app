@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.auth.dependencies import CurrentUser
 from app.progress.dependencies import get_progress_service
-from app.progress.schemas import ProgressSummaryOut, WeightEntryCreate, WeightEntryOut
+from app.progress.schemas import (
+    ProgressSummaryOut,
+    StreakOut,
+    WeightEntryCreate,
+    WeightEntryOut,
+)
 from app.progress.service import ProgressService
 
 router = APIRouter(tags=["progress"])
@@ -35,6 +40,14 @@ async def list_weight_entries(
     service: ProgressService = Depends(get_progress_service),
 ) -> list[WeightEntryOut]:
     return await service.list_weight_entries(user.id, from_at=from_, to_at=to)
+
+
+@router.get("/progress/streak", response_model=StreakOut)
+async def progress_streak(
+    user: CurrentUser,
+    service: ProgressService = Depends(get_progress_service),
+) -> StreakOut:
+    return await service.streak(user.id)
 
 
 @router.get("/progress/summary", response_model=ProgressSummaryOut)

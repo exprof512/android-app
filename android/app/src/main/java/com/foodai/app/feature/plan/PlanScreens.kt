@@ -73,6 +73,7 @@ import com.foodai.app.core.ui.RecipeImagePane
 import com.foodai.app.core.ui.displayRecipeName
 import com.foodai.app.core.ui.components.FoodAICard
 import com.foodai.app.core.ui.components.FoodAIEmptyState
+import com.foodai.app.core.ui.daysWord
 import com.foodai.app.core.ui.formatKcal
 import com.foodai.app.core.ui.formatMoney
 import com.foodai.app.core.ui.components.FoodAIMacroBar
@@ -292,6 +293,14 @@ fun TodayScreen(
                         style = FoodAITypography.bodyMedium,
                         color = FoodAIColors.TextSecondary,
                     )
+                    if (state.streakDays > 0) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "🔥 ${state.streakDays} ${daysWord(state.streakDays)} подряд",
+                            style = FoodAITypography.labelMedium,
+                            color = FoodAIColors.Primary,
+                        )
+                    }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onOpenDiary) {

@@ -68,3 +68,9 @@ class ProgressSummaryOut(BaseModel):
         "FoodAI не гарантирует результат по весу."
     )
     warnings: list[str] = Field(default_factory=list)
+
+
+class StreakOut(BaseModel):
+    current_days: int = 0
+    best_days: int = 0
+    last_active_date: date | None = None

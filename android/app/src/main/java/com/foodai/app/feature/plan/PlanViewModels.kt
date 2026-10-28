@@ -48,6 +48,7 @@ data class TodayUiState(
     val lastUpdatedEpochMs: Long = 0L,
     val error: String? = null,
     val offlineCached: Boolean = false,
+    val streakDays: Int = 0,
     val missingPlan: Boolean = false,
     val actionError: String? = null,
     val infoMessage: String? = null,
@@ -169,6 +170,7 @@ class TodayViewModel @Inject constructor(
                 }
                 val logsResult = runCatching { nutritionApi.listLogs(date.toString()) }
                 val logs = logsResult.getOrNull()
+                val streak = runCatching { progress.streak() }.getOrNull()
                 if (generation != refreshGeneration) return@launch
                 _state.value = TodayUiState(
                     loading = false,
@@ -179,6 +181,7 @@ class TodayViewModel @Inject constructor(
                     water = water,
                     nutritionLogs = logs ?: _state.value.nutritionLogs,
                     selectedDate = date.toString(),
+                    streakDays = streak?.currentDays ?: 0,
                     lastUpdatedEpochMs = System.currentTimeMillis(),
                     aiPreview = _state.value.aiPreview,
                     actionError = _state.value.actionError,

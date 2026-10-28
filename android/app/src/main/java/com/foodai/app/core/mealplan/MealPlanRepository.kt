@@ -1,5 +1,6 @@
 package com.foodai.app.core.mealplan
 
+import android.content.Context
 import com.foodai.app.core.network.ApiErrorParser
 import com.foodai.app.core.network.DishCardDto
 import com.foodai.app.core.network.MealPlanApi
@@ -14,7 +15,9 @@ import com.foodai.app.core.sync.DomainEvent
 import com.foodai.app.core.sync.SelectedDateStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,7 +41,12 @@ class MealPlanRepository @Inject constructor(
     private val recipeApi: RecipeApi,
     private val bus: AppStateBus,
     private val selectedDate: SelectedDateStore,
+    @ApplicationContext private val context: Context,
 ) {
+    private val cacheJson = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
     private val _weekPlan = MutableStateFlow(PlanSnapshot())
     val weekPlan: StateFlow<PlanSnapshot> = _weekPlan.asStateFlow()
 
@@ -53,12 +61,13 @@ class MealPlanRepository @Inject constructor(
                 plan = plan,
                 lastUpdatedEpochMs = System.currentTimeMillis(),
             )
+            saveCachedPlan(date, plan)
             plan
         } catch (error: Throwable) {
             val parsed = ApiErrorParser.fromThrowable(error)
             val missing = parsed.code == "meal_plan_not_found" || parsed.httpStatus == 404
-            // Keep cached plan on network failure for offline UX.
-            val cached = _todayPlan.value.plan
+            // Keep cached plan (memory, then disk) on network failure for offline UX.
+            val cached = _todayPlan.value.plan ?: loadCachedPlan(date)
             _todayPlan.value = PlanSnapshot(
                 plan = if (!missing) cached else null,
                 missing = missing,
@@ -179,6 +188,27 @@ class MealPlanRepository @Inject constructor(
 
     suspend fun searchRecipes(query: String): List<DishCardDto> =
         wrap { recipeApi.search(query = query.ifBlank { null }) }
+
+    private fun saveCachedPlan(date: LocalDate, plan: MealPlanDto) {
+        runCatching {
+            context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(cacheKey(date), cacheJson.encodeToString(MealPlanDto.serializer(), plan))
+                .apply()
+        }
+    }
+
+    private fun loadCachedPlan(date: LocalDate): MealPlanDto? = runCatching {
+        context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+            .getString(cacheKey(date), null)
+            ?.let { cacheJson.decodeFromString(MealPlanDto.serializer(), it) }
+    }.getOrNull()
+
+    private fun cacheKey(date: LocalDate) = "plan_$date"
+
+    private companion object {
+        const val CACHE_PREFS = "foodai_plan_cache"
+    }
 
     private suspend fun <T> wrap(block: suspend () -> T): T =
         try {

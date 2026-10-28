@@ -729,6 +729,13 @@ data class ProgressSummaryDto(
 )
 
 @Serializable
+data class StreakDto(
+    @SerialName("current_days") val currentDays: Int = 0,
+    @SerialName("best_days") val bestDays: Int = 0,
+    @SerialName("last_active_date") val lastActiveDate: String? = null,
+)
+
+@Serializable
 data class WaterEntryCreateRequest(
     @SerialName("amount_ml") val amountMl: Int,
     @SerialName("recorded_on") val recordedOn: String? = null,

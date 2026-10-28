@@ -14,3 +14,14 @@ fun formatMoney(value: Double): String =
     }.format(value)
 
 fun formatGrams(value: Int): String = "$value г"
+
+/** Russian plural for a day counter: 1 день, 2 дня, 5 дней. */
+fun daysWord(value: Int): String {
+    val mod10 = value % 10
+    val mod100 = value % 100
+    return when {
+        mod10 == 1 && mod100 != 11 -> "день"
+        mod10 in 2..4 && mod100 !in 12..14 -> "дня"
+        else -> "дней"
+    }
+}

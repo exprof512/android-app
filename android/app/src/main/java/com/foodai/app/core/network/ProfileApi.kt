@@ -105,6 +105,9 @@ interface ProgressApi {
         @Query("to") to: String? = null,
     ): List<WeightEntryDto>
 
+    @GET("progress/streak")
+    suspend fun streak(): StreakDto
+
     @GET("progress/summary")
     suspend fun summary(
         @Query("date") date: String? = null,

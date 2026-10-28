@@ -6,10 +6,12 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.models import as_utc
+from app.meal_plans.models import MealPlan, MealPlanItem
+from app.nutrition.models import NutritionLog
 from app.profiles.models import Goal, UserProfile
 from app.progress.models import WeightEntry
 from app.progress.repository import ProgressRepository
@@ -17,6 +19,7 @@ from app.progress.schemas import (
     DailyNutritionBalanceOut,
     ProgressSeriesPointOut,
     ProgressSummaryOut,
+    StreakOut,
     WeightEntryCreate,
     WeightEntryOut,
 )
@@ -141,6 +144,56 @@ class ProgressService:
             series=series,
             period_days=period_days,
             warnings=warnings,
+        )
+
+    async def streak(self, user_id: UUID, *, days: int = 180) -> StreakOut:
+        from app.core.user_time import local_today_for_user
+
+        today = await local_today_for_user(self._session, user_id)
+        start = today - timedelta(days=days - 1)
+        log_rows = await self._session.execute(
+            select(NutritionLog.logged_on).where(
+                NutritionLog.user_id == user_id,
+                NutritionLog.logged_on >= start,
+            )
+        )
+        active = set(log_rows.scalars())
+        item_rows = await self._session.execute(
+            select(MealPlanItem.planned_date)
+            .join(MealPlan, MealPlan.id == MealPlanItem.meal_plan_id)
+            .where(
+                MealPlan.user_id == user_id,
+                MealPlanItem.planned_date >= start,
+                or_(
+                    MealPlanItem.is_completed.is_(True),
+                    MealPlanItem.status == "completed",
+                ),
+            )
+        )
+        active.update(item_rows.scalars())
+        if not active:
+            return StreakOut(current_days=0, best_days=0, last_active_date=None)
+
+        cursor = today
+        if cursor not in active:
+            cursor = today - timedelta(days=1)
+        current = 0
+        while cursor in active:
+            current += 1
+            cursor -= timedelta(days=1)
+
+        best = 0
+        run = 0
+        previous: date | None = None
+        for day in sorted(active):
+            run = run + 1 if previous == day - timedelta(days=1) else 1
+            best = max(best, run)
+            previous = day
+
+        return StreakOut(
+            current_days=current,
+            best_days=best,
+            last_active_date=max(active),
         )
 
     async def _build_series(

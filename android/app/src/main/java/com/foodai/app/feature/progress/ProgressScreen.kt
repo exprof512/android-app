@@ -213,9 +213,10 @@ fun ProgressScreen(
                 verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
             ) {
                 Text("Динамика за ${state.period} дн.", style = FoodAITypography.titleMedium)
+                val weightSeries = series.filter { it.weightKg != null }
                 when {
-                    series.size >= 2 -> SeriesChart(
-                        points = series,
+                    weightSeries.size >= 2 -> SeriesChart(
+                        points = weightSeries,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(170.dp),
@@ -238,6 +239,43 @@ fun ProgressScreen(
                         "Тренд 7 дней: $sign${formatWeightValue(it)} кг",
                         style = FoodAITypography.labelSmall,
                         color = FoodAIColors.TextSecondary,
+                    )
+                }
+            }
+        }
+        item {
+            val daysWithFood = series.count { it.consumedKcal > 0 }
+            val avgKcal = if (daysWithFood > 0) {
+                series.filter { it.consumedKcal > 0 }.map { it.consumedKcal }.average().toInt()
+            } else {
+                0
+            }
+            val weights = series.mapNotNull { it.weightKg }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(FoodAIShapes.CardLarge)
+                    .background(FoodAIColors.Surface)
+                    .padding(FoodAIDimens.Space16),
+                verticalArrangement = Arrangement.spacedBy(FoodAIDimens.Space8),
+            ) {
+                Text("Итоги периода", style = FoodAITypography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    ProgressStat("Дней с едой", "$daysWithFood/${series.size}")
+                    ProgressStat(
+                        "Средние ккал",
+                        if (avgKcal > 0) formatKcal(avgKcal) else "—",
+                    )
+                    ProgressStat(
+                        "Вес",
+                        if (weights.size >= 2) {
+                            "${formatWeightValue(weights.last() - weights.first())} кг"
+                        } else {
+                            "—"
+                        },
                     )
                 }
             }
@@ -374,7 +412,7 @@ private fun SeriesChart(
     val gridColor = FoodAIColors.Divider
     val pointColor = FoodAIColors.Gold
     Canvas(modifier = modifier) {
-        val values = points.map { (it.weightKg ?: it.consumedKcal.toDouble()).toFloat() }
+        val values = points.map { it.weightKg!!.toFloat() }
         val minW = (values.minOrNull() ?: 0f) - 1f
         val maxW = (values.maxOrNull() ?: 1f) + 1f
         val range = (maxW - minW).coerceAtLeast(1f)

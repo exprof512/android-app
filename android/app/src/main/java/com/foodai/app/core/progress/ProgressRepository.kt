@@ -3,6 +3,7 @@ package com.foodai.app.core.progress
 import com.foodai.app.core.network.ApiErrorParser
 import com.foodai.app.core.network.ProgressApi
 import com.foodai.app.core.network.ProgressSummaryDto
+import com.foodai.app.core.network.StreakDto
 import com.foodai.app.core.network.WeightEntryCreateRequest
 import com.foodai.app.core.network.WeightEntryDto
 import com.foodai.app.core.profile.ProfileRepository
@@ -23,6 +24,8 @@ class ProgressRepository @Inject constructor(
 
     suspend fun listEntries(): List<WeightEntryDto> =
         wrap { progressApi.listWeightEntries() }
+
+    suspend fun streak(): StreakDto = wrap { progressApi.streak() }
 
     suspend fun addWeight(weightKg: Double, note: String? = null): WeightEntryDto {
         val entry = wrap {
