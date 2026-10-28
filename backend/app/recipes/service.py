@@ -9,9 +9,11 @@ from uuid import UUID
 from decimal import Decimal
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.meal_plans.models import MealPlan, MealPlanItem
+from app.shopping.models import ShoppingList
 from app.recipes.engine import RecipeDraft, RecipeEngine
 from app.recipes.errors import RecipeNotFound, RecipeValidationError
 from app.recipes.fingerprint import recipe_fingerprint
@@ -207,17 +209,40 @@ class RecipeService:
             ingredients=rows,
         )
         self._session.add(recipe)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError:
+            # The exact replacement already exists (e.g. user re-applied it).
+            await self._session.rollback()
+            existing = await self._repository.get_by_fingerprint(
+                recipe.recipe_fingerprint
+            )
+            if existing is None:
+                raise
+            recipe = existing
 
         plan_ids = select(MealPlan.id).where(MealPlan.user_id == user_id)
-        await self._session.execute(
-            update(MealPlanItem)
-            .where(
-                MealPlanItem.recipe_id == recipe_id,
-                MealPlanItem.meal_plan_id.in_(plan_ids),
+        items = (
+            await self._session.execute(
+                select(MealPlanItem).where(
+                    MealPlanItem.recipe_id == recipe_id,
+                    MealPlanItem.meal_plan_id.in_(plan_ids),
+                )
             )
-            .values(recipe_id=recipe.id)
-        )
+        ).scalars()
+        for item in items:
+            servings = Decimal(item.servings)
+            item.recipe_id = recipe.id
+            item.calories_kcal = int(Decimal(recipe.calories_kcal) * servings)
+            item.protein_g = (recipe.protein_g * servings).quantize(Decimal("0.01"))
+            item.fat_g = (recipe.fat_g * servings).quantize(Decimal("0.01"))
+            item.carbohydrate_g = (recipe.carbohydrate_g * servings).quantize(
+                Decimal("0.01")
+            )
+            item.estimated_cost_amount = (
+                recipe.estimated_cost_amount * servings
+            ).quantize(Decimal("0.01"))
+
         await self._session.execute(
             update(UserRecipeFavorite)
             .where(
@@ -225,6 +250,14 @@ class RecipeService:
                 UserRecipeFavorite.recipe_id == recipe_id,
             )
             .values(recipe_id=recipe.id)
+        )
+        await self._session.execute(
+            update(ShoppingList)
+            .where(
+                ShoppingList.user_id == user_id,
+                ShoppingList.meal_plan_id.in_(plan_ids),
+            )
+            .values(stale=True)
         )
         await self._session.commit()
         await self._session.refresh(recipe)
