@@ -2,6 +2,7 @@ package com.foodai.app.core.mealplan
 
 import android.content.Context
 import com.foodai.app.core.network.ApiErrorParser
+import com.foodai.app.core.network.ApplySubstitutionRequest
 import com.foodai.app.core.network.DishCardDto
 import com.foodai.app.core.network.MealPlanApi
 import com.foodai.app.core.network.MealPlanDto
@@ -173,6 +174,26 @@ class MealPlanRepository @Inject constructor(
 
     suspend fun recipe(recipeId: String): DishCardDto =
         wrap { recipeApi.getRecipe(recipeId) }
+
+    suspend fun applySubstitution(
+        recipeId: String,
+        originalName: String,
+        replacementName: String,
+    ): DishCardDto {
+        val card = wrap {
+            recipeApi.applySubstitution(
+                recipeId,
+                ApplySubstitutionRequest(
+                    originalName = originalName,
+                    replacementName = replacementName,
+                ),
+            )
+        }
+        runCatching { refreshAll(selectedDate.date.value) }
+        bus.emit(DomainEvent.PlanChanged("substitute"))
+        bus.emit(DomainEvent.ShoppingChanged())
+        return card
+    }
 
     suspend fun recipeImage(recipeId: String): RecipeImageDto =
         wrap { recipeApi.getImage(recipeId) }

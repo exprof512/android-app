@@ -68,6 +68,12 @@ interface RecipeApi {
     @GET("recipes/{recipeId}")
     suspend fun getRecipe(@Path("recipeId") recipeId: String): DishCardDto
 
+    @POST("recipes/{recipeId}/ingredient-substitutions/apply")
+    suspend fun applySubstitution(
+        @Path("recipeId") recipeId: String,
+        @Body body: ApplySubstitutionRequest,
+    ): DishCardDto
+
     @GET("recipes/{recipeId}/image")
     suspend fun getImage(@Path("recipeId") recipeId: String): RecipeImageDto
 

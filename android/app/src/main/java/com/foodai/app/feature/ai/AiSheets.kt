@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.foodai.app.core.network.AdaptDayDto
 import com.foodai.app.core.network.RecommendationCandidateDto
+import com.foodai.app.core.network.SubstitutionAlternativeDto
 import com.foodai.app.core.network.SubstitutionDto
 import com.foodai.app.core.network.VariantDto
 import com.foodai.app.core.ui.components.FoodAICard
@@ -98,6 +99,7 @@ fun AiPreviewSheet(
     onConfirmRecommendations: () -> Unit = {},
     onConfirmAdaptDay: () -> Unit = {},
     onConfirmVariant: () -> Unit = {},
+    onApplySubstitution: (SubstitutionAlternativeDto) -> Unit = {},
 ) {
     when (state) {
         AiPreviewState.Idle -> Unit
@@ -281,11 +283,14 @@ fun AiPreviewSheet(
                                 alt.reason?.let {
                                     Text(it, style = FoodAITypography.bodySmall)
                                 }
+                                TextButton(onClick = { onApplySubstitution(alt) }) {
+                                    Text("Заменить в рецепте", color = FoodAIColors.Primary)
+                                }
                             }
                         }
                     }
                     Text(
-                        "Это подсказка — рецепт сам не меняется.",
+                        "Будет создана ваша копия рецепта — остальные планы не изменятся.",
                         style = FoodAITypography.bodySmall,
                         color = FoodAIColors.TextSecondary,
                     )

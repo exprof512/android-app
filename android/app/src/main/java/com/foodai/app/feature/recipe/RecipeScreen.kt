@@ -40,6 +40,7 @@ import com.foodai.app.core.mealplan.MealPlanRepository
 import com.foodai.app.core.network.ApiException
 import com.foodai.app.core.network.DishCardDto
 import com.foodai.app.core.network.RecipeImageDto
+import com.foodai.app.core.network.SubstitutionAlternativeDto
 import com.foodai.app.core.ui.ErrorPane
 import com.foodai.app.core.ui.LoadingPane
 import com.foodai.app.core.ui.RecipeImagePane
@@ -81,6 +82,7 @@ class RecipeViewModel @Inject constructor(
 ) : ViewModel() {
     private val recipeId: String = checkNotNull(savedStateHandle["recipeId"])
     private val itemId: String? = savedStateHandle["itemId"]
+    private var activeRecipeId: String = recipeId
 
     private val _state = MutableStateFlow(RecipeUiState())
     val state: StateFlow<RecipeUiState> = _state.asStateFlow()
@@ -96,8 +98,8 @@ class RecipeViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             try {
-                val recipe = mealPlans.recipe(recipeId)
-                val image = runCatching { mealPlans.recipeImage(recipeId) }.getOrNull()
+                val recipe = mealPlans.recipe(activeRecipeId)
+                val image = runCatching { mealPlans.recipeImage(activeRecipeId) }.getOrNull()
                 _state.value = _state.value.copy(
                     loading = false,
                     recipe = recipe,
@@ -121,7 +123,7 @@ class RecipeViewModel @Inject constructor(
                 val current = _state.value.image?.status
                 if (current == "ready" || current == "failed") break
                 delay(4_000)
-                val image = runCatching { mealPlans.recipeImage(recipeId) }.getOrNull() ?: continue
+                val image = runCatching { mealPlans.recipeImage(activeRecipeId) }.getOrNull() ?: continue
                 _state.value = _state.value.copy(image = image)
                 if (image.status == "ready" || image.status == "failed") break
             }
@@ -242,6 +244,35 @@ class RecipeViewModel @Inject constructor(
         }
     }
 
+    fun applySubstitution(alternative: SubstitutionAlternativeDto) {
+        val preview = _state.value.aiPreview as? AiPreviewState.Substitution ?: return
+        val originalName = preview.preview.originalName
+        viewModelScope.launch {
+            _state.value = _state.value.copy(aiPreview = AiPreviewState.Loading, actionError = null)
+            try {
+                val card = mealPlans.applySubstitution(
+                    recipeId = activeRecipeId,
+                    originalName = originalName,
+                    replacementName = alternative.name,
+                )
+                activeRecipeId = card.id
+                val image = runCatching { mealPlans.recipeImage(card.id) }.getOrNull()
+                _state.value = _state.value.copy(
+                    recipe = card,
+                    image = image ?: _state.value.image,
+                    aiPreview = AiPreviewState.Idle,
+                    substituteIngredient = null,
+                    infoMessage = "Ингредиент заменён: ${alternative.name}",
+                )
+            } catch (error: ApiException) {
+                _state.value = _state.value.copy(
+                    aiPreview = preview,
+                    actionError = error.toUiMessage(),
+                )
+            }
+        }
+    }
+
     fun requestSubstitution(ingredientName: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(
@@ -312,6 +343,7 @@ fun RecipeRoute(
                 },
                 onVariant = viewModel::requestVariant,
                 onSubstitute = viewModel::requestSubstitution,
+                onApplySubstitution = viewModel::applySubstitution,
                 onDismissAi = viewModel::dismissAi,
                 onConfirmVariant = viewModel::confirmVariant,
                 modifier = Modifier.padding(padding),
@@ -328,6 +360,7 @@ fun RecipeScreen(
     onAskAi: () -> Unit = {},
     onVariant: (String) -> Unit = {},
     onSubstitute: (String) -> Unit = {},
+    onApplySubstitution: (SubstitutionAlternativeDto) -> Unit = {},
     onDismissAi: () -> Unit = {},
     onConfirmVariant: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -339,6 +372,7 @@ fun RecipeScreen(
             state = state.aiPreview,
             onDismiss = onDismissAi,
             onConfirmVariant = onConfirmVariant,
+            onApplySubstitution = onApplySubstitution,
         )
     }
 

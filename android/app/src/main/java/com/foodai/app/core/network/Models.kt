@@ -905,6 +905,12 @@ data class SubstitutionDto(
 )
 
 @Serializable
+data class ApplySubstitutionRequest(
+    @SerialName("original_name") val originalName: String,
+    @SerialName("replacement_name") val replacementName: String,
+)
+
+@Serializable
 data class VariantDto(
     @SerialName("recommendation_id") val recommendationId: String,
     val variant: String,
