@@ -125,6 +125,9 @@ class Recipe(UuidPrimaryKeyMixin, TimestampMixin, Base):
         ),
     )
 
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL")
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     recipe_fingerprint: Mapped[str] = mapped_column(CHAR(64), nullable=False)

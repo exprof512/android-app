@@ -10,6 +10,7 @@ from app.auth.dependencies import CurrentUser
 from app.recipes.dependencies import get_recipe_service
 from app.recipes.models import Recipe
 from app.recipes.schemas import (
+    IngredientSubstitutionApplyRequest,
     DishCardCost,
     DishCardIngredient,
     DishCardNutrition,
@@ -51,6 +52,22 @@ def _dish_card(recipe: Recipe, *, is_favorite: bool) -> DishCardResponse:
         steps=list(recipe.steps),
         is_favorite=is_favorite,
     )
+
+
+@router.post(
+    "/{recipe_id}/ingredient-substitutions/apply",
+    response_model=DishCardResponse,
+)
+async def apply_ingredient_substitution(
+    recipe_id: UUID,
+    payload: IngredientSubstitutionApplyRequest,
+    current_user: CurrentUser,
+    recipe_service: RecipeService = Depends(get_recipe_service),
+) -> DishCardResponse:
+    recipe = await recipe_service.apply_substitution(
+        current_user.id, recipe_id, payload
+    )
+    return _dish_card(recipe, is_favorite=False)
 
 
 @router.get("/favorites", response_model=list[DishCardResponse])

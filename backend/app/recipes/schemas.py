@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.schemas import DecimalOut
 
@@ -42,3 +44,9 @@ class DishCardResponse(BaseModel):
     ingredients: list[DishCardIngredient]
     steps: list[str]
     is_favorite: bool
+
+
+class IngredientSubstitutionApplyRequest(BaseModel):
+    original_name: str = Field(min_length=1, max_length=255)
+    replacement_name: str = Field(min_length=1, max_length=255)
+    quantity_g: Decimal | None = Field(default=None, gt=0, le=5000)

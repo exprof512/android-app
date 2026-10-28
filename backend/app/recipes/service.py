@@ -6,11 +6,18 @@ import logging
 from dataclasses import dataclass
 from uuid import UUID
 
+from decimal import Decimal
+
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.meal_plans.models import MealPlan, MealPlanItem
 from app.recipes.engine import RecipeDraft, RecipeEngine
+from app.recipes.errors import RecipeNotFound, RecipeValidationError
+from app.recipes.fingerprint import recipe_fingerprint
 from app.recipes.errors import RecipeNotFound
-from app.recipes.models import Recipe, RecipeIngredient
+from app.recipes.models import Recipe, RecipeIngredient, UserRecipeFavorite
+from app.recipes.schemas import IngredientSubstitutionApplyRequest
 from app.recipes.repository import RecipeRepository
 
 logger = logging.getLogger(__name__)
@@ -84,6 +91,145 @@ class RecipeService:
         await self._session.commit()
         logger.info("recipe_created", extra={"recipe_id": str(recipe.id)})
         return StoredRecipe(recipe=recipe, reused=False, warnings=canonical.warnings)
+
+    async def apply_substitution(
+        self,
+        user_id: UUID,
+        recipe_id: UUID,
+        payload: IngredientSubstitutionApplyRequest,
+    ) -> Recipe:
+        in_plans = await self._repository.user_has_recipe_in_plans(user_id, recipe_id)
+        favorite = await self._repository.is_favorite(user_id, recipe_id)
+        if not (in_plans or favorite):
+            raise RecipeNotFound()
+
+        source = await self._repository.get_recipe(recipe_id)
+        if source is None:
+            raise RecipeNotFound()
+        target = next(
+            (
+                item
+                for item in source.ingredients
+                if item.display_name.strip().lower() == payload.original_name.strip().lower()
+            ),
+            None,
+        )
+        if target is None:
+            raise RecipeValidationError(
+                [{"field": "original_name", "reason": "not_found"}]
+            )
+
+        catalog = await self._repository.active_catalog()
+        replacement = next(
+            (
+                item
+                for item in catalog.values()
+                if item.canonical_name.strip().lower()
+                == payload.replacement_name.strip().lower()
+                or item.normalized_name == payload.replacement_name.strip().lower()
+            ),
+            None,
+        )
+        if replacement is None:
+            raise RecipeValidationError(
+                [{"field": "replacement_name", "reason": "not_found"}]
+            )
+
+        quantity_g = (
+            Decimal(str(payload.quantity_g))
+            if payload.quantity_g is not None
+            else target.quantity_g
+        )
+        by_name = {item.canonical_name.strip().lower(): item for item in catalog.values()}
+        calories = Decimal("0")
+        protein = Decimal("0")
+        fat = Decimal("0")
+        carbs = Decimal("0")
+        cost = Decimal("0")
+        rows: list[RecipeIngredient] = []
+        for item in source.ingredients:
+            name = (
+                replacement.canonical_name
+                if item.id == target.id
+                else item.display_name
+            )
+            grams = quantity_g if item.id == target.id else item.quantity_g
+            catalog_item = replacement if item.id == target.id else by_name.get(
+                item.display_name.strip().lower()
+            )
+            ingredients_copy = RecipeIngredient(
+                ingredient_id=replacement.id if item.id == target.id else item.ingredient_id,
+                display_name=name,
+                quantity_g=grams,
+                quantity_value=quantity_g if item.id == target.id else item.quantity_value,
+                unit="g" if item.id == target.id else item.unit,
+                cost_amount=(
+                    replacement.reference_price_per_100g * grams / Decimal("100")
+                    if item.id == target.id
+                    and replacement.reference_price_per_100g is not None
+                    else (item.cost_amount if item.id != target.id else None)
+                ),
+                sort_order=item.sort_order,
+            )
+            rows.append(ingredients_copy)
+            if catalog_item is not None:
+                factor = grams / Decimal("100")
+                calories += catalog_item.calories_per_100g * factor
+                protein += catalog_item.protein_per_100g * factor
+                fat += catalog_item.fat_per_100g * factor
+                carbs += catalog_item.carbohydrate_per_100g * factor
+            if ingredients_copy.cost_amount is not None:
+                cost += ingredients_copy.cost_amount
+
+        servings = Decimal(source.servings)
+        recipe = Recipe(
+            created_by_user_id=user_id,
+            name=source.name,
+            description=source.description,
+            recipe_fingerprint=recipe_fingerprint(
+                name=source.name,
+                cooking_method=source.cooking_method,
+                servings=source.servings,
+                ingredients=[(row.ingredient_id, row.quantity_g) for row in rows],
+            ),
+            cooking_method=source.cooking_method,
+            cook_time_minutes=source.cook_time_minutes,
+            servings=source.servings,
+            calories_kcal=int((calories / servings).to_integral_value()),
+            protein_g=(protein / servings).quantize(Decimal("0.01")),
+            fat_g=(fat / servings).quantize(Decimal("0.01")),
+            carbohydrate_g=(carbs / servings).quantize(Decimal("0.01")),
+            estimated_cost_amount=(cost / servings).quantize(Decimal("0.01")),
+            currency=source.currency,
+            steps=list(source.steps),
+            status="ready",
+            ai_model=source.ai_model,
+            ingredients=rows,
+        )
+        self._session.add(recipe)
+        await self._session.flush()
+
+        plan_ids = select(MealPlan.id).where(MealPlan.user_id == user_id)
+        await self._session.execute(
+            update(MealPlanItem)
+            .where(
+                MealPlanItem.recipe_id == recipe_id,
+                MealPlanItem.meal_plan_id.in_(plan_ids),
+            )
+            .values(recipe_id=recipe.id)
+        )
+        await self._session.execute(
+            update(UserRecipeFavorite)
+            .where(
+                UserRecipeFavorite.user_id == user_id,
+                UserRecipeFavorite.recipe_id == recipe_id,
+            )
+            .values(recipe_id=recipe.id)
+        )
+        await self._session.commit()
+        await self._session.refresh(recipe)
+        logger.info("recipe_substituted", extra={"recipe_id": str(recipe.id)})
+        return recipe
 
     async def dish_card(self, user_id: UUID, recipe_id: UUID) -> tuple[Recipe, bool]:
         recipe = await self._readable_recipe(recipe_id)
