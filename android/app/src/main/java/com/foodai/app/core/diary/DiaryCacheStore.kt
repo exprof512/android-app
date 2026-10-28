@@ -18,6 +18,14 @@ class DiaryCacheStore @Inject constructor(
         encodeDefaults = true
     }
 
+    init {
+        // Drop pre-user-scoping keys: they may belong to a previous account.
+        val legacy = prefs.all.keys.filter { !it.contains(':') }
+        if (legacy.isNotEmpty()) {
+            prefs.edit().apply { legacy.forEach { remove(it) } }.apply()
+        }
+    }
+
     fun save(userId: String?, date: String, logs: List<NutritionLogDto>) {
         runCatching {
             prefs.edit()

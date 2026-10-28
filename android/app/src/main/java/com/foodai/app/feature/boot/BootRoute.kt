@@ -35,6 +35,11 @@ class BootViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
     private val prefs = context.getSharedPreferences("foodai_boot", Context.MODE_PRIVATE)
+
+    init {
+        prefs.edit().remove("profile_complete").apply()
+    }
+
     private val _destination = MutableStateFlow<BootDestination>(BootDestination.Loading)
     val destination: StateFlow<BootDestination> = _destination.asStateFlow()
 

@@ -50,6 +50,15 @@ class MealPlanRepository @Inject constructor(
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
+
+    init {
+        val prefs = context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
+        val legacy = prefs.all.keys.filter { !it.contains(':') }
+        if (legacy.isNotEmpty()) {
+            prefs.edit().apply { legacy.forEach { remove(it) } }.apply()
+        }
+    }
+
     private val _weekPlan = MutableStateFlow(PlanSnapshot())
     val weekPlan: StateFlow<PlanSnapshot> = _weekPlan.asStateFlow()
 
