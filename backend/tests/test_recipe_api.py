@@ -9,11 +9,13 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.models import User
 from app.core.services import Services
 from app.recipes.engine import IngredientDraft, RecipeDraft, RecipeEngine
 from app.recipes.errors import RecipeValidationError
 from app.recipes.models import Ingredient, Recipe, RecipeIngredient, UserRecipeFavorite
 from app.recipes.repository import RecipeRepository
+from app.recipes.schemas import IngredientSubstitutionApplyRequest
 from app.recipes.service import RecipeService
 from tests.conftest import API_PREFIX, TEST_PASSWORD
 
@@ -329,3 +331,42 @@ async def test_invalid_recipe_id_uses_the_validation_envelope(
 
 async def test_recipe_ids_are_uuids(recipe: Recipe) -> None:
     assert isinstance(recipe.id, UUID)
+
+
+async def _user_by_email(session: AsyncSession, email: str) -> User:
+    return (
+        await session.execute(select(User).where(User.email == email))
+    ).scalar_one()
+
+
+@pytest.mark.asyncio
+async def test_substitution_copy_is_reused_between_users(
+    catalog,
+    recipe: Recipe,
+    recipe_service: RecipeService,
+    session: AsyncSession,
+    client: AsyncClient,
+) -> None:
+    await register(client, "sub-a@example.com")
+    await register(client, "sub-b@example.com")
+    user_a = await _user_by_email(session, "sub-a@example.com")
+    user_b = await _user_by_email(session, "sub-b@example.com")
+
+    session.add(UserRecipeFavorite(user_id=user_a.id, recipe_id=recipe.id))
+    await session.commit()
+
+    payload = IngredientSubstitutionApplyRequest(
+        original_name="Рис", replacement_name="Куриная грудка"
+    )
+    first = await recipe_service.apply_substitution(user_a.id, recipe.id, payload)
+    assert first.id != recipe.id
+    assert first.created_by_user_id == user_a.id
+    assert any(
+        item.display_name == "Куриная грудка" for item in first.ingredients
+    )
+
+    session.add(UserRecipeFavorite(user_id=user_b.id, recipe_id=recipe.id))
+    await session.commit()
+    second = await recipe_service.apply_substitution(user_b.id, recipe.id, payload)
+
+    assert second.id == first.id
