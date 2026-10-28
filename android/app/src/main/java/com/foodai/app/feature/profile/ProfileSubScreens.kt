@@ -193,18 +193,19 @@ fun SettingsRoute(
                 Spacer(Modifier.height(FoodAIDimens.Space12))
                 Text("Тема", style = FoodAITypography.titleMedium)
                 Spacer(Modifier.height(FoodAIDimens.Space8))
-                listOf(
-                    com.foodai.app.core.ui.theme.ThemeMode.SYSTEM to "Системная",
-                    com.foodai.app.core.ui.theme.ThemeMode.LIGHT to "Светлая",
-                    com.foodai.app.core.ui.theme.ThemeMode.DARK to "Тёмная",
-                ).forEach { (mode, label) ->
-                    TextButton(
-                        onClick = { themePrefs.setMode(mode) },
-                        enabled = themeMode != mode,
-                    ) {
-                        Text(
-                            if (themeMode == mode) "✓ $label" else label,
-                            color = FoodAIColors.Primary,
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        com.foodai.app.core.ui.theme.ThemeMode.SYSTEM to "Системная",
+                        com.foodai.app.core.ui.theme.ThemeMode.LIGHT to "Светлая",
+                        com.foodai.app.core.ui.theme.ThemeMode.DARK to "Тёмная",
+                    ).forEach { (mode, label) ->
+                        androidx.compose.material3.FilterChip(
+                            selected = themeMode == mode,
+                            onClick = { themePrefs.setMode(mode) },
+                            label = { Text(label) },
+                            colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = FoodAIColors.PrimaryLight,
+                            ),
                         )
                     }
                 }
