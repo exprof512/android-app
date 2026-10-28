@@ -1,6 +1,7 @@
 package com.foodai.app.core.auth
 
 import com.foodai.app.core.metrics.DailyMetricsStore
+import com.foodai.app.core.prices.PriceBookStore
 import com.foodai.app.core.profile.UserProfileStore
 import com.foodai.app.feature.onboarding.OnboardingDraftStore
 import dagger.Binds
@@ -21,11 +22,13 @@ class DefaultLocalSessionCleaner @Inject constructor(
     private val draftStore: OnboardingDraftStore,
     private val metricsStore: DailyMetricsStore,
     private val userProfileStore: UserProfileStore,
+    private val priceBook: PriceBookStore,
 ) : LocalSessionCleaner {
     override fun clearBeforeNewSession() {
         draftStore.clearAll()
         metricsStore.clearAll()
         userProfileStore.clearAll()
+        priceBook.clearAll()
     }
 
     override fun clearOnLogout(userId: String?) {
@@ -33,10 +36,12 @@ class DefaultLocalSessionCleaner @Inject constructor(
             draftStore.clear(userId)
             metricsStore.clearUser(userId)
             userProfileStore.clearUser(userId)
+            priceBook.clearAll()
         } else {
             draftStore.clearAll()
             metricsStore.clearAll()
             userProfileStore.clearAll()
+            priceBook.clearAll()
         }
     }
 }

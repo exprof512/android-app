@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.Authenticator
@@ -49,7 +50,9 @@ class TokenAuthenticator @Inject constructor(
                 .header("Authorization", "Bearer $currentAccess")
                 .build()
         }
-        val refreshed = runBlocking { refreshCoordinator.refresh() } ?: return null
+        val refreshed = runBlocking {
+            withTimeoutOrNull(10_000) { refreshCoordinator.refresh() }
+        } ?: return null
         return response.request.newBuilder()
             .header("Authorization", "Bearer ${refreshed.accessToken}")
             .build()

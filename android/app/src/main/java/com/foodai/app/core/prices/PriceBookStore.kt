@@ -58,6 +58,10 @@ class PriceBookStore @Inject constructor(
         write(next)
     }
 
+    fun clearAll() {
+        prefs.edit().clear().apply()
+    }
+
     fun remove(store: String, product: String) {
         write(prices().filterNot { it.store == store && it.product.equals(product, ignoreCase = true) })
     }
